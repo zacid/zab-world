@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 3;
+export const SIM_VERSION = 4;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -44,6 +44,27 @@ export const TECHS = {
   fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
   granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
 };
+
+// ---------- weather ----------
+// One state per day, a Markov chain: a spell holds with `stay`, otherwise the season's odds pick
+// tomorrow. Bad days come in runs. Lists, not object keys, so the order never depends on the engine.
+export const WEATHER = {
+  clear: { name: 'clear', stay: 0.7 },
+  rain:  { name: 'rain', stay: 0.55 },
+  storm: { name: 'storm', stay: 0.4 },
+  heat:  { name: 'heatwave', stay: 0.72 },
+  cold:  { name: 'cold snap', stay: 0.66 },
+  snow:  { name: 'snow', stay: 0.6 },
+};
+const WX_ODDS = [ // per season, weights out of 100
+  [['clear', 55], ['rain', 34], ['storm', 5], ['cold', 6]],
+  [['clear', 56], ['rain', 20], ['storm', 9], ['heat', 15]],
+  [['clear', 46], ['rain', 34], ['storm', 12], ['cold', 8]],
+  [['clear', 42], ['snow', 34], ['cold', 16], ['storm', 8]],
+];
+const WX_GROW = { clear: 1, rain: 1.25, storm: 1, heat: 0.4, cold: 0.5, snow: 0 };
+const STORM_FLATTEN = 0.03;  // chance per storm day that a tall or ripe field is flattened
+const STORM_ROOF = 0.15;    // chance per storm day that one building loses its roof
 
 // ---------- randomness ----------
 export function rnd(w) {
@@ -134,7 +155,8 @@ export function genesis(seed, epoch) {
     buildings: [], fields: [], people: [], nextId: 1, res: {}, prog: {},
     techs: ['fire', 'shelter', 'gather', 'farming', 'woodcut'],
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
-    stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, hungry: false, cold: false },
+    stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
+    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
   };
   // name the island
   let nm = '';
@@ -303,15 +325,17 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
-    w.stats.yb = w.stats.yd = w.stats.yh = 0;
+    w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) if (f.stage === 'harvested') f.stage = 'fallow';
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; }
   }
+  weather(w, c);
+  const wx = w.wx.k;
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
@@ -320,13 +344,15 @@ function daily(w, c, fx) {
   }
   // growth
   if (c.season < 3) {
+    const g = WX_GROW[wx] / GROW_DAYS;
     for (const f of w.fields) if (f.stage === 'planted') {
-      f.growth = Math.min(1, Math.round((f.growth + 1 / GROW_DAYS) * 10000) / 10000);
+      f.growth = Math.min(1, Math.round((f.growth + g) * 10000) / 10000);
       if (f.growth >= 1) f.stage = 'ripe';
     }
-    w.wild = Math.min(WILD_CAP, w.wild + WILD_REGEN);
+    w.wild = Math.min(WILD_CAP, w.wild + (wx === 'heat' ? WILD_REGEN / 2 : wx === 'rain' ? WILD_REGEN + 2 : WILD_REGEN));
   }
-  if (w.shore) w.fish = Math.min(FISH_CAP, w.fish + (c.season < 3 ? FISH_REGEN : 2));
+  // a storm churns the shallows; snow and ice slow the fish
+  if (w.shore) w.fish = Math.min(FISH_CAP, w.fish + (wx === 'storm' ? 0 : wx === 'snow' ? 1 : c.season < 3 ? FISH_REGEN : 2));
   // forests regrow
   for (let k = 0; k < 60; k++) {
     const x = ri(w, MAP), y = ri(w, MAP), i = idx(x, y);
@@ -337,10 +363,11 @@ function daily(w, c, fx) {
       w.tiles[i] = T.FOREST; w.wood[i] = 1;
     }
   }
-  // winter fuel
-  if (c.season === 3) {
+  // winter fuel; a cold snap doubles it, and even out of winter it sends people to the woodpile
+  const burn = c.season === 3 ? (wx === 'cold' ? 2 : wx === 'snow' ? 1.3 : 1) : wx === 'cold' ? 0.5 : 0;
+  if (burn > 0) {
     const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && w.people.some((p) => p.home === b.id)).length;
-    const need = homes * FUEL_PER_HOUSE;
+    const need = Math.round(homes * FUEL_PER_HOUSE * burn * 100) / 100;
     if (w.timber >= need) { w.timber = Math.round((w.timber - need) * 100) / 100; if (w.stats.cold) { w.stats.cold = false; log(w, 'Every hearth is lit again.', 'good'); } }
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
   } else w.stats.cold = false;
@@ -380,6 +407,76 @@ function daily(w, c, fx) {
   }
 }
 
+// ---------- the sky ----------
+const COUNT = ['', 'A day', 'Two days', 'Three days', 'Four days', 'Five days', 'Six days', 'A week'];
+const spellLen = (n) => COUNT[n] || (n === 14 ? 'Two weeks' : `${n} days`);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+function weather(w, c) {
+  const s = w.wx;
+  const odds = WX_ODDS[c.season];
+  const fits = odds.some(([k]) => k === s.k);
+  let next = s.k;
+  if (!fits || rnd(w) >= WEATHER[s.k].stay) {
+    let r = rnd(w) * 100;
+    next = odds[odds.length - 1][0];
+    for (const [k, p] of odds) { if (r < p) { next = k; break; } r -= p; }
+  }
+  if (next === s.k) s.n++;
+  else {
+    endSpell(w, s);
+    w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
+    if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
+    else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
+    else if (next === 'heat') log(w, 'The sun beats down. The soil cracks.', 'info');
+  }
+  if (w.wx.k === 'storm') storm(w);
+}
+
+function storm(w) {
+  const s = w.wx;
+  w.stats.ys = (w.stats.ys || 0) + 1;
+  // wind lays tall grain flat; it can't be sown again until spring
+  for (const f of w.fields) {
+    if (f.stage !== 'ripe' && !(f.stage === 'planted' && f.growth >= 0.5)) continue;
+    if (rnd(w) < STORM_FLATTEN) { f.stage = 'fallow'; f.growth = 0; f.flat = 1; s.f++; w.stats.yf = (w.stats.yf || 0) + 1; }
+  }
+  // and now and then it takes a roof
+  if (rnd(w) < STORM_ROOF) {
+    const standing = w.buildings.filter((b) => b.progress >= 1);
+    if (standing.length) {
+      const b = standing[ri(w, standing.length)];
+      b.progress = 0.75; b.dmg = 1; s.r++;
+    }
+  }
+}
+
+// a spell ends: tell the chronicle if it was one people will remember
+function endSpell(w, s) {
+  const n = s.n, len = spellLen(n);
+  let text = null, k = 'bad', big = false;
+  if (s.k === 'storm' && (n >= 3 || s.f || s.r)) {
+    const hurt = [];
+    if (s.f) hurt.push(`${plural(s.f, 'field', 'fields')} flattened`);
+    if (s.r) hurt.push(`${plural(s.r, 'roof', 'roofs')} torn away`);
+    text = n === 1 ? `A storm tears across ${w.name}` : `${len} of storms batter ${w.name}`;
+    text += hurt.length ? `: ${hurt.join(', ')}.` : ', but the village holds.';
+    big = n >= 7 || s.r >= 3 || s.f >= Math.max(10, w.fields.length >> 3);
+  } else if (s.k === 'heat' && n >= 7) {
+    text = `${len} of blazing heat break at last. The grain stood still in the sun.`;
+    big = n >= 18 || s.d >= 2;
+  } else if (s.k === 'cold' && n >= 6) {
+    text = `${len} of bitter cold lift.` + (s.d ? ` ${plural(s.d, 'soul was', 'souls were')} lost to it.` : ' Every hearth was kept burning.');
+    big = n >= 15 || s.d >= 2;
+  } else if (s.k === 'snow' && n >= 5) {
+    text = `${len} of snow end. Drifts lie deep against the houses.`; k = 'info';
+  } else if (s.k === 'rain' && n >= 7) {
+    text = `${len} of rain end. The fields have drunk deep.`; k = 'good';
+  }
+  if (!text) return;
+  if (big) milestone(w, text); else log(w, text, k);
+}
+
 function die(w, p, why) {
   p.dead = true;
   release(w, p);
@@ -390,15 +487,24 @@ function die(w, p, why) {
 
 function lifeAndDeath(w, c) {
   const pop = w.people.length;
+  const wx = w.wx ? w.wx.k : 'clear';
+  const bitter = wx === 'cold' && c.season === 3; // a deep frost reaches the frail even by the fire
   for (const p of w.people) {
     if (p.dead) continue;
     const a = ageY(w, p);
+    const frail = a < 6 || a > 55;
     let risk = 0.00003;
     if (a > 45) { const k = (a - 45) / 30; risk += k * k * k * 0.012; }
     if (a < 2) risk += 0.0002;
-    if (w.stats.cold && (a < 6 || a > 55)) risk += 0.006;
+    if (w.stats.cold && frail) risk += 0.006;
+    if (bitter && frail) risk += 0.0008;
+    if (wx === 'heat' && a > 65) risk += 0.0006;
     if (p.hunger > 12) risk += 0.0015 * (p.hunger - 12) * (a < 6 || a > 60 ? 2 : 1);
-    if (rnd(w) < risk) die(w, p, p.hunger > 12 ? 'starved' : w.stats.cold && (a < 6 || a > 55) ? 'died of the cold' : 'passed away');
+    if (rnd(w) < risk) {
+      const why = p.hunger > 12 ? 'starved' : (w.stats.cold || bitter) && frail ? 'died of the cold' : wx === 'heat' && a > 65 ? 'died in the heat' : 'passed away';
+      if (why !== 'passed away' && w.wx) w.wx.d++;
+      die(w, p, why);
+    }
   }
   // births
   for (const p of w.people) {
@@ -628,7 +734,8 @@ function act(w, p, c, fx) {
   const a = ageY(w, p), h = c.hour;
   const night = h >= 21 || h < 6;
   const evening = h >= 18 && h < 21;
-  if (night) {
+  const storm = w.wx && w.wx.k === 'storm';
+  if (night || storm) { // in a storm nobody works outdoors: they wait it out at home
     if (p.task && p.task.k !== 'home') release(w, p);
     const home = homeOf(w, p);
     const off = (p.id % 3) * 0.25 - 0.25;
@@ -671,13 +778,16 @@ function finish(w, p, t, c, fx) {
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
-    if (f && f.stage === 'fallow') { f.stage = 'planted'; f.growth = 0; pop('sown', 'muted'); }
+    if (f && f.stage === 'fallow') { f.stage = 'planted'; f.growth = 0; delete f.flat; pop('sown', 'muted'); }
   } else if (t.k === 'build') {
     const b = w.buildings.find((o) => 'b' + o.id === t.key);
     if (!b || b.progress >= 1) return;
     b.progress = Math.min(1, Math.round((b.progress + 4 / (b.kind === 'granary' ? GRANARY_WORK : HOUSE_WORK)) * 1000) / 1000);
     pop('+' + Math.round(b.progress * 100) + '%', 'build');
-    if (b.progress >= 1 && b.kind === 'granary') {
+    if (b.progress >= 1 && b.dmg) {
+      delete b.dmg;
+      log(w, b.kind === 'granary' ? 'The granary roof is thatched again.' : 'A storm-torn roof is mended.', 'good');
+    } else if (b.progress >= 1 && b.kind === 'granary') {
       const n = w.buildings.filter((o) => o.kind === 'granary' && o.progress >= 1).length;
       if (n === 1) milestone(w, `The first granary stands on ${w.name}, its floor raised above the damp.`);
       else log(w, `A granary is finished. ${n} now guard the harvest.`, 'good');
@@ -738,6 +848,15 @@ const MIGRATIONS = {
         : `The islanders learn to keep grain dry in raised granaries.`);
     }
   },
+  // v3 -> v4: weather. The sky gets moods; storms, frosts and heat now come in spells.
+  3: (w) => {
+    w.wx = { k: 'clear', n: 1, f: 0, r: 0, d: 0 };
+    w.stats.ys = 0; w.stats.yf = 0;
+    const who = w.people.filter((p) => ageY(w, p) >= 14).sort((a, b) => a.born - b.born || a.id - b.id)[0];
+    milestone(w, who
+      ? `${who.name} watches the clouds pile up over the sea and says the gentle days are over. From now on the sky brings rain, storms, heat and hard frost.`
+      : `Clouds pile up over the sea. From now on the sky brings rain, storms, heat and hard frost.`);
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -759,6 +878,8 @@ export function summary(w) {
     houses: w.buildings.filter((b) => b.progress >= 1 && isHouse(b)).length, fields: w.fields.length,
     granaries: w.buildings.filter((b) => b.progress >= 1 && b.kind === 'granary').length, safe: storeCap(w),
     births: w.stats.births, deaths: w.stats.deaths, peak: w.stats.peak,
+    weather: w.wx ? WEATHER[w.wx.k].name : 'clear', weatherDays: w.wx ? w.wx.n : 1,
+    roofsDown: w.buildings.filter((b) => b.dmg && isHouse(b)).length,
   };
 }
 

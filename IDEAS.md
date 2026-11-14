@@ -2,15 +2,6 @@
 
 ## Owner requests (do these next, one per visit)
 
-### Weather
-- A daily weather state per season (clear, rain, storm, heatwave, cold snap, snow), chosen with
-  `rnd(w)` as a simple Markov chain so bad days come in runs.
-- Effects: cold snaps burn more firewood and raise cold deaths; storms stop outdoor work and can
-  flatten a ripe field or damage a house; heatwaves and dry spells slow crop growth; rain helps it.
-- Visible: rain and snow particles, storm flashes, a darker sky, snow settling on roofs. Show
-  today's weather next to the date. Log notable spells in the chronicle ("A week of storms...").
-- Survivable but felt: a hard year should cost a few lives and some stores, not the village.
-
 ### Creatures
 - Wolves live in the deep forest. In winter and at night they come to the forest edge; a villager
   out alone far from the fire can be attacked (rare, and mostly the unlucky or careless).
@@ -51,3 +42,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
 - Granary discovery triggers in year 1 on new worlds (open heap >= 1000). Could tie it to a first
   visible loss instead (a "rats in the grain" event) so it feels earned.
 - Speed: one 100-year run took 934 ms/yr on average once pop passed 300; findFieldSite is still the hot spot.
+- Weather is done (w.wx: k, n days, f fields flattened, r roofs, d deaths). Answers it invites:
+  weather lore (elders read the sky: harvest ripe fields before a storm, stack wood before a frost),
+  stone or thatch-pegged roofs that resist storms, irrigation ditches against heatwaves, a storm cellar.
+- Storms could wreck fishers caught on the shore, or wash up driftwood / a castaway boat.
+- Snow could slow walking and pile up on the map (white tiles that melt in spring); rainbows after rain.
+- Spring cold snaps can run 15-20 days; a late frost could kill young shoots outright for real drama.
+- Yearly history now records `storms` (storm days) and `flattened` (fields); a weather row in the
+  graph panel would show bad years at a glance.

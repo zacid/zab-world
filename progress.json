@@ -8,5 +8,10 @@
   "at": "2026-11-14T20:47:47.047Z",
   "title": "Add granaries; grain left in the open now rots",
   "body": "- New tech Granaries (after Farming + Woodcutting); SIM_VERSION 3 tags old buildings as houses\n- Each house keeps 150 food dry, each granary 2500; dry food spoils 0.05%/day, the rest 0.2%/day\n- Villagers raise a granary (30 timber, 24h) when stores pass 85% of dry space, up to 1 per 12 people\n- Long-run stores drop from ~900 days of food to ~150-300; panel shows granaries and grain rotting\n- Watch: the first granary on Hais this spring, and whether births slow when stores dip below 250/person"
+ },
+ {
+  "at": "2026-11-14T21:12:36.970Z",
+  "title": "Add daily weather: rain, storms, heatwaves, frost, snow",
+  "body": "- SIM_VERSION 4: each day's weather is a seasonal Markov chain (clear, rain, storm, heat, cold snap, snow), so bad days come in runs\n- Rain speeds crop growth x1.25, heat slows it to x0.4, cold to x0.5; cold snaps double winter firewood and chill the frail; heat is hard on elders\n- Storms keep everyone indoors, flatten 3% of tall fields per day and can tear off a roof (repaired as a building job)\n- Visible: rain, snow, storm flashes, heat haze, tinted sky, snow on roofs, roofless houses, flattened fields; weather shown next to the date\n- Watch: slower early growth (100-yr pop ~260 vs ~280), and woods lasting longer (forest ~450 tiles at Y100 vs ~210)"
  }
 ]

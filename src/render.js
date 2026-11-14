@@ -106,6 +106,8 @@ function drawTerrain() {
       for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) { px(tc, X + k * 2, Y + r * 2, '#e6c14a', 1, 2); px(tc, X + k * 2, Y + r * 2, '#f7dc78'); }
     } else if (f.stage === 'harvested') {
       for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) px(tc, X + k * 2, Y + r * 2 + 1, '#b59b5c');
+    } else if (f.flat) { // storm-flattened grain lying in the mud
+      for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
     }
   }
   // fire ring, stores
@@ -124,14 +126,24 @@ function drawTerrain() {
       if (pal.snow && b.progress >= 1) px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
       continue;
     }
+    if (b.dmg) { // storm took the roof: walls stand, rafters show through
+      sprite(tc, HOUSE, b.x * TILE, b.y * TILE, HCOL);
+      for (const [hx, hy] of [[3, 1], [4, 1], [2, 2], [4, 2], [5, 2], [3, 3]]) px(tc, b.x * TILE + hx, b.y * TILE + hy, '#2a1c14');
+      px(tc, b.x * TILE + 1, b.y * TILE + 3, '#9a6a3c', 6, 1);
+      continue;
+    }
     if (b.progress >= 1) sprite(tc, HOUSE, b.x * TILE, b.y * TILE, HCOL);
     else {
       sprite(tc, FRAME, b.x * TILE, b.y * TILE, HCOL);
       if (b.progress > 0.5) sprite(tc, HOUSE.slice(0, 4), b.x * TILE, b.y * TILE, HCOL);
     }
-    if (pal.snow && b.progress >= 1) px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
+    if (pal.snow && b.progress >= 1) {
+      px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
+      if (wxNow() === 'snow') { px(tc, b.x * TILE + 1, b.y * TILE + 2, '#eef3f7', 6, 1); px(tc, b.x * TILE + 3, b.y * TILE, '#eef3f7', 2, 1); }
+    }
   }
 }
+const wxNow = () => (w.wx ? w.wx.k : 'clear');
 
 // ---------- time ----------
 function nowTickF() { return (Date.now() - w.epoch) / S.TICK_MS; }
@@ -205,6 +217,10 @@ function frame() {
     }
     shown.push({ p, x, y });
   }
+  // the day's sky colours the land
+  const wx = wxNow();
+  const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)' }[wx];
+  if (tint) { sc.fillStyle = tint; sc.fillRect(0, 0, PX, PX); }
   // night
   if (dark > 0) {
     sc.fillStyle = `rgba(6,10,28,${dark.toFixed(3)})`; sc.fillRect(0, 0, PX, PX);
@@ -218,6 +234,7 @@ function frame() {
     glow(sc, fx0 + 4, fy0 + 4, 22 + Math.sin(now / 200) * 1.5, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
     sc.globalCompositeOperation = 'source-over';
   }
+  skyFx(wx, now);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(scene, view.ox, view.oy, PX * view.s, PX * view.s);
 
@@ -249,6 +266,36 @@ function frame() {
   }
   requestAnimationFrame(frame);
 }
+// rain, snow and lightning over the scene, at native pixel size so they stay crisp
+const drops = Array.from({ length: 900 }, (_, i) => ({ x: S.hash(i, 1, 31), y: S.hash(i, 2, 31), s: S.hash(i, 3, 31) }));
+function skyFx(wx, now) {
+  if (wx === 'rain' || wx === 'storm') {
+    const n = wx === 'storm' ? 900 : 380, slant = wx === 'storm' ? 2 : 1;
+    sc.fillStyle = wx === 'storm' ? 'rgba(190,210,235,0.55)' : 'rgba(160,190,225,0.45)';
+    for (let i = 0; i < n; i++) {
+      const d = drops[i], v = 0.22 + d.s * 0.12;
+      const y = (d.y * PX + now * v) % PX, x = (d.x * PX + (y * slant) / 4) % PX;
+      sc.fillRect(x | 0, y | 0, 1, 2); sc.fillRect((x + slant / 2) | 0, (y + 2) | 0, 1, 2);
+    }
+    if (wx === 'storm') { // lightning: a white flash, then a fainter echo
+      const k = Math.floor(now / 120), f = S.hash(k, 7, 77) < 0.012 ? 0.5 : S.hash(k - 1, 7, 77) < 0.012 ? 0.2 : 0;
+      if (f) { sc.fillStyle = `rgba(230,238,255,${f})`; sc.fillRect(0, 0, PX, PX); }
+    }
+  } else if (wx === 'snow') {
+    for (let i = 0; i < 420; i++) {
+      const d = drops[i], v = 0.012 + d.s * 0.014;
+      const y = (d.y * PX + now * v) % PX, x = (d.x * PX + Math.sin(now / 1100 + d.s * 6.28) * 3 + PX) % PX;
+      sc.fillStyle = d.s > 0.8 ? '#ffffff' : 'rgba(235,242,250,0.8)';
+      sc.fillRect(x | 0, y | 0, d.s > 0.8 ? 2 : 1, d.s > 0.8 ? 2 : 1);
+    }
+  } else if (wx === 'heat') { // heat haze: faint rising shimmer
+    sc.fillStyle = 'rgba(255,230,180,0.10)';
+    for (let i = 0; i < 120; i++) {
+      const d = drops[i], y = PX - ((d.y * PX + now * 0.01) % PX);
+      sc.fillRect((d.x * PX) | 0, y | 0, 3, 1);
+    }
+  }
+}
 function glow(c, x, y, r, col) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -259,12 +306,13 @@ function glow(c, x, y, r, col) {
 function updatePanels() {
   const s = S.summary(w), c = S.clock(w.t);
   $('title').textContent = w.name;
-  $('when').textContent = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00`;
+  const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>`;
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>`],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
-    ['house', 'Houses', s.houses],
+    ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
