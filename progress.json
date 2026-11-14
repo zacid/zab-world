@@ -1,1 +1,7 @@
-[]
+[
+ {
+  "at": "2026-11-14T20:33:37.399Z",
+  "title": "Add fishing from the beaches as year-round food",
+  "body": "- New tech Fishing (after Gathering); SIM_VERSION 2 marks shore tiles and stocks 240 fish\n- Idle adults fish from beach sand: 3-6 food per 4h trip, all year incl. winter\n- Fish regrow 5/day (2/day in winter); live world catches ~1700 food/yr at 13 people\n- Fishers show in teal with a rod and bobbing line; \"+n\" catches pop in teal\n- Watch: winter shore activity, and whether spring stores rise in the early years"
+ }
+]

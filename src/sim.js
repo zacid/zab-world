@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 1;
+export const SIM_VERSION = 2;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -27,6 +27,8 @@ const WILD_CAP = 300;
 const WILD_REGEN = 8;
 const FUEL_PER_HOUSE = 0.3;  // wood per winter day
 const SPOIL = 0.0005;        // share of stored food lost per day
+const FISH_CAP = 240;        // fish in the shallows around the island
+const FISH_REGEN = 5;        // per day, spring to autumn (2 in winter)
 
 export const TECHS = {
   fire:     { name: 'Fire',      desc: 'A hearth at the heart of the village. Warmth, light, cooked food.', req: [] },
@@ -34,6 +36,7 @@ export const TECHS = {
   gather:   { name: 'Gathering', desc: 'Berries, roots and nuts foraged from the wild.', req: ['fire'] },
   farming:  { name: 'Farming',   desc: 'Grain planted in spring, harvested before the frost.', req: ['gather'] },
   woodcut:  { name: 'Woodcutting', desc: 'Stone axes fell trees for timber and firewood.', req: ['fire'] },
+  fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
 };
 
 // ---------- randomness ----------
@@ -163,6 +166,9 @@ export function genesis(seed, epoch) {
   for (let y = cy - 3; y <= cy + 3; y++) for (let x = cx - 3; x <= cx + 3; x++)
     if (tile(w, x, y) === T.FOREST || tile(w, x, y) === T.SAND) { w.tiles[idx(x, y)] = T.GRASS; w.wood[idx(x, y)] = 0; }
   for (const [ax, ay] of [[0, 0], [1, 0], [-1, 0]]) w.tiles[idx(cx + ax, cy + ay)] = T.BUILD;
+  w.shore = findShore(w);
+  w.fish = FISH_CAP;
+  w.techs.push('fishing');
 
   // founders
   for (let c = 0; c < 3; c++) {
@@ -177,6 +183,16 @@ export function genesis(seed, epoch) {
   milestone(w, `${w.people.length} settlers land on ${w.name} and light a fire.`);
   w.stats.peak = w.people.length;
   return w;
+}
+
+// beach tiles touching open water: where the fishers stand. Sand never changes, so this is fixed.
+function findShore(w) {
+  const out = [];
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (tile(w, x, y) !== T.SAND) continue;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tile(w, x + a, y + b) === T.WATER)) out.push(idx(x, y));
+  }
+  return out;
 }
 
 function addPerson(w, sex, ageYears, mother, father, home) {
@@ -298,6 +314,7 @@ function daily(w, c, fx) {
     }
     w.wild = Math.min(WILD_CAP, w.wild + WILD_REGEN);
   }
+  if (w.shore) w.fish = Math.min(FISH_CAP, w.fish + (c.season < 3 ? FISH_REGEN : 2));
   // forests regrow
   for (let k = 0; k < 60; k++) {
     const x = ri(w, MAP), y = ri(w, MAP), i = idx(x, y);
@@ -479,6 +496,10 @@ function pickTask(w, p, c) {
     const tk = forage(w, p);
     if (tk) return tk;
   }
+  if (w.food < w.people.length * 20) {
+    const tk = fish(w, p);
+    if (tk) return tk;
+  }
   // construction
   let b = nearest(w.buildings, p, (o) => o.progress < 1 && free('b' + o.id));
   if (b) return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
@@ -517,7 +538,26 @@ function pickTask(w, p, c) {
     const tk = forage(w, p);
     if (tk) return tk;
   }
+  // the shore: in winter, or when the woods are picked bare
+  const tk = fish(w, p);
+  if (tk) return tk;
   return wander(w, p, w.fire.x, w.fire.y, 3, 2);
+}
+
+function fish(w, p) {
+  if (!w.shore || w.fish < 3 || !w.techs.includes('fishing')) return null;
+  let best = null, bd = 1e9;
+  const R2 = 22 * 22;
+  const fx = w.fire.x, fy = w.fire.y, px = p.x - 0.5, py = p.y - 0.5;
+  for (let k = 0; k < w.shore.length; k++) {
+    const i = w.shore[k], x = i % MAP, y = (i - x) / MAP;
+    const dd = (x - px) * (x - px) + (y - py) * (y - py);
+    if (dd >= bd || (x - fx) * (x - fx) + (y - fy) * (y - fy) > R2 || w.res['s' + i] != null) continue;
+    bd = dd; best = { x, y, i };
+  }
+  // only the nearest free spot is checked for a dry path; if the way is blocked, try another day
+  if (!best || !lineOfLand(w, p.x, p.y, best.x + 0.5, best.y + 0.5)) return null;
+  return { k: 'fish', key: 's' + best.i, x: best.x, y: best.y, h: 4 };
 }
 
 function forage(w, p) {
@@ -626,6 +666,10 @@ function finish(w, p, t, c, fx) {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
     if (got > 0) pop('+' + got, 'food');
+  } else if (t.k === 'fish') {
+    const got = Math.min(w.fish, 3 + ri(w, 4));
+    w.fish -= got; w.food += got;
+    if (got > 0) pop('+' + got, 'fish');
   }
 }
 
@@ -633,7 +677,18 @@ function finish(w, p, t, c, fx) {
 // Every rules change that alters the saved shape bumps SIM_VERSION and adds a step here.
 // The live world must always load and carry on: never reset it, never drop people.
 const MIGRATIONS = {
-  // 1: (w) => { /* v1 -> v2 */ },
+  // v1 -> v2: fishing. Mark the beaches, stock the shallows, and let someone find out.
+  1: (w) => {
+    w.shore = findShore(w);
+    w.fish = FISH_CAP;
+    if (!w.techs.includes('fishing')) {
+      w.techs.push('fishing');
+      const who = w.people.find((p) => ageY(w, p) >= 14);
+      milestone(w, who
+        ? `${who.name} wades into the shallows with a sharpened stick and comes back with fish. ${w.name} learns to fish.`
+        : `The islanders learn to spear fish in the shallows.`);
+    }
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {

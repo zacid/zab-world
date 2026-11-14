@@ -10,8 +10,8 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', idle: '#d9d9d9', gather: '#d9d9d9' };
-const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', muted: '#9aa' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', idle: '#d9d9d9', gather: '#d9d9d9' };
+const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', muted: '#9aa' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
 const FRAME = ['........', '...bb...', '..b..b..', '.b....b.', '.bbbbbb.', '.b....b.', '.b....b.', '........'];
@@ -188,6 +188,11 @@ function frame() {
     } else {
       px(sc, X + 1, Y, '#f1c9a5'); px(sc, X, Y + 1, col, 3, 2); px(sc, X + step * 2, Y + 3, '#3a3a3a', 1, 1); px(sc, X + 2 - step * 2, Y + 3, '#3a3a3a', 1, 1);
       if (p.task && !moving && ['chop', 'harvest', 'build', 'clear'].includes(p.task.k) && Math.floor(now / 300 + p.id) % 2) px(sc, X + 3, Y + 1, '#ddd', 1, 1);
+      if (p.task && p.task.k === 'fish' && !moving) { // rod held out toward the water, line bobbing
+        const bob = Math.floor(now / 500 + p.id) % 3 === 0 ? 1 : 0;
+        px(sc, X + 3, Y, '#8a5a32', 1, 1); px(sc, X + 4, Y - 1, '#8a5a32', 1, 1);
+        px(sc, X + 5, Y - 1, 'rgba(255,255,255,0.55)', 1, 3 + bob); px(sc, X + 5, Y + 2 + bob, '#e8e8e8', 1, 1);
+      }
     }
     shown.push({ p, x, y });
   }
@@ -227,7 +232,7 @@ function frame() {
     const tip = $('tip');
     if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = a < 14 ? 'playing' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', idle: 'idling', gather: 'at the fire' })[p.task ? p.task.k : 'idle'];
+      const job = a < 14 ? 'playing' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire' })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;

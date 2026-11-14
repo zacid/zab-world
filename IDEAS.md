@@ -15,3 +15,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
 - Visual: weather (rain, snowfall particles), smoke from chimneys in winter, birds, waves.
 - UI: click a villager to follow them; family tree view; timelapse of the past year.
 - Performance: spatial indexes so 1000+ villagers stay fast.
+- Performance: findFieldSite (full 64x64 scan per idle worker in spring/summer) and the timber scan in
+  pickTask dominate at 300 people (~1.6 s/yr). Cache the best field site per day; keep a forest-tile list.
+- Boats: fishing is done (shore only). Dugout canoes could fish deeper water, raise the fish cap, and later
+  carry settlers to nearby isles.
+- Smoking/drying fish: preserved catch for winter; fish spoils faster than grain once spoilage matters.
+- Food is far above need in long runs (stores reach 1-2 years of supply). Spoilage, feasts or trade
+  could give the surplus a purpose; births could depend on diet variety (grain + fish + wild food).
+- Grass vanishes: forest reclaims nearly all open land by year 25, so every new field is cleared woodland.
+  Grazing animals or coppicing could keep meadows open.
