@@ -1,5 +1,25 @@
 # Ideas backlog
 
+## Owner requests (do these next, one per visit)
+
+### Weather
+- A daily weather state per season (clear, rain, storm, heatwave, cold snap, snow), chosen with
+  `rnd(w)` as a simple Markov chain so bad days come in runs.
+- Effects: cold snaps burn more firewood and raise cold deaths; storms stop outdoor work and can
+  flatten a ripe field or damage a house; heatwaves and dry spells slow crop growth; rain helps it.
+- Visible: rain and snow particles, storm flashes, a darker sky, snow settling on roofs. Show
+  today's weather next to the date. Log notable spells in the chronicle ("A week of storms...").
+- Survivable but felt: a hard year should cost a few lives and some stores, not the village.
+
+### Creatures
+- Wolves live in the deep forest. In winter and at night they come to the forest edge; a villager
+  out alone far from the fire can be attacked (rare, and mostly the unlucky or careless).
+- Boars trample fields near the forest in summer and autumn.
+- Visible: grey wolf sprites prowling the treeline at night with glowing eyes; boars rooting in
+  fields. Villagers react: stay closer to the fire at night after an attack.
+- Leave room for later answers: hunting (food and fewer wolves), a palisade, guard dogs.
+
+
 Loose, unordered. Take whatever the island needs most; add new ideas at the bottom.
 
 - Fishing: shore tiles, boats later; steady food that doesn't depend on harvest.
