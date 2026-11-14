@@ -155,6 +155,21 @@ function nearBuild(w, x, y, r) {
 }
 const d2 = (ax, ay, bx, by) => (ax - bx) * (ax - bx) + (ay - by) * (ay - by);
 
+// ---------- lookup caches ----------
+// Derived data only, never saved and never consulted for anything but speed: a world loaded from JSON
+// gets a fresh cache and makes exactly the same choices. Change tiles in the step path only through
+// setTile(), so cached searches that depend on the map know to start over.
+const CACHE = new WeakMap();function cacheOf(w) {
+  let c = CACHE.get(w);
+  if (!c) { c = { tv: 0, siteTv: -1, site: null, shoreOf: null, shore: null }; CACHE.set(w, c); }
+  return c;
+}
+function setTile(w, i, t) {
+  w.tiles[i] = t;
+  const c = CACHE.get(w);
+  if (c) c.tv++;
+}
+
 // ---------- logging ----------
 function log(w, text, k = 'info') {
   w.log.push({ t: w.t, s: stamp(w), text, k });
@@ -274,12 +289,18 @@ function addBuilding(w, progress, kind = 'house') {
   if (!s) return null;
   w.timber += w.wood[idx(s.x, s.y)];
   w.wood[idx(s.x, s.y)] = 0;
-  w.tiles[idx(s.x, s.y)] = T.BUILD;
+  setTile(w, idx(s.x, s.y), T.BUILD);
   const b = { id: w.nextId++, kind, x: s.x, y: s.y, progress };
   w.buildings.push(b);
   return b.id;
 }
+// the best spot for a new field depends only on the map, so it is worked out again only when a tile changes
 function findFieldSite(w) {
+  const c = cacheOf(w);
+  if (c.siteTv !== c.tv) { c.site = scanFieldSite(w); c.siteTv = c.tv; }
+  return c.site && { x: c.site.x, y: c.site.y };
+}
+function scanFieldSite(w) {
   let best = null, bs = 1e9;
   const { x: fx, y: fy } = w.fire;
   for (let y = 1; y < MAP - 1; y++) for (let x = 1; x < MAP - 1; x++) {
@@ -299,7 +320,7 @@ function findFieldSite(w) {
 function addField(w, at) {
   const s = at || findFieldSite(w);
   if (!s) return null;
-  w.tiles[idx(s.x, s.y)] = T.FIELD;
+  setTile(w, idx(s.x, s.y), T.FIELD);
   const f = { id: w.nextId++, x: s.x, y: s.y, stage: 'fallow', growth: 0 };
   w.fields.push(f);
   return f;
@@ -385,7 +406,7 @@ function daily(w, c, fx) {
     else if (w.tiles[i] === T.GRASS && rnd(w) < 0.05 && !nearBuild(w, x, y, 1) &&
       ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tile(w, x + a, y + b) === T.FIELD) &&
       [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tile(w, x + a, y + b) === T.FOREST)) {
-      w.tiles[i] = T.FOREST; w.wood[i] = 1;
+      setTile(w, i, T.FOREST); w.wood[i] = 1;
     }
   }
   // winter fuel; a cold snap doubles it, and even out of winter it sends people to the woodpile
@@ -885,8 +906,27 @@ function housing(w) {
   }
 }
 
+// Homes are only ever handed out and couples only start wanting one at the daily reckoning, so once
+// nobody needs a house this hour, nobody will until the next.
 function needHouse(w) {
-  return w.people.some((p) => !p.dead && (p.home == null || (p.sex === 'f' && p.wants)));
+  const c = cacheOf(w);
+  if (c.nhT === w.t && !c.nh) return false;
+  c.nhT = w.t;
+  c.nh = w.people.some((p) => !p.dead && (p.home == null || (p.sex === 'f' && p.wants)));
+  return c.nh;
+}
+// This hour's ripe fields, fallow fields and unfinished buildings, in their usual order. During the
+// villagers' hour fields only leave these states (or are added, which rebuilds the lists), so callers
+// re-check the state and get the same answer a sweep of every field would give.
+function workLists(w) {
+  const c = cacheOf(w);
+  if (c.wt !== w.t || c.wf !== w.fields.length || c.wb !== w.buildings.length) {
+    c.wt = w.t; c.wf = w.fields.length; c.wb = w.buildings.length;
+    c.ripe = []; c.fallow = []; c.raw = [];
+    for (const f of w.fields) if (f.stage === 'ripe') c.ripe.push(f); else if (f.stage === 'fallow') c.fallow.push(f);
+    for (const b of w.buildings) if (b.progress < 1) c.raw.push(b);
+  }
+  return c;
 }
 const isHouse = (b) => b.kind !== 'granary';
 // how much food can be kept dry: a little in every house, a lot in each granary
@@ -896,10 +936,10 @@ export function storeCap(w) {
   return n;
 }
 function needGranary(w) {
-  if (!w.techs.includes('granary') || w.food < storeCap(w) * 0.85) return false;
-  let g = 0;
-  for (const b of w.buildings) if (b.kind === 'granary') g++;
-  return g < 1 + Math.floor(w.people.length / 12);
+  if (!w.techs.includes('granary')) return false;
+  const c = cacheOf(w);
+  if (c.gb !== w.buildings.length) { c.gb = w.buildings.length; c.g = 0; for (const b of w.buildings) if (b.kind === 'granary') c.g++; }
+  return c.g < 1 + Math.floor(w.people.length / 12) && w.food >= storeCap(w) * 0.85;
 }
 function woodTarget(w) { return HOUSE_COST * 2 + w.buildings.length * 25; }
 function needFields(w) {
@@ -928,15 +968,27 @@ function nearest(list, p, ok) {
   for (const o of list) { if (!ok(o)) continue; const dd = d2(o.x + 0.5, o.y + 0.5, p.x, p.y); if (dd < bd) { bd = dd; best = o; } }
   return best;
 }
+// the nearest field in a given stage that nobody has claimed; the claim is only looked up for a field
+// that would be the new nearest, which picks the same field as checking every one
+function nearestFree(w, list, p, stage, pre) {
+  let best = null, bd = 1e9;
+  for (const o of list) {
+    if (o.stage !== stage) continue;
+    const dd = d2(o.x + 0.5, o.y + 0.5, p.x, p.y);
+    if (dd < bd && w.res[pre + o.id] == null) { bd = dd; best = o; }
+  }
+  return best;
+}
 
 function pickTask(w, p, c) {
   const free = (k) => w.res[k] == null;
+  const L = workLists(w);
   // harvest
-  let f = nearest(w.fields, p, (o) => o.stage === 'ripe' && free('f' + o.id));
+  let f = nearestFree(w, L.ripe, p, 'ripe', 'f');
   if (f) return { k: 'harvest', key: 'f' + f.id, x: f.x, y: f.y, h: 4 };
   // planting
   if (c.season === 0) {
-    f = nearest(w.fields, p, (o) => o.stage === 'fallow' && free('f' + o.id));
+    f = nearestFree(w, L.fallow, p, 'fallow', 'f');
     if (f) return { k: 'plant', key: 'f' + f.id, x: f.x, y: f.y, h: 3 };
   }
   // lean times: everyone who can, forages
@@ -949,9 +1001,10 @@ function pickTask(w, p, c) {
     if (tk) return tk;
   }
   // construction
-  let b = nearest(w.buildings, p, (o) => o.progress < 1 && free('b' + o.id));
+  let b = nearest(L.raw, p, (o) => o.progress < 1 && free('b' + o.id));
   if (b) return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
-  if (needHouse(w) && w.timber >= HOUSE_COST && !w.buildings.some((o) => o.progress < 1)) {
+  const building = L.raw.some((o) => o.progress < 1);
+  if (w.timber >= HOUSE_COST && !building && needHouse(w)) {
     const id = addBuilding(w, 0);
     if (id != null) {
       w.timber -= HOUSE_COST;
@@ -960,7 +1013,7 @@ function pickTask(w, p, c) {
       return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
     }
   }
-  if (w.timber >= GRANARY_COST + HOUSE_COST && needGranary(w) && !w.buildings.some((o) => o.progress < 1) && !needHouse(w)) {
+  if (w.timber >= GRANARY_COST + HOUSE_COST && !building && needGranary(w) && !needHouse(w)) {
     const id = addBuilding(w, 0, 'granary');
     if (id != null) {
       w.timber -= GRANARY_COST;
@@ -974,15 +1027,7 @@ function pickTask(w, p, c) {
   if (hk) return hk;
   // timber
   if (w.timber < woodTarget(w)) {
-    let bt = null, bd = 1e9;
-    const R = 20;
-    for (let y = w.fire.y - R; y <= w.fire.y + R; y++) for (let x = w.fire.x - R; x <= w.fire.x + R; x++) {
-      if (!inMap(x, y)) continue;
-      const i = idx(x, y);
-      if (w.tiles[i] !== T.FOREST || w.wood[i] < 6 || !free('t' + i)) continue;
-      const dd = d2(x + 0.5, y + 0.5, p.x, p.y);
-      if (dd < bd && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) { bd = dd; bt = { x, y, i }; }
-    }
+    const bt = nearestTimber(w, p);
     if (bt) return { k: 'chop', key: 't' + bt.i, x: bt.x, y: bt.y, h: 3 };
   }
   // new fields
@@ -1004,16 +1049,85 @@ function pickTask(w, p, c) {
   return wander(w, p, w.fire.x, w.fire.y, 3, 2);
 }
 
-function fish(w, p) {
-  if (!w.shore || w.fish < 3 || !w.techs.includes('fishing')) return null;
-  let best = null, bd = 1e9;
-  const R2 = 22 * 22;
-  const fx = w.fire.x, fy = w.fire.y, px = p.x - 0.5, py = p.y - 0.5;
+// The nearest standing timber within 20 tiles of the hearth that the worker can walk straight to.
+// Searched in square rings out from the worker, stopping once no farther ring can hold anything closer;
+// ties go to the tile first in map order, exactly as a full sweep of the square would choose.
+// Trees only grow at the daily reckoning; during the day they are only cut down. So the list of tall
+// trees near the hearth, taken once a day in map order, holds every tree that can still be chosen.
+function nearestTimber(w, p) {
+  const R = 20, fx = w.fire.x, fy = w.fire.y;
+  const x0 = Math.max(0, fx - R), x1 = Math.min(MAP - 1, fx + R), y0 = Math.max(0, fy - R), y1 = Math.min(MAP - 1, fy + R);
+  const c = cacheOf(w), day = Math.floor(w.t / TICKS_PER_DAY);
+  if (c.treesDay !== day) {
+    c.treesDay = day; c.trees = [];
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = idx(x, y); if (w.tiles[i] === T.FOREST && w.wood[i] >= 6) c.trees.push(i); }
+  }
+  let best = null, bd = 1e9, bi = 0;
+  if (c.trees.length < 400) { // few trees left: just look at each of them
+    for (const i of c.trees) {
+      if (w.tiles[i] !== T.FOREST || w.wood[i] < 6) continue;
+      const x = i % MAP, y = (i - x) / MAP, dd = d2(x + 0.5, y + 0.5, p.x, p.y);
+      if (dd < bd && w.res['t' + i] == null && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) { bd = dd; best = { x, y, i }; }
+    }
+    return best;
+  }
+  const cx = Math.floor(p.x), cy = Math.floor(p.y);
+  const far = Math.max(Math.abs(cx - x0), Math.abs(cx - x1), Math.abs(cy - y0), Math.abs(cy - y1));
+  for (let r = 0; r <= far; r++) {
+    if (r > 0 && (r - 0.5) * (r - 0.5) > bd + 1e-6) break; // every tile on ring r is at least r - 0.5 away
+    for (let y = cy - r; y <= cy + r; y++) {
+      if (y < y0 || y > y1) continue;
+      const step = r === 0 || y === cy - r || y === cy + r ? 1 : 2 * r; // whole top and bottom rows, ends of the rest
+      for (let x = cx - r; x <= cx + r; x += step) {
+        if (x < x0 || x > x1) continue;
+        const i = idx(x, y);
+        if (w.tiles[i] !== T.FOREST || w.wood[i] < 6) continue;
+        const dd = d2(x + 0.5, y + 0.5, p.x, p.y);
+        if (dd > bd || (dd === bd && i > bi)) continue;
+        if (w.res['t' + i] != null || !lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) continue;
+        bd = dd; bi = i; best = { x, y, i };
+      }
+    }
+  }
+  return best;
+}
+
+// Fishing spots within reach of the hearth, sorted into 8x8 blocks of the map. The beach never moves,
+// so this is built once per world.
+function shoreBlocks(w) {
+  const c = cacheOf(w);
+  if (c.shoreOf === w.shore) return c.shore;
+  const R2 = 22 * 22, fx = w.fire.x, fy = w.fire.y, blocks = [];
+  const at = new Array(64).fill(null);
   for (let k = 0; k < w.shore.length; k++) {
     const i = w.shore[k], x = i % MAP, y = (i - x) / MAP;
-    const dd = (x - px) * (x - px) + (y - py) * (y - py);
-    if (dd >= bd || (x - fx) * (x - fx) + (y - fy) * (y - fy) > R2 || w.res['s' + i] != null) continue;
-    bd = dd; best = { x, y, i };
+    if ((x - fx) * (x - fx) + (y - fy) * (y - fy) > R2) continue;
+    const b = (y >> 3) * 8 + (x >> 3);
+    if (!at[b]) { at[b] = { x0: x & ~7, y0: y & ~7, md: 0, spots: [] }; blocks.push(at[b]); }
+    at[b].spots.push({ x, y, i, k, key: 's' + i });
+  }
+  c.shoreOf = w.shore; c.shore = blocks;
+  return blocks;
+}
+
+function fish(w, p) {
+  if (!w.shore || w.fish < 3 || !w.techs.includes('fishing')) return null;
+  // the nearest free spot; ties go to the spot listed first, as a sweep along the beach would choose
+  let best = null, bd = 1e9, bk = 0;
+  const px = p.x - 0.5, py = p.y - 0.5, blocks = shoreBlocks(w);
+  for (const b of blocks) {
+    const dx = px < b.x0 ? b.x0 - px : px > b.x0 + 7 ? px - (b.x0 + 7) : 0;
+    const dy = py < b.y0 ? b.y0 - py : py > b.y0 + 7 ? py - (b.y0 + 7) : 0;
+    b.md = dx * dx + dy * dy;
+  }
+  blocks.sort((a, b) => a.md - b.md || a.y0 - b.y0 || a.x0 - b.x0);
+  for (const b of blocks) {
+    if (b.md > bd) break; // no spot in this block, or any later one, can be nearer
+    for (const s of b.spots) {
+      const dd = (s.x - px) * (s.x - px) + (s.y - py) * (s.y - py);
+      if (dd > bd || (dd === bd && s.k > bk) || w.res[s.key] != null) continue;
+      bd = dd; bk = s.k; best = s;
+    }
   }
   // only the nearest free spot is checked for a dry path; if the way is blocked, try another day
   if (!best || !lineOfLand(w, p.x, p.y, best.x + 0.5, best.y + 0.5)) return null;
@@ -1038,8 +1152,13 @@ function wander(w, p, cx, cy, r, h) {
 }
 
 function homeOf(w, p) {
-  const b = p.home != null ? w.buildings.find((o) => o.id === p.home && o.progress >= 1) : null;
-  return b || { x: w.fire.x, y: w.fire.y + 1 };
+  let b = null;
+  if (p.home != null) {
+    const c = cacheOf(w);
+    if (c.hb !== w.buildings.length) { c.hb = w.buildings.length; c.byId = new Map(); for (const o of w.buildings) c.byId.set(o.id, o); }
+    b = c.byId.get(p.home);
+  }
+  return b && b.progress >= 1 ? b : { x: w.fire.x, y: w.fire.y + 1 };
 }
 
 function moveToward(p, tx, ty, sp = SPEED) {
@@ -1125,7 +1244,7 @@ function finish(w, p, t, c, fx) {
     if (w.tiles[i] !== T.FOREST) return;
     const got = Math.min(CHOP, w.wood[i]);
     w.wood[i] -= got; w.timber += got;
-    if (w.wood[i] <= 0) { w.tiles[i] = T.GRASS; w.wood[i] = 0; }
+    if (w.wood[i] <= 0) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
     pop('+' + got, 'wood');
   } else if (t.k === 'clear') {
     const tt = tile(w, t.x, t.y);

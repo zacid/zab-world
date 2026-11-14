@@ -23,5 +23,10 @@
   "at": "2026-11-14T22:21:40.482Z",
   "title": "Add hunting: boar and wolf hunts, meat and hides",
   "body": "- New tech Hunting (SIM_VERSION 6); live world learns it on load, new worlds after the first boar raid or wolf attack\n- Every 6 days a pair sets out at dawn for the boar lair, or the wolf den in winter and after an attack; trip must fit before dusk\n- Success 50% boar / 35% wolf (about half alone); 8-10% chance the beast turns, rarely fatal; herds never hunted below 2\n- Kills are carried home on a shoulder (+45 meat boar, +12 wolf); hides dry on a rack by the hearth, cut winter firewood up to 30%, wear out yearly\n- Visible: red hunters with spears, carcass on the way home, hide rack, Hunt row in panel; watch for the first boar taken on Hais this spring"
+ },
+ {
+  "at": "2026-11-14T23:59:41.709Z",
+  "title": "Speed up the simulation about 4x with identical results",
+  "body": "- Cache the best field site until a tile changes; keep a daily list of tall trees near the hearth\n- Find the nearest fishing spot by 8x8 map blocks; index houses by id; per-hour lists of ripe/fallow fields and unfinished buildings\n- Same world, same choices: fingerprints match the old code for 100 years on seed 4242 and 15 years on the live world\n- Seed 4242: 2773 -> 631 ms per year on average, ~1.5 s at 331 people (was ~8 s); browsers catch up faster on load\n- Watch: tiles must now change through setTile() in the step path, or the field-site cache goes stale"
  }
 ]
