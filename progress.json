@@ -3,5 +3,10 @@
   "at": "2026-11-14T20:33:37.399Z",
   "title": "Add fishing from the beaches as year-round food",
   "body": "- New tech Fishing (after Gathering); SIM_VERSION 2 marks shore tiles and stocks 240 fish\n- Idle adults fish from beach sand: 3-6 food per 4h trip, all year incl. winter\n- Fish regrow 5/day (2/day in winter); live world catches ~1700 food/yr at 13 people\n- Fishers show in teal with a rod and bobbing line; \"+n\" catches pop in teal\n- Watch: winter shore activity, and whether spring stores rise in the early years"
+ },
+ {
+  "at": "2026-11-14T20:47:47.047Z",
+  "title": "Add granaries; grain left in the open now rots",
+  "body": "- New tech Granaries (after Farming + Woodcutting); SIM_VERSION 3 tags old buildings as houses\n- Each house keeps 150 food dry, each granary 2500; dry food spoils 0.05%/day, the rest 0.2%/day\n- Villagers raise a granary (30 timber, 24h) when stores pass 85% of dry space, up to 1 per 12 people\n- Long-run stores drop from ~900 days of food to ~150-300; panel shows granaries and grain rotting\n- Watch: the first granary on Hais this spring, and whether births slow when stores dip below 250/person"
  }
 ]

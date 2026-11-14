@@ -24,3 +24,10 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   could give the surplus a purpose; births could depend on diet variety (grain + fish + wild food).
 - Grass vanishes: forest reclaims nearly all open land by year 25, so every new field is cleared woodland.
   Grazing animals or coppicing could keep meadows open.
+- Granaries are done. Field sprawl is now the big long-run problem: needFields keeps ~2 fields per person
+  and they eat the woods. On seed 20261114 forest fell to ~210 tiles by Y85, timber hit 0, winters went
+  cold and pop dropped 334 -> 281. Crop rotation / manuring (more yield per field, fewer fields) or
+  forestry (replanting, coppice) would fix it; also stop building houses when the woodpile can't heat them.
+- Granary discovery triggers in year 1 on new worlds (open heap >= 1000). Could tie it to a first
+  visible loss instead (a "rats in the grain" event) so it feels earned.
+- Speed: one 100-year run took 934 ms/yr on average once pop passed 300; findFieldSite is still the hot spot.

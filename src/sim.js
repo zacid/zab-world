@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 2;
+export const SIM_VERSION = 3;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -26,7 +26,12 @@ const CHOP = 4;
 const WILD_CAP = 300;
 const WILD_REGEN = 8;
 const FUEL_PER_HOUSE = 0.3;  // wood per winter day
-const SPOIL = 0.0005;        // share of stored food lost per day
+const SPOIL = 0.0005;        // share of sheltered food lost per day
+const SPOIL_OPEN = 0.002;    // share lost per day from food heaped in the open (~50% a year)
+const HOME_STORE = 150;      // food each house keeps dry in its rafters
+const GRANARY_CAP = 2500;    // food a granary keeps dry
+const GRANARY_COST = 30;     // wood
+const GRANARY_WORK = 24;     // hours
 const FISH_CAP = 240;        // fish in the shallows around the island
 const FISH_REGEN = 5;        // per day, spring to autumn (2 in winter)
 
@@ -37,6 +42,7 @@ export const TECHS = {
   farming:  { name: 'Farming',   desc: 'Grain planted in spring, harvested before the frost.', req: ['gather'] },
   woodcut:  { name: 'Woodcutting', desc: 'Stone axes fell trees for timber and firewood.', req: ['fire'] },
   fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
+  granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
 };
 
 // ---------- randomness ----------
@@ -220,13 +226,13 @@ function findHouseSite(w) {
   }
   return best;
 }
-function addBuilding(w, progress) {
+function addBuilding(w, progress, kind = 'house') {
   const s = findHouseSite(w);
   if (!s) return null;
   w.timber += w.wood[idx(s.x, s.y)];
   w.wood[idx(s.x, s.y)] = 0;
   w.tiles[idx(s.x, s.y)] = T.BUILD;
-  const b = { id: w.nextId++, kind: 'house', x: s.x, y: s.y, progress };
+  const b = { id: w.nextId++, kind, x: s.x, y: s.y, progress };
   w.buildings.push(b);
   return b.id;
 }
@@ -287,7 +293,13 @@ function supper(w) {
 
 function daily(w, c, fx) {
   const pop = w.people.length;
-  w.food = Math.round(w.food * (1 - SPOIL) * 100) / 100;
+  // food under a roof keeps; food heaped in the open rots
+  const open = Math.max(0, w.food - storeCap(w));
+  w.food = Math.round(((w.food - open) * (1 - SPOIL) + open * (1 - SPOIL_OPEN)) * 100) / 100;
+  if (open >= 1000 && !w.techs.includes('granary') && w.techs.includes('farming') && w.techs.includes('woodcut')) {
+    w.techs.push('granary');
+    milestone(w, `Grain rots in heaps behind the houses. The ${w.name} folk raise a store on stilts to keep it dry.`);
+  }
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
@@ -327,7 +339,7 @@ function daily(w, c, fx) {
   }
   // winter fuel
   if (c.season === 3) {
-    const homes = w.buildings.filter((b) => b.progress >= 1 && w.people.some((p) => p.home === b.id)).length;
+    const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && w.people.some((p) => p.home === b.id)).length;
     const need = homes * FUEL_PER_HOUSE;
     if (w.timber >= need) { w.timber = Math.round((w.timber - need) * 100) / 100; if (w.stats.cold) { w.stats.cold = false; log(w, 'Every hearth is lit again.', 'good'); } }
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
@@ -425,7 +437,7 @@ function pairing(w) {
 
 function occupants(w, id) { let n = 0; for (const p of w.people) if (!p.dead && p.home === id) n++; return n; }
 function housing(w) {
-  const houses = w.buildings.filter((b) => b.progress >= 1);
+  const houses = w.buildings.filter((b) => b.progress >= 1 && isHouse(b));
   // children follow their mother
   for (const p of w.people) {
     if (p.dead || p.home != null || ageY(w, p) >= 14) continue;
@@ -452,6 +464,19 @@ function housing(w) {
 
 function needHouse(w) {
   return w.people.some((p) => !p.dead && (p.home == null || (p.sex === 'f' && p.wants)));
+}
+const isHouse = (b) => b.kind !== 'granary';
+// how much food can be kept dry: a little in every house, a lot in each granary
+export function storeCap(w) {
+  let n = 0;
+  for (const b of w.buildings) if (b.progress >= 1) n += b.kind === 'granary' ? GRANARY_CAP : HOME_STORE;
+  return n;
+}
+function needGranary(w) {
+  if (!w.techs.includes('granary') || w.food < storeCap(w) * 0.85) return false;
+  let g = 0;
+  for (const b of w.buildings) if (b.kind === 'granary') g++;
+  return g < 1 + Math.floor(w.people.length / 12);
 }
 function woodTarget(w) { return HOUSE_COST * 2 + w.buildings.length * 25; }
 function needFields(w) {
@@ -509,6 +534,15 @@ function pickTask(w, p, c) {
       w.timber -= HOUSE_COST;
       b = w.buildings[w.buildings.length - 1];
       log(w, 'Timber is stacked for a new house.', 'info');
+      return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
+    }
+  }
+  if (w.timber >= GRANARY_COST + HOUSE_COST && needGranary(w) && !w.buildings.some((o) => o.progress < 1) && !needHouse(w)) {
+    const id = addBuilding(w, 0, 'granary');
+    if (id != null) {
+      w.timber -= GRANARY_COST;
+      b = w.buildings[w.buildings.length - 1];
+      log(w, 'Posts are sunk for a granary.', 'info');
       return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
     }
   }
@@ -641,10 +675,14 @@ function finish(w, p, t, c, fx) {
   } else if (t.k === 'build') {
     const b = w.buildings.find((o) => 'b' + o.id === t.key);
     if (!b || b.progress >= 1) return;
-    b.progress = Math.min(1, Math.round((b.progress + 4 / HOUSE_WORK) * 1000) / 1000);
+    b.progress = Math.min(1, Math.round((b.progress + 4 / (b.kind === 'granary' ? GRANARY_WORK : HOUSE_WORK)) * 1000) / 1000);
     pop('+' + Math.round(b.progress * 100) + '%', 'build');
-    if (b.progress >= 1) {
-      const n = w.buildings.filter((o) => o.progress >= 1).length;
+    if (b.progress >= 1 && b.kind === 'granary') {
+      const n = w.buildings.filter((o) => o.kind === 'granary' && o.progress >= 1).length;
+      if (n === 1) milestone(w, `The first granary stands on ${w.name}, its floor raised above the damp.`);
+      else log(w, `A granary is finished. ${n} now guard the harvest.`, 'good');
+    } else if (b.progress >= 1) {
+      const n = w.buildings.filter((o) => o.progress >= 1 && isHouse(o)).length;
       if (n === 10 || n === 25 || n === 50) milestone(w, `The ${n}th house is raised on ${w.name}.`);
       else log(w, 'A new house is finished.', 'good');
       housing(w);
@@ -689,6 +727,17 @@ const MIGRATIONS = {
         : `The islanders learn to spear fish in the shallows.`);
     }
   },
+  // v2 -> v3: granaries. Old buildings are houses; food left in the open now rots faster.
+  2: (w) => {
+    for (const b of w.buildings) if (!b.kind) b.kind = 'house';
+    if (!w.techs.includes('granary')) {
+      w.techs.push('granary');
+      const who = w.people.filter((p) => ageY(w, p) >= 14).sort((a, b) => a.born - b.born || a.id - b.id)[0];
+      milestone(w, who
+        ? `${who.name} lays a timber floor on four posts and heaps the grain on it, out of the damp. ${w.name} learns to build granaries.`
+        : `The islanders learn to keep grain dry in raised granaries.`);
+    }
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -707,7 +756,8 @@ export function summary(w) {
     name: w.name, year: c.year, season: SEASONS[c.season], day: c.dos, hour: c.hour,
     pop: w.people.length, adults, children: w.people.length - adults,
     food: Math.floor(w.food), timber: Math.floor(w.timber),
-    houses: w.buildings.filter((b) => b.progress >= 1).length, fields: w.fields.length,
+    houses: w.buildings.filter((b) => b.progress >= 1 && isHouse(b)).length, fields: w.fields.length,
+    granaries: w.buildings.filter((b) => b.progress >= 1 && b.kind === 'granary').length, safe: storeCap(w),
     births: w.stats.births, deaths: w.stats.deaths, peak: w.stats.peak,
   };
 }
