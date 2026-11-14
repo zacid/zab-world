@@ -1,0 +1,74 @@
+# The world's heartbeat. Every 3 hours: load the saved world, simulate up to now,
+# save it to the `world-data` branch, and publish the site. Also runs when code
+# changes land on main, so new rules go live straight away (after the checks pass).
+name: World clock
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: world-clock
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Rules still hold (determinism + 60-year balance)
+        if: github.event_name == 'push'
+        run: node scripts/check.mjs 60
+
+      - name: Load the saved world
+        run: |
+          mkdir -p world
+          if git fetch --depth 1 origin world-data 2>/dev/null; then
+            git show FETCH_HEAD:state.json > world/state.json
+          else
+            echo "No saved world yet - this run founds it."
+          fi
+
+      - name: Advance the world to now
+        run: node scripts/tick.mjs world
+
+      - name: Save the world
+        run: |
+          cd world
+          git init -q -b world-data
+          git config user.name "world-clock"
+          git config user.email "world-clock@users.noreply.github.com"
+          git add state.json summary.json
+          git commit -q -m "$(node -e "const s=require('./summary.json');console.log('Update world state: year '+s.year+', '+s.season.toLowerCase()+' day '+s.day+', '+s.pop+' people')")"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" world-data
+
+      - name: Build the site
+        run: |
+          node scripts/build.mjs
+          mkdir -p dist/world
+          cp world/state.json world/summary.json dist/world/
+          cp progress.json dist/ 2>/dev/null || true
+          rm -f dist/preview.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4
