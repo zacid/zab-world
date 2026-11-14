@@ -13,5 +13,10 @@
   "at": "2026-11-14T21:12:36.970Z",
   "title": "Add daily weather: rain, storms, heatwaves, frost, snow",
   "body": "- SIM_VERSION 4: each day's weather is a seasonal Markov chain (clear, rain, storm, heat, cold snap, snow), so bad days come in runs\n- Rain speeds crop growth x1.25, heat slows it to x0.4, cold to x0.5; cold snaps double winter firewood and chill the frail; heat is hard on elders\n- Storms keep everyone indoors, flatten 3% of tall fields per day and can tear off a roof (repaired as a building job)\n- Visible: rain, snow, storm flashes, heat haze, tinted sky, snow on roofs, roofless houses, flattened fields; weather shown next to the date\n- Watch: slower early growth (100-yr pop ~260 vs ~280), and woods lasting longer (forest ~450 tiles at Y100 vs ~210)"
+ },
+ {
+  "at": "2026-11-14T21:42:33.673Z",
+  "title": "Add wolves and boars to the woods of the island",
+  "body": "- SIM_VERSION 5: a wolf pack dens in the deepest forest, boars lie up in cover near the fields (3 each, herd size follows forest cover)\n- Wolves prowl the treeline from dusk to dawn (and on winter cold snaps); a lone adult away from the houses can be bitten (12 days laid up) or killed; a helper nearby drives the wolf off. ~1 attack and ~0.1 deaths a year\n- After an attack the village comes in at 16:00 and goes out at 07:00 for 45 days; boars root through growing grain near the woods on ~14 spring/summer nights a year\n- Visible: grey wolves with glowing eyes at night, boars rooting in fields, torn-up field tiles, bandaged villagers, a Wilds row in the panel\n- Watch: first bite and first raid in the chronicle; 100-yr pop ~217 vs ~259 before"
  }
 ]

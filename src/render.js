@@ -109,6 +109,9 @@ function drawTerrain() {
     } else if (f.flat) { // storm-flattened grain lying in the mud
       for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
     }
+    if (f.root) { // boars have been at it: torn-up clods and bare black earth
+      for (let k = 0; k < 6; k++) { const hh = S.hash(f.x * 6 + k, f.y, 23); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 7, k < 3 ? '#2a1a10' : '#7a5636', 2, 1); }
+    }
   }
   // fire ring, stores
   const fx = w.fire.x * TILE, fy = w.fire.y * TILE;
@@ -215,8 +218,10 @@ function frame() {
         px(sc, X + 5, Y - 1, 'rgba(255,255,255,0.55)', 1, 3 + bob); px(sc, X + 5, Y + 2 + bob, '#e8e8e8', 1, 1);
       }
     }
+    if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     shown.push({ p, x, y });
   }
+  const beasts = drawBeasts(frac, now);
   // the day's sky colours the land
   const wx = wxNow();
   const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)' }[wx];
@@ -232,6 +237,12 @@ function frame() {
       glow(sc, b.x * TILE + 4, b.y * TILE + 5, 7, `rgba(255,190,90,${(dark * 0.35).toFixed(3)})`);
     }
     glow(sc, fx0 + 4, fy0 + 4, 22 + Math.sin(now / 200) * 1.5, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
+    // wolf eyes catch the firelight at the treeline
+    if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
+      const ex = o.X + (o.face > 0 ? 5 : 0), ey = o.Y + 1;
+      px(sc, ex, ey, '#ffe36a');
+      glow(sc, ex + 0.5, ey + 0.5, 3, `rgba(255,220,90,${(dark * 0.7).toFixed(3)})`);
+    }
     sc.globalCompositeOperation = 'source-over';
   }
   skyFx(wx, now);
@@ -255,10 +266,18 @@ function frame() {
     const mx = (mouse.x * dpr - view.ox) / (TILE * view.s), my = (mouse.y * dpr - view.oy) / (TILE * view.s);
     let best = null, bd = 0.6;
     for (const o of shown) { const d = Math.hypot(o.x - mx, o.y - 0.2 - my); if (d < bd) { bd = d; best = o; } }
+    let beast = null;
+    for (const o of beasts) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; beast = o.b; best = null; } }
     const tip = $('tip');
-    if (best) {
+    if (beast) {
+      const what = beast.k === 'wolf'
+        ? (beast.prey != null ? 'stalking someone' : 'prowling the treeline')
+        : (beast.f != null && beast.x === beast.px && beast.y === beast.py ? 'rooting in the grain' : 'trotting through the dark');
+      tip.innerHTML = `<b>${beast.k === 'wolf' ? 'Grey wolf' : 'Wild boar'}</b><br><span class="m">${what}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = a < 14 ? 'playing' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire' })[p.task ? p.task.k : 'idle'];
+      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire' })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
@@ -296,6 +315,40 @@ function skyFx(wx, now) {
     }
   }
 }
+// ---------- creatures ----------
+// 6x4 sprites facing right; mirrored when heading left. Legs swap while moving.
+const WOLF = ['....gG', 'G..gGg', '.gggg.', '.d..d.'];
+const WOLF_RUN = ['....gG', 'G..gGg', '.gggg.', 'd....d'];
+const WCOL = { g: '#8a8d93', G: '#b4b7bc', d: '#55585e' };
+const BOAR = ['.BBB..', 'bbbbbs', 'bbbbbt', '.d..d.'];
+const BOAR_RUN = ['.BBB..', 'bbbbbs', 'bbbbbt', 'd....d'];
+const BOAR_ROOT = ['.BBB..', 'bbbbb.', 'bbbbbs', '.d..dt'];
+const BCOL = { b: '#4d3527', B: '#2e2018', s: '#7a5444', t: '#efe6d2', d: '#2a1d15' };
+const facing = new Map();
+function drawBeasts(frac, now) {
+  const out = [];
+  for (const b of w.beasts || []) {
+    if (!b.out) continue;
+    const x = b.px + (b.x - b.px) * frac, y = b.py + (b.y - b.py) * frac;
+    const dx = b.x - b.px, moving = dx !== 0 || b.y !== b.py;
+    let face = facing.get(b.id) || 1;
+    if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
+    facing.set(b.id, face);
+    const X = Math.round(x * TILE) - 3, Y = Math.round(y * TILE) - 3;
+    const stepF = Math.floor(now / 160 + b.id) % 2;
+    let rows;
+    if (b.k === 'wolf') rows = moving && stepF ? WOLF_RUN : WOLF;
+    else rows = !moving && b.f != null ? (Math.floor(now / 380 + b.id) % 2 ? BOAR_ROOT : BOAR) : moving && stepF ? BOAR_RUN : BOAR;
+    const map = b.k === 'wolf' ? WCOL : BCOL;
+    for (let r = 0; r < rows.length; r++) for (let k = 0; k < 6; k++) {
+      const ch = rows[r][k];
+      if (ch !== '.' && map[ch]) px(sc, face > 0 ? X + k : X + 5 - k, Y + r, map[ch]);
+    }
+    out.push({ b, x, y, X, Y, face });
+  }
+  return out;
+}
+
 function glow(c, x, y, r, col) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -315,6 +368,7 @@ function updatePanels() {
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
+    ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');

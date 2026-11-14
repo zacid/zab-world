@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 4;
+export const SIM_VERSION = 5;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -65,6 +65,16 @@ const WX_ODDS = [ // per season, weights out of 100
 const WX_GROW = { clear: 1, rain: 1.25, storm: 1, heat: 0.4, cold: 0.5, snow: 0 };
 const STORM_FLATTEN = 0.03;  // chance per storm day that a tall or ripe field is flattened
 const STORM_ROOF = 0.15;    // chance per storm day that one building loses its roof
+
+// ---------- creatures ----------
+const WOLF_SPEED = 4;        // tiles per hour
+const BOAR_SPEED = 3;
+const WOLF_SAFE = 49;        // wolves keep 7 tiles from the hearth (squared)
+const WOLF_STALK = 0.015;   // chance per hour that a prowling wolf picks out a lone villager nearby (a third by day)
+const WOLF_KILL = 0.2;      // share of attacks on someone alone that end in death
+const WOUND_DAYS = 12;
+const FEAR_DAYS = 45;        // after an attack, nobody lingers outside at dusk or dawn
+const BOAR_RAID = 0.08;      // chance per spring/summer night that the boars come for the growing grain
 
 // ---------- randomness ----------
 export function rnd(w) {
@@ -157,6 +167,7 @@ export function genesis(seed, epoch) {
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
+    beasts: [], fauna: null,
   };
   // name the island
   let nm = '';
@@ -209,6 +220,7 @@ export function genesis(seed, epoch) {
   }
   for (let i = 0; i < 3; i++) addField(w);
   milestone(w, `${w.people.length} settlers land on ${w.name} and light a fire.`);
+  stockWilds(w);
   w.stats.peak = w.people.length;
   return w;
 }
@@ -291,6 +303,7 @@ export function step(w, fx) {
   if (c.hour === 0) daily(w, c, fx);
   if (c.hour === 19) supper(w);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
+  if (w.beasts) prowl(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   w.t++;
 }
@@ -325,21 +338,23 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
+    w.stats.yw = w.stats.yr = 0;
   }
+  if (w.beasts) wilds(w, c);
   weather(w, c);
   const wx = w.wx.k;
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
-    for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; rot++; }
+    for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; delete f.lost; rot++; }
     if (rot) log(w, `Frost takes ${rot} unharvested field${rot > 1 ? 's' : ''}.`, 'bad');
   }
   // growth
@@ -475,6 +490,220 @@ function endSpell(w, s) {
   }
   if (!text) return;
   if (big) milestone(w, text); else log(w, text, k);
+}
+
+// ---------- the wild ----------
+// A wolf pack dens in the deepest woods, far from the hearth; a sounder of boars lies up in thick
+// cover nearer the fields. Both stay hidden by day and come out at dusk.
+function thicket(w, x, y) {
+  let n = 0;
+  for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (tile(w, xx, yy) === T.FOREST) n++;
+  return n;
+}
+function findLairs(w) {
+  const F = w.fauna, { x: fx, y: fy } = w.fire;
+  let den = null, ds = -1e9, lair = null, ls = -1e9;
+  for (let y = 2; y < MAP - 2; y++) for (let x = 2; x < MAP - 2; x++) {
+    if (w.tiles[idx(x, y)] !== T.FOREST) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < 64) continue;
+    const n = thicket(w, x, y);
+    if (n < 18) continue;
+    const r = Math.sqrt(dd), j = hash(x, y, w.seed + 41) * 2;
+    const a = n + r * 0.6 + j, b = n - r * 0.5 + j;
+    if (a > ds && lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) { ds = a; den = { x, y }; }
+    if (b > ls && lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) { ls = b; lair = { x, y }; }
+  }
+  F.den = den; F.lair = lair;
+  for (const b of w.beasts) {
+    const home = b.k === 'wolf' ? den : lair;
+    if (!b.out && home) { b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; }
+  }
+}
+function addBeast(w, k) {
+  const home = (k === 'wolf' ? w.fauna.den : w.fauna.lair) || w.fire;
+  const b = { id: w.nextId++, k, x: home.x + 0.5, y: home.y + 0.5, px: 0, py: 0, out: 0, tx: null, ty: null, h: 0, prey: null, f: null, rest: 0 };
+  b.px = b.x; b.py = b.y;
+  w.beasts.push(b);
+  return b;
+}
+function stockWilds(w) {
+  w.beasts = [];
+  w.fauna = { fear: 0, den: null, lair: null, raid: 0, hit: 0, att: 0, kills: 0, raids: 0 };
+  findLairs(w);
+  for (let i = 0; i < 3; i++) addBeast(w, 'wolf');
+  for (let i = 0; i < 3; i++) addBeast(w, 'boar');
+}
+
+// once a day: wounds heal, lairs shift as the woods change, litters are born and the weak leave
+function wilds(w, c) {
+  const F = w.fauna;
+  for (const p of w.people) if (p.hurt && p.hurt <= w.t) delete p.hurt;
+  if (c.day % 30 === 0 || (F.den && tile(w, F.den.x, F.den.y) !== T.FOREST) || (F.lair && tile(w, F.lair.x, F.lair.y) !== T.FOREST)) findLairs(w);
+  if (c.doy !== 45 && c.doy !== 300) return;
+  let forest = 0;
+  for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] === T.FOREST) forest++;
+  for (const [k, per, hi] of [['wolf', 160, 5], ['boar', 140, 6]]) {
+    const cap = Math.max(2, Math.min(hi, Math.round(forest / per)));
+    const herd = w.beasts.filter((b) => b.k === k);
+    const home = k === 'wolf' ? F.den : F.lair;
+    if (c.doy === 45 && home && herd.length >= 2 && herd.length < cap && rnd(w) < 0.5) {
+      addBeast(w, k);
+      log(w, k === 'wolf' ? 'Cubs yip somewhere in the deep woods. The pack has grown.' : 'Striped piglets trot after the sows at the forest edge.', 'info');
+    } else if (c.doy === 300 && herd.length > cap) {
+      const gone = herd[herd.length - 1];
+      w.beasts = w.beasts.filter((b) => b !== gone);
+      log(w, k === 'wolf' ? 'The woods are thinner now. One wolf has left the pack.' : 'With less cover in the woods, the boars are fewer.', 'info');
+    }
+  }
+}
+
+const moveBeast = (b, tx, ty, sp) => moveToward(b, tx, ty, sp);
+
+function prowl(w, c) {
+  const F = w.fauna, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
+  const storm = wx === 'storm';
+  // wolves come out at dusk; in a hungry winter frost they roam by day too
+  const dusk = h >= 18 || h < 7;
+  const wolfOut = !storm && !!F.den && (dusk || (c.season === 3 && wx === 'cold'));
+  F.bold = dusk ? WOLF_STALK : WOLF_STALK / 3;
+  // boars raid the growing grain on spring and summer nights
+  if (h === 21) F.raid = !storm && F.lair && c.season < 2 && w.fields.some((f) => f.stage === 'planted' || f.stage === 'ripe') && rnd(w) < BOAR_RAID ? 1 : 0;
+  const boarOut = !!F.raid && !storm && (h >= 21 || h < 5);
+  for (const b of w.beasts) {
+    b.px = b.x; b.py = b.y;
+    if (b.k === 'wolf') wolf(w, b, wolfOut && b.rest <= w.t);
+    else boar(w, b, boarOut);
+  }
+  if (h === 6 && F.hit) {
+    w.stats.yr = (w.stats.yr || 0) + 1;
+    const text = `Boars root through ${plural(F.hit, 'field', 'fields')} by the woods in the night.`;
+    if (!F.raids) milestone(w, `${text} The grain is trampled and torn up. Nobody on ${w.name} has an answer for them yet.`);
+    else log(w, text, 'bad');
+    F.raids++; F.hit = 0;
+  }
+  if (h === 6) F.raid = 0;
+}
+
+function wolf(w, b, active) {
+  const F = w.fauna, home = F.den;
+  if (!active) {
+    b.prey = null;
+    if (b.out && moveBeast(b, (home ? home.x : b.x) + 0.5, (home ? home.y : b.y) + 0.5, WOLF_SPEED)) b.out = 0;
+    return;
+  }
+  if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; edge(w, b); }
+  if (b.prey != null) {
+    const p = w.people.find((o) => o.id === b.prey);
+    if (!p || p.dead || p.asleep || !wild(w, p)) { b.prey = null; edge(w, b); }
+    else {
+      if (moveBeast(b, p.x, p.y, WOLF_SPEED) || d2(b.x, b.y, p.x, p.y) < 1.5) bite(w, b, p);
+      return;
+    }
+  }
+  if (!moveBeast(b, b.tx + 0.5, b.ty + 0.5, WOLF_SPEED)) return;
+  // at the treeline: watch, and now and then pick out someone alone
+  if (rnd(w) < F.bold) {
+    const p = lone(w, b);
+    if (p) { b.prey = p.id; return; }
+  }
+  if (--b.h <= 0) edge(w, b);
+}
+
+// wolves won't come near the hearth or in among the houses
+const wild = (w, p) => d2(p.x, p.y, w.fire.x + 0.5, w.fire.y + 0.5) >= WOLF_SAFE && !nearBuild(w, Math.floor(p.x), Math.floor(p.y), 2);
+// a grown villager out on their own, within a wolf's sight and well away from the village
+function lone(w, b) {
+  let best = null, bd = 36;
+  for (const p of w.people) {
+    if (p.dead || p.asleep) continue;
+    const dd = d2(p.x, p.y, b.x, b.y);
+    if (dd >= bd || ageY(w, p) < 14 || !wild(w, p)) continue;
+    if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
+    bd = dd; best = p;
+  }
+  return best;
+}
+
+function bite(w, b, p) {
+  const F = w.fauna;
+  b.prey = null; b.rest = w.t + 48; // the wolf slinks off and lies low for two days
+  w.stats.yw = (w.stats.yw || 0) + 1;
+  const first = !F.att;
+  F.att++;
+  const wasAfraid = F.fear > w.t;
+  F.fear = w.t + FEAR_DAYS * TICKS_PER_DAY;
+  const after = wasAfraid ? '' : ' For weeks after, nobody stays out past dusk.';
+  const helper = w.people.find((o) => o !== p && !o.dead && !o.asleep && ageY(w, o) >= 14 && d2(o.x, o.y, p.x, p.y) < 9);
+  let text;
+  if (helper) text = `A wolf springs at ${p.name}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
+  else if (rnd(w) < WOLF_KILL) {
+    die(w, p, 'was dragged down by wolves');
+    text = `Wolves take ${p.name} at the edge of the trees.`;
+    F.kills = (F.kills || 0) + 1;
+    if (F.kills === 1) { milestone(w, text + ` ${w.name} learns to fear the dark woods.` + after); return; }
+  } else {
+    p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+    release(w, p);
+    text = `A wolf leaps on ${p.name} at the edge of the trees. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`;
+  }
+  if (first) milestone(w, text + after);
+  else log(w, text + after, 'bad');
+}
+
+function edge(w, b) {
+  const { x: fx, y: fy } = w.fire;
+  let best = null, bs = 1e9;
+  for (let k = 0; k < 24; k++) {
+    const x = fx + ri(w, 33) - 16, y = fy + ri(w, 33) - 16;
+    if (tile(w, x, y) !== T.FOREST) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < WOLF_SAFE) continue;
+    if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, c]) => { const t = tile(w, x + a, y + c); return t === T.GRASS || t === T.FIELD || t === T.SAND; })) continue;
+    const sc = dd + hash(x, y, b.id) * 60;
+    if (sc < bs && lineOfLand(w, b.x, b.y, x + 0.5, y + 0.5)) { bs = sc; best = { x, y }; }
+  }
+  const home = w.fauna.den || { x: Math.floor(b.x), y: Math.floor(b.y) };
+  b.tx = best ? best.x : home.x; b.ty = best ? best.y : home.y;
+  b.h = 2 + ri(w, 4);
+}
+
+function boar(w, b, active) {
+  const F = w.fauna, home = F.lair || { x: Math.floor(b.x), y: Math.floor(b.y) };
+  if (!active) {
+    b.f = null; b.tx = null;
+    if (b.out && moveBeast(b, home.x + 0.5, home.y + 0.5, BOAR_SPEED)) b.out = 0;
+    return;
+  }
+  if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; b.tx = null; }
+  if (b.tx == null) {
+    const f = pickCrop(w, b);
+    if (f) { b.tx = f.x; b.ty = f.y; b.f = f.id; b.h = 3; }
+    else { b.tx = home.x; b.ty = home.y; b.f = null; }
+  }
+  const off = (b.id % 3) * 0.25 - 0.25;
+  if (!moveBeast(b, b.tx + 0.5 + off, b.ty + 0.5 - off, BOAR_SPEED) || b.f == null) return;
+  if (--b.h > 0) return;
+  const f = w.fields.find((o) => o.id === b.f);
+  if (f && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - 0.3) * 10000) / 10000); f.root = 1; F.hit++; }
+  else if (f && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.4) * 100) / 100); f.root = 1; F.hit++; }
+  b.f = null; b.tx = home.x; b.ty = home.y;
+}
+
+// standing grain beside the trees, where a boar can slip out of cover
+function pickCrop(w, b) {
+  const near = [];
+  for (const f of w.fields) {
+    if (f.stage !== 'planted' && f.stage !== 'ripe') continue;
+    let wood = false;
+    for (let yy = f.y - 2; yy <= f.y + 2 && !wood; yy++) for (let xx = f.x - 2; xx <= f.x + 2; xx++) if (tile(w, xx, yy) === T.FOREST) { wood = true; break; }
+    if (wood) near.push(f);
+  }
+  for (let k = 0; k < 6 && near.length; k++) {
+    const f = near[ri(w, near.length)];
+    if (lineOfLand(w, b.x, b.y, f.x + 0.5, f.y + 0.5)) return f;
+  }
+  return null;
 }
 
 function die(w, p, why) {
@@ -722,18 +951,20 @@ function homeOf(w, p) {
   return b || { x: w.fire.x, y: w.fire.y + 1 };
 }
 
-function moveToward(p, tx, ty) {
+function moveToward(p, tx, ty, sp = SPEED) {
   const dx = tx - p.x, dy = ty - p.y, dd = Math.sqrt(dx * dx + dy * dy);
-  if (dd <= SPEED) { p.x = tx; p.y = ty; return true; }
-  p.x = Math.round((p.x + (dx / dd) * SPEED) * 1000) / 1000;
-  p.y = Math.round((p.y + (dy / dd) * SPEED) * 1000) / 1000;
+  if (dd <= sp) { p.x = tx; p.y = ty; return true; }
+  p.x = Math.round((p.x + (dx / dd) * sp) * 1000) / 1000;
+  p.y = Math.round((p.y + (dy / dd) * sp) * 1000) / 1000;
   return false;
 }
 
 function act(w, p, c, fx) {
   const a = ageY(w, p), h = c.hour;
-  const night = h >= 21 || h < 6;
-  const evening = h >= 18 && h < 21;
+  // after a wolf attack the village keeps in from dusk to full daylight
+  const afraid = w.fauna && w.fauna.fear > w.t;
+  const night = h >= 21 || h < (afraid ? 7 : 6);
+  const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
   if (night || storm) { // in a storm nobody works outdoors: they wait it out at home
     if (p.task && p.task.k !== 'home') release(w, p);
@@ -757,7 +988,7 @@ function act(w, p, c, fx) {
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
     else if (a < 14) p.task = wander(w, p, w.fire.x, w.fire.y, 6, 2);
-    else if (a >= 65) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 4);
+    else if (a >= 65 || p.hurt) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 4);
     else reserve(w, p, pickTask(w, p, c));
   }
   const t = p.task;
@@ -773,12 +1004,12 @@ function finish(w, p, t, c, fx) {
   if (t.k === 'harvest') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (!f || f.stage !== 'ripe') return;
-    const y = Math.round(FIELD_YIELD * w.harvest);
-    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0;
+    const y = Math.round(FIELD_YIELD * w.harvest * (1 - (f.lost || 0)));
+    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; delete f.lost;
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
-    if (f && f.stage === 'fallow') { f.stage = 'planted'; f.growth = 0; delete f.flat; pop('sown', 'muted'); }
+    if (f && f.stage === 'fallow') { f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; pop('sown', 'muted'); }
   } else if (t.k === 'build') {
     const b = w.buildings.find((o) => 'b' + o.id === t.key);
     if (!b || b.progress >= 1) return;
@@ -857,6 +1088,15 @@ const MIGRATIONS = {
       ? `${who.name} watches the clouds pile up over the sea and says the gentle days are over. From now on the sky brings rain, storms, heat and hard frost.`
       : `Clouds pile up over the sea. From now on the sky brings rain, storms, heat and hard frost.`);
   },
+  // v4 -> v5: creatures. A wolf pack and a sounder of boars wake in the deep woods.
+  4: (w) => {
+    stockWilds(w);
+    w.stats.yw = 0; w.stats.yr = 0;
+    const who = w.people.filter((p) => ageY(w, p) >= 14).sort((a, b) => a.born - b.born || a.id - b.id)[0];
+    milestone(w, who
+      ? `${who.name} finds great paw prints in the mud and hears howling from the deep woods. Wolves live on ${w.name}, and boars root among the trees.`
+      : `Howls drift from the deep woods. Wolves live on ${w.name}, and boars root among the trees.`);
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -880,6 +1120,8 @@ export function summary(w) {
     births: w.stats.births, deaths: w.stats.deaths, peak: w.stats.peak,
     weather: w.wx ? WEATHER[w.wx.k].name : 'clear', weatherDays: w.wx ? w.wx.n : 1,
     roofsDown: w.buildings.filter((b) => b.dmg && isHouse(b)).length,
+    wolves: (w.beasts || []).filter((b) => b.k === 'wolf').length, boars: (w.beasts || []).filter((b) => b.k === 'boar').length,
+    afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,
   };
 }
 

@@ -2,14 +2,6 @@
 
 ## Owner requests (do these next, one per visit)
 
-### Creatures
-- Wolves live in the deep forest. In winter and at night they come to the forest edge; a villager
-  out alone far from the fire can be attacked (rare, and mostly the unlucky or careless).
-- Boars trample fields near the forest in summer and autumn.
-- Visible: grey wolf sprites prowling the treeline at night with glowing eyes; boars rooting in
-  fields. Villagers react: stay closer to the fire at night after an attack.
-- Leave room for later answers: hunting (food and fewer wolves), a palisade, guard dogs.
-
 
 Loose, unordered. Take whatever the island needs most; add new ideas at the bottom.
 
@@ -50,3 +42,18 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
 - Spring cold snaps can run 15-20 days; a late frost could kill young shoots outright for real drama.
 - Yearly history now records `storms` (storm days) and `flattened` (fields); a weather row in the
   graph panel would show bad years at a glance.
+- Creatures are done (w.beasts, w.fauna: den, lair, fear, att, kills, raids; p.hurt; f.root/f.lost;
+  yearly `wolves` attacks and `raids` nights). Answers they invite:
+  - Hunting: spears, a hunter role that tracks boars into the lair (meat, hides) and thins the wolf
+    pack (remove a beast; herd regrows in spring at doy 45 if >= 2 remain).
+  - Fences / hedges around fields next to the woods (f.root never set behind a fence).
+  - Guard dogs (tamed wolf cubs?): a dog with a lone worker counts as a helper in bite().
+  - A palisade or watch fire at the treeline: wolves' edge() picks tiles farther out.
+  - Herbal medicine shortens WOUND_DAYS; a bad bite could fester.
+  - Boars only raid spring/summer here because grain is harvested by ~day 100; a second (autumn) crop
+    or orchards/nuts would give them autumn targets.
+- Speed is now a real problem: seed 4242 reaches 305 people at Y97 and a year then takes ~4.6 s in
+  Node (creatures add <1%). Caching findFieldSite per tick only saved ~10%, so the rest is elsewhere:
+  suspects are homeOf() (buildings.find per person per tick at night), the timber scan in pickTask
+  (timber is nearly always under woodTarget late game, so every idle worker scans 41x41 tiles), and
+  occupants() inside housing(). Profile before guessing.
