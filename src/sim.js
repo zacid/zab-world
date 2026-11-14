@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 5;
+export const SIM_VERSION = 6;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -43,6 +43,7 @@ export const TECHS = {
   woodcut:  { name: 'Woodcutting', desc: 'Stone axes fell trees for timber and firewood.', req: ['fire'] },
   fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
   granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
+  hunting:  { name: 'Hunting',   desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
 };
 
 // ---------- weather ----------
@@ -75,6 +76,14 @@ const WOLF_KILL = 0.2;      // share of attacks on someone alone that end in dea
 const WOUND_DAYS = 12;
 const FEAR_DAYS = 45;        // after an attack, nobody lingers outside at dusk or dawn
 const BOAR_RAID = 0.08;      // chance per spring/summer night that the boars come for the growing grain
+
+// ---------- hunting ----------
+const HUNT_GAP = 6;          // days between hunts
+const HUNT_WORK = 3;         // hours spent tracking and closing in at the lair
+const HUNT_REACH = 24 * 24;  // a lair farther than this from the hearth is out of a day's reach
+const HUNT_KEEP = 3;         // hunters leave the last two of a herd, so it can breed again
+const MEAT = { boar: 45, wolf: 12 };
+const HIDE_WARM = 0.3;       // hides over every doorway cut winter firewood by up to 30%
 
 // ---------- randomness ----------
 export function rnd(w) {
@@ -338,7 +347,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -346,7 +355,8 @@ function daily(w, c, fx) {
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
     for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
-    w.stats.yw = w.stats.yr = 0;
+    w.stats.yw = w.stats.yr = w.stats.yk = 0;
+    if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
   }
   if (w.beasts) wilds(w, c);
   weather(w, c);
@@ -382,7 +392,8 @@ function daily(w, c, fx) {
   const burn = c.season === 3 ? (wx === 'cold' ? 2 : wx === 'snow' ? 1.3 : 1) : wx === 'cold' ? 0.5 : 0;
   if (burn > 0) {
     const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && w.people.some((p) => p.home === b.id)).length;
-    const need = Math.round(homes * FUEL_PER_HOUSE * burn * 100) / 100;
+    const warm = homes ? Math.min(HIDE_WARM, ((w.hides || 0) / homes) * HIDE_WARM) : 0;
+    const need = Math.round(homes * FUEL_PER_HOUSE * burn * (1 - warm) * 100) / 100;
     if (w.timber >= need) { w.timber = Math.round((w.timber - need) * 100) / 100; if (w.stats.cold) { w.stats.cold = false; log(w, 'Every hearth is lit again.', 'good'); } }
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
   } else w.stats.cold = false;
@@ -547,8 +558,9 @@ function wilds(w, c) {
     const cap = Math.max(2, Math.min(hi, Math.round(forest / per)));
     const herd = w.beasts.filter((b) => b.k === k);
     const home = k === 'wolf' ? F.den : F.lair;
-    if (c.doy === 45 && home && herd.length >= 2 && herd.length < cap && rnd(w) < 0.5) {
+    if (c.doy === 45 && home && herd.length >= 2 && herd.length < cap && rnd(w) < (k === 'wolf' ? 0.5 : 0.7)) {
       addBeast(w, k);
+      if (k === 'boar' && herd.length + 1 < cap && rnd(w) < 0.5) addBeast(w, k); // a sow farrows a litter
       log(w, k === 'wolf' ? 'Cubs yip somewhere in the deep woods. The pack has grown.' : 'Striped piglets trot after the sows at the forest edge.', 'info');
     } else if (c.doy === 300 && herd.length > cap) {
       const gone = herd[herd.length - 1];
@@ -581,6 +593,7 @@ function prowl(w, c) {
     if (!F.raids) milestone(w, `${text} The grain is trampled and torn up. Nobody on ${w.name} has an answer for them yet.`);
     else log(w, text, 'bad');
     F.raids++; F.hit = 0;
+    learnHunting(w);
   }
   if (h === 6) F.raid = 0;
 }
@@ -649,6 +662,7 @@ function bite(w, b, p) {
   }
   if (first) milestone(w, text + after);
   else log(w, text + after, 'bad');
+  learnHunting(w);
 }
 
 function edge(w, b) {
@@ -704,6 +718,80 @@ function pickCrop(w, b) {
     if (lineOfLand(w, b.x, b.y, f.x + 0.5, f.y + 0.5)) return f;
   }
   return null;
+}
+
+// ---------- the hunt ----------
+const elder = (w) => w.people.filter((p) => !p.dead && ageY(w, p) >= 14).sort((a, b) => a.born - b.born || a.id - b.id)[0];
+function learnHunting(w) {
+  if (w.techs.includes('hunting')) return;
+  w.techs.push('hunting');
+  w.hides = w.hides || 0;
+  const who = elder(w);
+  milestone(w, who
+    ? `${who.name} lashes a flint point to a long ash pole. If the beasts come for ${w.name}, ${w.name} will go out after them. The islanders learn to hunt.`
+    : `The islanders lash flint to ash poles and learn to hunt.`);
+}
+// what is worth tracking today: the pack in winter or after it has drawn blood, otherwise the boars
+function quarry(w, c) {
+  const F = w.fauna;
+  let wolves = 0, boars = 0;
+  for (const b of w.beasts) if (b.k === 'wolf') wolves++; else boars++;
+  if (F.den && wolves >= HUNT_KEEP && (c.season === 3 || F.fear > w.t)) return 'wolf';
+  if (F.lair && boars >= HUNT_KEEP) return 'boar';
+  return null;
+}
+// can a hunter setting out now reach the lair and finish before the village comes in for the evening?
+function inDaylight(w, p, c, x, y) {
+  const dusk = w.fauna.fear > w.t ? 16 : 18;
+  return c.hour + Math.ceil(Math.sqrt(d2(x + 0.5, y + 0.5, p.x, p.y)) / SPEED) + HUNT_WORK < dusk;
+}
+function hunt(w, p, c) {
+  if (!w.fauna || !w.techs.includes('hunting') || c.hour > 10 || ageY(w, p) > 55) return null;
+  const F = w.fauna;
+  const lead = w.res.h0 != null ? w.people.find((o) => o.id === w.res.h0) : null;
+  if (lead) { // a hunter rarely goes alone: the next free hand follows the trail
+    const t = lead.task;
+    if (w.res.h1 != null || !t || t.k !== 'hunt' || !inDaylight(w, p, c, t.x, t.y) || !lineOfLand(w, p.x, p.y, t.x + 0.5, t.y + 0.5)) return null;
+    return { k: 'hunt', key: 'h1', x: t.x, y: t.y, h: HUNT_WORK + 2, q: t.q };
+  }
+  if ((F.hunt || 0) > w.t) return null;
+  const q = quarry(w, c);
+  if (!q) return null;
+  const at = q === 'wolf' ? F.den : F.lair;
+  if (d2(at.x, at.y, w.fire.x, w.fire.y) > HUNT_REACH || !inDaylight(w, p, c, at.x, at.y) || !lineOfLand(w, p.x, p.y, at.x + 0.5, at.y + 0.5)) return null;
+  F.hunt = w.t + HUNT_GAP * TICKS_PER_DAY;
+  return { k: 'hunt', key: 'h0', x: at.x, y: at.y, h: HUNT_WORK, q };
+}
+// the leader's hours at the lair are up: the beast is taken, gets away, or fights back
+function strike(w, p, t) {
+  const F = w.fauna, q = t.q;
+  const herd = w.beasts.filter((b) => b.k === q);
+  if (herd.length < HUNT_KEEP) return;
+  const mate = w.people.find((o) => o !== p && !o.dead && o.task && o.task.key === 'h1' && d2(o.x, o.y, p.x, p.y) < 9);
+  const odds = (q === 'boar' ? 0.5 : 0.35) * (mate ? 1 : 0.55);
+  const harm = (q === 'boar' ? 0.08 : 0.1) * (mate ? 1 : 2);
+  const r = rnd(w), who = mate ? `${p.name} and ${mate.name}` : p.name;
+  if (r < odds) {
+    const prey = herd.find((b) => !b.out) || herd[herd.length - 1];
+    w.beasts = w.beasts.filter((b) => b !== prey);
+    w.hides = (w.hides || 0) + 1;
+    w.stats.yk = (w.stats.yk || 0) + 1;
+    p.haul = q;
+    const n = q === 'boar' ? (F.sb = (F.sb || 0) + 1) : (F.sw = (F.sw || 0) + 1);
+    const text = q === 'boar'
+      ? `${who} ${mate ? 'spear' : 'spears'} a boar in its wallow and ${mate ? 'carry' : 'drags'} it home.`
+      : `${who} ${mate ? 'track' : 'tracks'} the pack to its den and ${mate ? 'kill' : 'kills'} a wolf. Its pelt will hang by the fire.`;
+    if (n === 1) milestone(w, q === 'boar' ? `${text} The first boar taken on ${w.name}; there is roast pork at the fire tonight.` : `${text} The first wolf ever slain on ${w.name}.`);
+    else log(w, text, 'good');
+  } else if (r < odds + harm) {
+    const fatal = rnd(w) < (mate ? 0.1 : 0.3);
+    const beast = q === 'boar' ? 'A boar' : 'A wolf';
+    if (fatal) die(w, p, q === 'boar' ? 'was gored by a boar' : 'was killed hunting wolves');
+    else p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+    log(w, fatal
+      ? `${beast} turns on ${p.name} at the lair. ${mate ? mate.name + ' brings the body home.' : 'Nobody was there to help.'}`
+      : `${beast} turns on ${p.name} at the lair. ${p.sex === 'f' ? 'She' : 'He'} comes home ${q === 'boar' ? 'gored' : 'bitten'}, empty-handed.`, 'bad');
+  } else if (q === 'wolf') log(w, `${who} ${mate ? 'follow' : 'follows'} wolf tracks to the den, but the pack slips away into the trees.`, 'info');
 }
 
 function die(w, p, why) {
@@ -881,6 +969,9 @@ function pickTask(w, p, c) {
       return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
     }
   }
+  // the hunt
+  const hk = hunt(w, p, c);
+  if (hk) return hk;
   // timber
   if (w.timber < woodTarget(w)) {
     let bt = null, bd = 1e9;
@@ -985,6 +1076,7 @@ function act(w, p, c, fx) {
   }
   if (p.task && (p.task.k === 'gather' || p.task.k === 'home')) p.task = null;
   // daytime
+  if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
     else if (a < 14) p.task = wander(w, p, w.fire.x, w.fire.y, 6, 2);
@@ -1045,6 +1137,12 @@ function finish(w, p, t, c, fx) {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
     if (got > 0) pop('+' + got, 'food');
+  } else if (t.k === 'hunt') {
+    if (t.key === 'h0') strike(w, p, t);
+  } else if (t.k === 'haul') {
+    const n = MEAT[t.q] || 0;
+    w.food += n; delete p.haul;
+    pop('+' + n, 'meat');
   } else if (t.k === 'fish') {
     const got = Math.min(w.fish, 3 + ri(w, 4));
     w.fish -= got; w.food += got;
@@ -1097,6 +1195,13 @@ const MIGRATIONS = {
       ? `${who.name} finds great paw prints in the mud and hears howling from the deep woods. Wolves live on ${w.name}, and boars root among the trees.`
       : `Howls drift from the deep woods. Wolves live on ${w.name}, and boars root among the trees.`);
   },
+  // v5 -> v6: hunting. Spears for the boars and the pack; meat for the pot, hides for the doorways.
+  5: (w) => {
+    w.hides = w.hides || 0;
+    w.stats.yk = 0;
+    if (w.fauna) { w.fauna.hunt = w.fauna.hunt || 0; w.fauna.sb = w.fauna.sb || 0; w.fauna.sw = w.fauna.sw || 0; }
+    learnHunting(w);
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1122,6 +1227,8 @@ export function summary(w) {
     roofsDown: w.buildings.filter((b) => b.dmg && isHouse(b)).length,
     wolves: (w.beasts || []).filter((b) => b.k === 'wolf').length, boars: (w.beasts || []).filter((b) => b.k === 'boar').length,
     afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,
+    hunting: w.techs.includes('hunting'), hides: w.hides || 0,
+    boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
   };
 }
 

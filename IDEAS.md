@@ -57,3 +57,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   suspects are homeOf() (buildings.find per person per tick at night), the timber scan in pickTask
   (timber is nearly always under woodTarget late game, so every idle worker scans 41x41 tiles), and
   occupants() inside housing(). Profile before guessing.
+- Hunting is done (tech 'hunting', SIM_VERSION 6; w.hides, fauna.hunt/sb/sw, p.haul, task keys h0/h1,
+  yearly `hunted`). Hunters pin both herds at the floor of 2 most of the year, yet boars still raid
+  ~10-20 nights a year (two boars are enough). Answers it invites:
+  - Fences / hedges (still open above): the only real fix for raids now that hunting is capped.
+  - Tanning: hides only cut winter firewood (up to 30%) and wear out by 40% a year; a tannery could
+    turn them into leather (clothing for the frail in cold snaps, boat skins, water bags).
+  - Hunter as a lasting role: the same pairs keep going out; skill could grow with each kill.
+  - Deer on the meadows would give a non-dangerous quarry and keep grass open (see grass vanishing).
+  - If the wolf pack is held at 2 too long, a lone wolf could turn bold (attacks by day) as a twist.

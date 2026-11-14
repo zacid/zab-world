@@ -10,8 +10,8 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', idle: '#d9d9d9', gather: '#d9d9d9' };
-const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', muted: '#9aa' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', idle: '#d9d9d9', gather: '#d9d9d9' };
+const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
 const FRAME = ['........', '...bb...', '..b..b..', '.b....b.', '.bbbbbb.', '.b....b.', '.b....b.', '........'];
@@ -121,6 +121,13 @@ function drawTerrain() {
   for (let k = 0; k < sacks; k++) { px(tc, fx + 9 + (k % 2) * 3, fy + 2 + ((k / 2) | 0) * 3, '#d9c08a', 3, 3); px(tc, fx + 10 + (k % 2) * 3, fy + 2 + ((k / 2) | 0) * 3, '#b49a64'); }
   const logs = Math.min(4, Math.ceil(w.timber / 60));
   for (let k = 0; k < logs; k++) { px(tc, fx - 7, fy + 6 - k * 2, '#8a5a32', 6, 2); px(tc, fx - 7, fy + 6 - k * 2, '#c09060', 1, 2); }
+  // drying rack above the hearth: one stretched hide per pelt in store, up to three
+  if (w.techs.includes('hunting')) {
+    const rx = fx - 6, ry = fy - 7;
+    px(tc, rx, ry, '#6e4a2a', 1, 6); px(tc, rx + 10, ry, '#6e4a2a', 1, 6); px(tc, rx, ry, '#8a5a32', 11, 1);
+    const hides = Math.min(3, w.hides || 0);
+    for (let k = 0; k < hides; k++) { px(tc, rx + 1 + k * 3, ry + 1, k === 1 ? '#8a6c4c' : '#a4825a', 3, 4); px(tc, rx + 2 + k * 3, ry + 2, '#6e5238', 1, 2); }
+  }
   // houses
   for (const b of w.buildings) {
     if (b.kind === 'granary') {
@@ -217,6 +224,14 @@ function frame() {
         px(sc, X + 3, Y, '#8a5a32', 1, 1); px(sc, X + 4, Y - 1, '#8a5a32', 1, 1);
         px(sc, X + 5, Y - 1, 'rgba(255,255,255,0.55)', 1, 3 + bob); px(sc, X + 5, Y + 2 + bob, '#e8e8e8', 1, 1);
       }
+      if (p.task && p.task.k === 'hunt') { // an ash spear, flint point up; jabbed forward at the lair
+        const jab = !moving && Math.floor(now / 260 + p.id) % 4 === 0 ? 1 : 0;
+        px(sc, X + 3 + jab, Y - 2, '#b49a6a', 1, 5); px(sc, X + 3 + jab, Y - 3, '#e8e8e8', 1, 1);
+      }
+      if (p.task && p.task.k === 'haul') { // the kill slung over a shoulder
+        const fur = p.task.q === 'wolf' ? '#8a8d93' : '#4d3527';
+        px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, p.task.q === 'wolf' ? '#b4b7bc' : '#7a5444', 1, 1);
+      }
     }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     shown.push({ p, x, y });
@@ -277,7 +292,8 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire' })[p.task ? p.task.k : 'idle'];
+      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
+        hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
@@ -369,6 +385,7 @@ function updatePanels() {
     ['field', 'Fields', s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
+    ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');

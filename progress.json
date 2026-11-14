@@ -18,5 +18,10 @@
   "at": "2026-11-14T21:42:33.673Z",
   "title": "Add wolves and boars to the woods of the island",
   "body": "- SIM_VERSION 5: a wolf pack dens in the deepest forest, boars lie up in cover near the fields (3 each, herd size follows forest cover)\n- Wolves prowl the treeline from dusk to dawn (and on winter cold snaps); a lone adult away from the houses can be bitten (12 days laid up) or killed; a helper nearby drives the wolf off. ~1 attack and ~0.1 deaths a year\n- After an attack the village comes in at 16:00 and goes out at 07:00 for 45 days; boars root through growing grain near the woods on ~14 spring/summer nights a year\n- Visible: grey wolves with glowing eyes at night, boars rooting in fields, torn-up field tiles, bandaged villagers, a Wilds row in the panel\n- Watch: first bite and first raid in the chronicle; 100-yr pop ~217 vs ~259 before"
+ },
+ {
+  "at": "2026-11-14T22:21:40.482Z",
+  "title": "Add hunting: boar and wolf hunts, meat and hides",
+  "body": "- New tech Hunting (SIM_VERSION 6); live world learns it on load, new worlds after the first boar raid or wolf attack\n- Every 6 days a pair sets out at dawn for the boar lair, or the wolf den in winter and after an attack; trip must fit before dusk\n- Success 50% boar / 35% wolf (about half alone); 8-10% chance the beast turns, rarely fatal; herds never hunted below 2\n- Kills are carried home on a shoulder (+45 meat boar, +12 wolf); hides dry on a rack by the hearth, cut winter firewood up to 30%, wear out yearly\n- Visible: red hunters with spears, carcass on the way home, hide rack, Hunt row in panel; watch for the first boar taken on Hais this spring"
  }
 ]
