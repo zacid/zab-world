@@ -100,3 +100,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Crowding matters: more houses (or stone longhouses) lower the outbreak odds; tie house building to it.
   - Mourning: the chronicle could name the dead of a bad fever year; a burial ground on the map.
   - A yearly `sick` row in the graph panel would show the fever years at a glance.
+- Boats were considered and skipped for now: the shallows sit at 0-20 fish all year (every idle adult fishes),
+  but food is already 10-20k in store, so more catch adds nothing. Boats become worth it once food is tight,
+  or as transport (a second settlement, trade, visitors at midsummer).
+- Footpaths are done (SIM_VERSION 10; w.wear[MAP*MAP] 0..60, PATH_AT 24, w.paths count, tech 'paths'; walk()/tread()
+  in sim.js, drawPath() in render.js). Answers it invites:
+  - Roads: lay stone or log corduroy on the busiest paths (needs stone/quarry); faster still, never grass over.
+  - Paths through forest: woodcutters' tracks could wear forest edges into rides; wolves could follow paths at night.
+  - Snow slows walking off-path (2 tiles/h) so winter tracks matter more; trodden snow already shows grey.
+  - Bridges or stepping stones where a path meets a stream (no rivers yet; rivers would be a big terrain change).
+  - Wayside things along old paths: a cairn where someone died, a shrine, a bench for elders.
+  - Paths keep grass open but only along tracks; grass still vanishes elsewhere (see grass vanishing).

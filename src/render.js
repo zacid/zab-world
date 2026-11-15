@@ -156,6 +156,39 @@ function drawTree(c, x, y, size, pal, h) {
   px(c, x + 2, y + 1, l2, 2, 1); px(c, x + 1, y + 2, l2, 1, 1); px(c, x + 3, y + 2, l2, 1, 1);
   if (pal.snow) { px(c, x + 2, y + 1, '#eef3f7', 3, 1); px(c, x + 1, y + 2, '#eef3f7', 1, 1); }
 }
+// footpaths: trampled grass shows scuffs of earth; a real path is a ragged bare track that joins up
+// with the paths, houses, beach and fields around it. Under snow it is churned grey slush.
+const isWay = (x, y) => {
+  if (x < 0 || y < 0 || x >= N || y >= N) return false;
+  const i = y * N + x, t = w.tiles[i];
+  return t === S.T.BUILD || t === S.T.SAND || t === S.T.FIELD || (t === S.T.GRASS && w.wear[i] >= S.PATH_AT);
+};
+function drawPath(x, y, X, Y, v, pal) {
+  const dirt = pal.snow ? '#a1998c' : '#6f5a3e', edge = pal.snow ? '#b3ada3' : '#7f6a4a', stone = pal.snow ? '#8d8579' : '#8f8170';
+  if (v < S.PATH_AT) { // scuffed: a few patches of earth, more the more it is walked
+    const k = Math.min(7, 1 + ((v - S.WEAR_SEEN) / 3) | 0);
+    for (let j = 0; j < k; j++) { const hh = S.hash(x * 7 + j, y, 41); px(tc, X + 1 + ((hh * 6) | 0), Y + 1 + ((hh * 360) | 0) % 6, j & 1 ? edge : dirt, 2, 1); }
+    return;
+  }
+  px(tc, X + 2, Y + 2, dirt, 4, 4);
+  const n = isWay(x, y - 1), s = isWay(x, y + 1), e = isWay(x + 1, y), we = isWay(x - 1, y);
+  if (n) px(tc, X + 2, Y, dirt, 4, 2);
+  if (s) px(tc, X + 2, Y + 6, dirt, 4, 2);
+  if (we) px(tc, X, Y + 2, dirt, 2, 4);
+  if (e) px(tc, X + 6, Y + 2, dirt, 2, 4);
+  // diagonal tracks, where the walk cuts a corner
+  for (const [ax, ay] of [[1, -1], [1, 1], [-1, 1], [-1, -1]]) {
+    if (!isWay(x + ax, y + ay) || isWay(x + ax, y) || isWay(x, y + ay)) continue;
+    px(tc, X + (ax > 0 ? 6 : 0), Y + (ay > 0 ? 6 : 0), dirt, 2, 2);
+  }
+  // ragged verges and a pebble or two, so it reads as worn ground rather than paving
+  const h = S.hash(x, y, 43);
+  px(tc, X + 2 + ((h * 4) | 0), Y + 2 + ((h * 40) | 0) % 4, stone);
+  if (!n) px(tc, X + 2 + ((h * 90) | 0) % 4, Y + 1, edge, 2, 1);
+  if (!s) px(tc, X + 2 + ((h * 70) | 0) % 4, Y + 6, edge, 2, 1);
+  if (!we) px(tc, X + 1, Y + 2 + ((h * 50) | 0) % 4, edge, 1, 2);
+  if (!e) px(tc, X + 6, Y + 2 + ((h * 30) | 0) % 4, edge, 1, 2);
+}
 function drawTerrain() {
   const c = clockNow();
   const pal = PAL[c.season];
@@ -177,6 +210,7 @@ function drawTerrain() {
     px(tc, X, Y, pal.grass[0], 8, 8);
     for (let k = 0; k < 5; k++) { const hh = S.hash(x * 5 + k, y, 17); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, k < 3 ? pal.grass[1] : pal.grass[2]); }
     if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, pal, h);
+    else if (t === S.T.GRASS && w.wear && w.wear[i] >= S.WEAR_SEEN) drawPath(x, y, X, Y, w.wear[i], pal);
   }
   // fields
   for (const f of w.fields) {
@@ -544,6 +578,7 @@ function updatePanels() {
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced)</span>` : s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
+    ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };

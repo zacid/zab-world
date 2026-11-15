@@ -48,5 +48,10 @@
   "at": "2026-11-15T01:19:07.381Z",
   "title": "Add fever outbreaks that spread through crowded houses",
   "body": "- SIM_VERSION 9 (w.fever, p.sick, p.imm): a fever can take hold any day, most often in autumn and winter, more in crowded houses and bigger villages; castaways bring it ashore 15% of the time\n- It spreads 10%/day per sick housemate plus a little across the village; 6-10 days in bed, then 4 years immune, so outbreaks burn out\n- Sick islanders stop working and skip midsummer; infants and elders are most at risk (~3-4% of cases die, double when hungry or cold); 100-yr pop on seed 20261114 drops ~199 -> 151\n- Visible: sick lie under a blanket in their doorway, pale green \"fever\" pops, \"n sick\" on the People row, \"laid up with fever\" on the follow card\n- Watch: the first fever on Hais (likely within the first in-world year or two); outbreak ends are logged, and ones that take 3+ lives go in the chronicle"
+ },
+ {
+  "at": "2026-11-15T01:30:51.916Z",
+  "title": "Add footpaths worn into the grass by daily walking",
+  "body": "- SIM_VERSION 10 (w.wear per tile): each hour's walk wears the grass it crosses; grass heals 1/day spring to autumn, not under snow\n- Tiles worn to 24+ become bare-earth paths: walking on them is 4 tiles/h instead of 3, and the woods cannot regrow over them\n- New tech Footpaths is noticed in-world once a track of 12+ path tiles leads 7+ tiles out from the hearth (the live world should see it within weeks of game time)\n- Visible: scuffed grass, then ragged dirt tracks that join houses, beach and fields (grey slush in winter); Paths row in the panel\n- Watch: trails to the beach and woodlots stay open as forest closes in; ~90-120 path tiles on test seeds"
  }
 ]

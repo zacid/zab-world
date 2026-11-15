@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 9;
+export const SIM_VERSION = 10;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -46,6 +46,7 @@ export const TECHS = {
   hunting:  { name: 'Hunting',   desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
   fencing:  { name: 'Fences',    desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
   midsummer: { name: 'Midsummer', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
+  paths:    { name: 'Footpaths', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
 };
 
 // ---------- weather ----------
@@ -111,6 +112,14 @@ const FEVER_TOWN = 0.04;    // daily chance x share of the village that is sick 
 const FEVER_DAYS = 6;        // laid up for 6-10 days
 const FEVER_IMMUNE = 4;      // years a survivor cannot catch it again
 const FEVER_CASTAWAY = 0.15; // chance a castaway brings it ashore
+// ---------- footpaths ----------
+// Every step on open grass wears it a little; the grass grows back a little each day. Where people
+// walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
+export const WEAR_MAX = 60;     // how worn a tile can get
+export const WEAR_SEEN = 6;     // grass looks trampled from here
+export const PATH_AT = 24;      // and is a bare-earth path from here
+const PATH_SPEED = 4;           // tiles per hour along a path (3 off it)
+const WEAR_HEAL = [1, 1, 1, 0]; // grass heals spring to autumn; under snow nothing grows back
 // where the dancers stand: 24 points on a circle of radius 1, 15 degrees apart (written out, no trig in the step)
 const RING = [[1, 0], [0.966, 0.259], [0.866, 0.5], [0.707, 0.707], [0.5, 0.866], [0.259, 0.966], [0, 1], [-0.259, 0.966],
   [-0.5, 0.866], [-0.707, 0.707], [-0.866, 0.5], [-0.966, 0.259], [-1, 0], [-0.966, -0.259], [-0.866, -0.5], [-0.707, -0.707],
@@ -224,6 +233,7 @@ export function genesis(seed, epoch) {
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
+    wear: new Array(MAP * MAP).fill(0),
   };
   // name the island
   let nm = '';
@@ -440,12 +450,13 @@ function daily(w, c, fx) {
   for (let k = 0; k < 60; k++) {
     const x = ri(w, MAP), y = ri(w, MAP), i = idx(x, y);
     if (w.tiles[i] === T.FOREST && w.wood[i] < TREE_MAX) w.wood[i]++;
-    else if (w.tiles[i] === T.GRASS && rnd(w) < 0.05 && !nearBuild(w, x, y, 1) &&
+    else if (w.tiles[i] === T.GRASS && rnd(w) < 0.05 && !(w.wear && w.wear[i] >= PATH_AT) && !nearBuild(w, x, y, 1) &&
       ![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tile(w, x + a, y + b) === T.FIELD) &&
       [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tile(w, x + a, y + b) === T.FOREST)) {
       setTile(w, i, T.FOREST); w.wood[i] = 1;
     }
   }
+  if (w.wear) paths(w, c);
   // winter fuel; a cold snap doubles it, and even out of winter it sends people to the woodpile
   const burn = c.season === 3 ? (wx === 'cold' ? 2 : wx === 'snow' ? 1.3 : 1) : wx === 'cold' ? 0.5 : 0;
   if (burn > 0) {
@@ -792,6 +803,62 @@ function pickCrop(w, b) {
     return f;
   }
   return null;
+}
+
+// ---------- footpaths ----------
+// Feet wear the grass on every tile they cross (sampled along the hour's walk); paths are only ever
+// counted, never laid, so they run wherever the work actually is: the shore, the fields, the woodlot.
+function tread(w, x0, y0, x1, y1) {
+  const W = w.wear, dx = x1 - x0, dy = y1 - y0;
+  const n = Math.ceil(Math.abs(dx) + Math.abs(dy));
+  let last = -1;
+  for (let k = 1; k <= n; k++) {
+    const x = Math.floor(x0 + (dx * k) / n), y = Math.floor(y0 + (dy * k) / n);
+    if (!inMap(x, y)) continue;
+    const i = idx(x, y);
+    if (i === last) continue;
+    last = i;
+    if (w.tiles[i] === T.GRASS && W[i] < WEAR_MAX) W[i]++;
+  }
+}
+// a villager's walk for the hour: quicker where the ground is trodden bare
+function walk(w, p, tx, ty) {
+  const W = w.wear;
+  if (!W) return moveToward(p, tx, ty);
+  const x0 = p.x, y0 = p.y, cx = Math.floor(x0), cy = Math.floor(y0);
+  const on = inMap(cx, cy) && W[idx(cx, cy)] >= PATH_AT;
+  const done = moveToward(p, tx, ty, on ? PATH_SPEED : SPEED);
+  if (p.x !== x0 || p.y !== y0) tread(w, x0, y0, p.x, p.y);
+  return done;
+}
+// once a day the grass creeps back over the ground nobody crossed
+function paths(w, c) {
+  const W = w.wear, heal = WEAR_HEAL[c.season];
+  let n = 0, far = -1, fd = -1;
+  for (let i = 0; i < W.length; i++) {
+    if (!W[i]) continue;
+    if (w.tiles[i] !== T.GRASS) { W[i] = 0; continue; } // ploughed, built on or overgrown: the old track is gone
+    if (heal) W[i] -= heal;
+    if (W[i] >= PATH_AT) {
+      n++;
+      const x = i % MAP, y = (i - x) / MAP, dd = d2(x, y, w.fire.x, w.fire.y);
+      if (dd > fd) { fd = dd; far = i; }
+    }
+  }
+  w.paths = n;
+  if (n >= 12 && fd >= 49 && !w.techs.includes('paths')) { // a track that leads somewhere, not just the yard by the fire
+    w.techs.push('paths');
+    const x = far % MAP, y = (far - x) / MAP;
+    let to = 'the fields';
+    for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) {
+      const t = tile(w, xx, yy);
+      if (t === T.SAND) to = 'the beach';
+      else if (t === T.FOREST && to !== 'the beach') to = 'the woods';
+    }
+    const who = elder(w);
+    milestone(w, `The grass between the hearth and ${to} is trodden down to bare earth. Nobody laid it out; the feet of ${w.name} did.` +
+      (who ? ` ${who.name} notices the walk is quicker on it, and the others follow the track.` : ' The walk is quicker along it.'));
+  }
 }
 
 // ---------- midsummer ----------
@@ -1406,7 +1473,7 @@ function act(w, p, c, fx) {
     if (p.task && p.task.k !== 'fest') release(w, p);
     if (!p.task) p.task = festSpot(w);
     p.asleep = false;
-    moveToward(p, p.task.x + 0.5, p.task.y + 0.5);
+    walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
   if (night || storm || p.sick) { // in a storm nobody works outdoors: they wait it out at home. The sick keep to their beds
@@ -1418,7 +1485,7 @@ function act(w, p, c, fx) {
       moveToward(p, home.x + 0.5 + off, home.y + 1.25);
       return;
     }
-    if (moveToward(p, home.x + 0.5 + off, home.y + 0.5)) p.asleep = p.home != null;
+    if (walk(w, p, home.x + 0.5 + off, home.y + 0.5)) p.asleep = p.home != null;
     return;
   }
   p.asleep = false;
@@ -1428,7 +1495,7 @@ function act(w, p, c, fx) {
       const ang = (p.id * 2654435761) >>> 0;
       p.task = { k: 'gather', x: w.fire.x + ((ang % 5) - 2), y: w.fire.y + (((ang >>> 8) % 3) - 1) + ((ang >>> 4) & 1 ? 1 : -1), h: 99 };
     }
-    moveToward(p, p.task.x + 0.5, p.task.y + 0.5);
+    walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
   if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest')) p.task = null;
@@ -1441,7 +1508,7 @@ function act(w, p, c, fx) {
     else reserve(w, p, pickTask(w, p, c));
   }
   const t = p.task;
-  if (!moveToward(p, t.x + 0.5, t.y + 0.5)) return;
+  if (!walk(w, p, t.x + 0.5, t.y + 0.5)) return;
   t.h--;
   if (t.h > 0) return;
   finish(w, p, t, c, fx);
@@ -1580,6 +1647,11 @@ const MIGRATIONS = {
     w.fever = w.fever || { k: 0, n: 0, d: 0, all: 0 };
     w.stats.yi = w.stats.yi || 0;
   },
+  // v9 -> v10: footpaths. Feet now wear the grass; the first worn track is noticed in-world.
+  9: (w) => {
+    if (!Array.isArray(w.wear) || w.wear.length !== MAP * MAP) w.wear = new Array(MAP * MAP).fill(0);
+    w.paths = w.paths || 0;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1610,6 +1682,7 @@ export function summary(w) {
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
+    paths: w.paths || 0,
   };
 }
 
