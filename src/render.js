@@ -365,10 +365,12 @@ function ambience(c, hf, now, layer) {
   const wx = wxNow(), storm = wx === 'storm', dark = darkness(hf);
   if (layer === 'below') {
     // waves run up the sand and draw back; storms throw up a wide white fringe
-    const reach = storm ? 4 : wx === 'rain' ? 3 : 2, period = storm ? 1500 : 2600;
+    // in fog the sea lies flat: a faint, slow lap at the sand
+    const fog = wx === 'fog';
+    const reach = storm ? 4 : wx === 'rain' ? 3 : fog ? 1 : 2, period = storm ? 1500 : fog ? 4200 : 2600;
     for (const s of surf) {
       const ph = ((now / period + s.h) % 1), k = ph < 0.6 ? ph / 0.6 : (1 - ph) / 0.4; // in fast, out slow
-      const d = reach - Math.round(k * reach), a = (0.25 + 0.45 * k) * (1 - dark * 0.6);
+      const d = reach - Math.round(k * reach), a = (0.25 + 0.45 * k) * (1 - dark * 0.6) * (fog ? 0.5 : 1);
       sc.fillStyle = `rgba(220,235,245,${a.toFixed(3)})`;
       const gap = ((s.h * 64) | 0) % 8; // a break in the foam, so it does not read as a ruled line
       for (let j = 0; j < 8; j++) {
@@ -403,7 +405,7 @@ function ambience(c, hf, now, layer) {
     }
   }
   // gulls: a few wheel over the shallows by day, drawn to whoever is fishing; gone at night and in storms
-  const want = dark > 0.3 || storm || !surf.length ? 0 : c.season === 3 ? 2 : 4;
+  const want = dark > 0.3 || storm || wx === 'fog' || !surf.length ? 0 : c.season === 3 ? 2 : 4;
   const fishers = w.people.filter((p) => !p.asleep && p.task && p.task.k === 'fish');
   for (let g = 0; g < want; g++) {
     const f = fishers.length ? fishers[g % fishers.length] : null;
@@ -444,7 +446,10 @@ function frame() {
 
   // background sea: near-black with drifting glints
   ctx.fillStyle = '#04070d'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const fogged = wxNow() === 'fog';
+  if (fogged) { ctx.fillStyle = `rgba(120,130,138,${(0.16 * (1 - dark * 0.7)).toFixed(3)})`; ctx.fillRect(0, 0, cv.width, cv.height); }
   for (const s of sparks) {
+    if (fogged && s.s < 0.8) continue; // fog swallows all but the brightest glints
     const a = 0.25 + 0.75 * Math.max(0, Math.sin(now / 1400 + s.p));
     ctx.fillStyle = `rgba(150,180,220,${(a * (0.25 + s.s * 0.5)).toFixed(3)})`;
     const sz = s.s > 0.85 ? 2 : 1;
@@ -527,7 +532,7 @@ function frame() {
   ambience(c, hf, now, 'above');
   // the day's sky colours the land
   const wx = wxNow();
-  const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)' }[wx];
+  const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)', fog: 'rgba(190,198,204,0.30)' }[wx];
   if (tint) { sc.fillStyle = tint; sc.fillRect(0, 0, PX, PX); }
   // night
   if (dark > 0) {
@@ -549,7 +554,7 @@ function frame() {
     }
     sc.globalCompositeOperation = 'source-over';
   }
-  skyFx(wx, now);
+  skyFx(wx, now, dark);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(scene, view.ox, view.oy, PX * view.s, PX * view.s);
   if (fpos) { // thin white corner brackets around whoever is followed; dashed round the house while they sleep
@@ -627,7 +632,18 @@ function bonfire(X, Y, now) {
 }
 // rain, snow and lightning over the scene, at native pixel size so they stay crisp
 const drops = Array.from({ length: 900 }, (_, i) => ({ x: S.hash(i, 1, 31), y: S.hash(i, 2, 31), s: S.hash(i, 3, 31) }));
-function skyFx(wx, now) {
+function skyFx(wx, now, dark = 0) {
+  if (wx === 'fog') { // banks of sea fog drift slowly in from the west and thin out between
+    const col = dark > 0.3 ? '120,128,140' : '214,220,224', a = 0.2 * (1 - dark * 0.55);
+    for (let i = 0; i < 26; i++) {
+      const d = drops[i], r = 18 + d.s * 26, span = PX + r * 2;
+      const x = ((d.x * span + now * (0.0016 + d.s * 0.0018)) % span) - r;
+      const y = d.y * PX + Math.sin(now / 9000 + i) * 4;
+      const k = 0.55 + 0.45 * Math.sin(now / 7000 + d.s * 9); // each bank thickens and thins
+      glow(sc, x, y, r, `rgba(${col},${(a * k).toFixed(3)})`);
+    }
+    return;
+  }
   if (wx === 'rain' || wx === 'storm') {
     const n = wx === 'storm' ? 900 : 380, slant = wx === 'storm' ? 2 : 1;
     sc.fillStyle = wx === 'storm' ? 'rgba(190,210,235,0.55)' : 'rgba(160,190,225,0.45)';

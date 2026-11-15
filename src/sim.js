@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 12;
+export const SIM_VERSION = 13;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -60,14 +60,19 @@ export const WEATHER = {
   heat:  { name: 'heatwave', stay: 0.72 },
   cold:  { name: 'cold snap', stay: 0.66 },
   snow:  { name: 'snow', stay: 0.6 },
+  fog:   { name: 'sea fog', stay: 0.55 },
 };
 const WX_ODDS = [ // per season, weights out of 100
-  [['clear', 55], ['rain', 34], ['storm', 5], ['cold', 6]],
-  [['clear', 56], ['rain', 20], ['storm', 9], ['heat', 15]],
-  [['clear', 46], ['rain', 34], ['storm', 12], ['cold', 8]],
-  [['clear', 42], ['snow', 34], ['cold', 16], ['storm', 8]],
+  [['clear', 48], ['rain', 34], ['fog', 7], ['storm', 5], ['cold', 6]],
+  [['clear', 53], ['rain', 20], ['fog', 3], ['storm', 9], ['heat', 15]],
+  [['clear', 36], ['rain', 34], ['fog', 10], ['storm', 12], ['cold', 8]],
+  [['clear', 37], ['snow', 34], ['fog', 5], ['cold', 16], ['storm', 8]],
 ];
-const WX_GROW = { clear: 1, rain: 1.25, storm: 1, heat: 0.4, cold: 0.5, snow: 0 };
+const WX_GROW = { clear: 1, rain: 1.25, storm: 1, heat: 0.4, cold: 0.5, snow: 0, fog: 0.8 };
+// sea fog: nobody can see the fish or follow a trail, people grope along off the paths, and the
+// wolves, hidden in the grey, come out of the trees by day
+const FOG_SPEED = 2;         // tiles per hour off a path in fog (a path is still PATH_SPEED)
+const FOG_BOLD = 0.5;        // share of its dusk boldness a wolf has by day in fog
 const STORM_FLATTEN = 0.03;  // chance per storm day that a tall or ripe field is flattened
 const STORM_ROOF = 0.15;    // chance per storm day that one building loses its roof
 
@@ -429,7 +434,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -437,7 +442,7 @@ function daily(w, c, fx) {
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
     for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
-    w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = 0;
+    w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
     for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
@@ -547,8 +552,18 @@ function weather(w, c) {
     if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
     else if (next === 'heat') log(w, 'The sun beats down. The soil cracks.', 'info');
+    else if (next === 'fog') fogComes(w);
   }
   if (w.wx.k === 'storm') storm(w);
+  if (w.wx.k === 'fog') w.stats.yg = (w.stats.yg || 0) + 1;
+}
+
+function fogComes(w) {
+  w.stats.fogs = (w.stats.fogs || 0) + 1;
+  if (w.stats.fogs > 1) { log(w, 'Fog rolls in off the sea. The shore goes quiet and the trees fade to grey.', 'info'); return; }
+  const who = elder(w);
+  milestone(w, `A wall of grey rolls in off the sea and swallows ${w.name}. From the beach ${who ? who.name : 'nobody'} cannot see the water, and from the fields nobody can see the trees. ` +
+    'Nobody fishes and nobody hunts, and somewhere out in the white a wolf howls in broad day.');
 }
 
 function storm(w) {
@@ -590,6 +605,13 @@ function endSpell(w, s) {
     big = n >= 15 || s.d >= 2;
   } else if (s.k === 'snow' && n >= 5) {
     text = `${len} of snow end. Drifts lie deep against the houses.`; k = 'info';
+  } else if (s.k === 'fog' && (n >= 4 || s.b)) {
+    const fell = s.b === 1 ? 'a wolf fell on one of the village' : `wolves fell on ${s.b} islanders`;
+    text = (n === 1 ? 'The fog lifts.' : `${len} of fog lift.`) + (!s.b ? ' The sea and the woods come back.'
+      : s.x >= s.b ? ` Out of the grey, wolves took ${s.x === 1 ? 'one of the village' : s.x + ' islanders'}.`
+      : ` Out of the grey, ${fell}${s.x ? `, and ${s.x === 1 ? 'one' : s.x} did not come home` : ''}.`);
+    k = s.b ? 'bad' : 'info';
+    big = n >= 12 || s.x >= 1;
   } else if (s.k === 'rain' && n >= 7) {
     text = `${len} of rain end. The fields have drunk deep.`; k = 'good';
   }
@@ -738,8 +760,10 @@ function prowl(w, c) {
   const storm = wx === 'storm';
   // wolves come out at dusk; in a hungry winter frost they roam by day too
   const dusk = h >= 18 || h < 7;
-  const wolfOut = !storm && !!F.den && (dusk || (c.season === 3 && wx === 'cold'));
-  F.bold = dusk ? WOLF_STALK : WOLF_STALK / 3;
+  // and in a sea fog they slip out of the trees by day, unseen until they are close
+  const fog = wx === 'fog';
+  const wolfOut = !storm && !!F.den && (dusk || fog || (c.season === 3 && wx === 'cold'));
+  F.bold = dusk ? WOLF_STALK : fog ? WOLF_STALK * FOG_BOLD : WOLF_STALK / 3;
   // boars raid the growing grain on spring and summer nights
   if (h === 21) F.raid = !storm && F.lair && c.season < 2 && w.fields.some((f) => f.stage === 'planted' || f.stage === 'ripe') && rnd(w) < BOAR_RAID ? 1 : 0;
   const boarOut = !!F.raid && !storm && (h >= 21 || h < 5);
@@ -818,17 +842,21 @@ function bite(w, b, p) {
   F.fear = w.t + FEAR_DAYS * TICKS_PER_DAY;
   const after = wasAfraid ? '' : ' For weeks after, nobody stays out past dusk.';
   const helper = w.people.find((o) => o !== p && !o.dead && !o.asleep && ageY(w, o) >= 14 && d2(o.x, o.y, p.x, p.y) < 9);
+  const fog = w.wx && w.wx.k === 'fog';
+  if (fog) w.wx.b = (w.wx.b || 0) + 1;
+  const where = fog ? 'out of the fog' : 'at the edge of the trees';
   let text;
-  if (helper) text = `A wolf springs at ${p.name}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
+  if (helper) text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
   else if (rnd(w) < WOLF_KILL) {
-    die(w, p, 'was dragged down by wolves');
-    text = `Wolves take ${p.name} at the edge of the trees.`;
+    die(w, p, fog ? 'was dragged down by wolves in the fog' : 'was dragged down by wolves');
+    text = fog ? `Wolves take ${p.name} in the fog. Nobody saw them come.` : `Wolves take ${p.name} at the edge of the trees.`;
+    if (fog) w.wx.x = (w.wx.x || 0) + 1;
     F.kills = (F.kills || 0) + 1;
     if (F.kills === 1) { milestone(w, text + ` ${w.name} learns to fear the dark woods.` + after); return; }
   } else {
     p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
     release(w, p);
-    text = `A wolf leaps on ${p.name} at the edge of the trees. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`;
+    text = `A wolf leaps on ${p.name} ${where}. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`;
   }
   if (first) milestone(w, text + after);
   else log(w, text + after, 'bad');
@@ -953,7 +981,7 @@ function walk(w, p, tx, ty) {
   if (!W) return moveToward(p, tx, ty);
   const x0 = p.x, y0 = p.y, cx = Math.floor(x0), cy = Math.floor(y0);
   const on = inMap(cx, cy) && W[idx(cx, cy)] >= PATH_AT;
-  const done = moveToward(p, tx, ty, on ? PATH_SPEED : SPEED);
+  const done = moveToward(p, tx, ty, on ? PATH_SPEED : w.wx && w.wx.k === 'fog' ? FOG_SPEED : SPEED);
   if (p.x !== x0 || p.y !== y0) tread(w, x0, y0, p.x, p.y);
   return done;
 }
@@ -1115,7 +1143,7 @@ function hunt(w, p, c) {
     if (w.res.h1 != null || !t || t.k !== 'hunt' || !inDaylight(w, p, c, t.x, t.y) || !lineOfLand(w, p.x, p.y, t.x + 0.5, t.y + 0.5)) return null;
     return { k: 'hunt', key: 'h1', x: t.x, y: t.y, h: HUNT_WORK + 2, q: t.q };
   }
-  if ((F.hunt || 0) > w.t) return null;
+  if ((F.hunt || 0) > w.t || (w.wx && w.wx.k === 'fog')) return null; // no trail can be followed in fog
   const q = quarry(w, c);
   if (!q) return null;
   const at = q === 'wolf' ? F.den : q === 'deer' ? F.mead : F.lair;
@@ -1624,6 +1652,7 @@ function shoreBlocks(w) {
 
 function fish(w, p) {
   if (!w.shore || w.fish < 3 || !w.techs.includes('fishing')) return null;
+  if (w.wx && w.wx.k === 'fog') return null; // nobody can see a fish in grey water
   // the nearest free spot; ties go to the spot listed first, as a sweep along the beach would choose
   let best = null, bd = 1e9, bk = 0;
   const px = p.x - 0.5, py = p.y - 0.5, blocks = shoreBlocks(w);
@@ -1900,6 +1929,11 @@ const MIGRATIONS = {
     milestone(w, who
       ? `At first light ${who.name} sees four deer grazing on the open grass ${where} of the village. They lift their heads, stare, and are gone into the trees. Not everything in the woods of ${w.name} has teeth.`
       : `Deer are seen grazing on the open grass at first light.`);
+  },
+  // v12 -> v13: sea fog joins the weather. The first fog bank is noticed in-world when it comes.
+  12: (w) => {
+    w.stats.fogs = w.stats.fogs || 0;
+    w.stats.yg = w.stats.yg || 0;
   },
 };
 export function migrate(w) {

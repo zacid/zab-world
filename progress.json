@@ -68,5 +68,10 @@
   "at": "2026-11-15T02:54:06.266Z",
   "title": "Add surf, chimney smoke and gulls to the map",
   "body": "- Waves run up to every beach and draw back; rain and storms push the foam wider and faster, with spray in storms\n- Lived-in houses smoke: all day in winter and on cold or snowy days, mornings and evenings in spring and autumn, only at supper in summer; storms flatten the smoke sideways\n- Gulls wheel over the shallows by day and drift over to whoever is fishing; fewer in winter, none at night or in storms\n- Render only: no change to the simulation, saved state or SIM_VERSION\n- Watch: the first winter on Hais, when every roof should be smoking"
+ },
+ {
+  "at": "2026-11-15T04:35:23.786Z",
+  "title": "Add sea fog: wolves hunt by day in the grey",
+  "body": "- SIM_VERSION 13: new weather kind 'fog' (spring 7%, summer 3%, autumn 10%, winter 5% of new spells; holds 55%); crops grow at 0.8x\n- In fog nobody fishes or sets out to hunt, walking off a path drops to 2 tiles/h (paths stay 4), and wolves leave the trees by day at half their dusk boldness\n- First fog bank is a chronicle milestone; spells of 4+ days or with a wolf attack are logged, wolf kills in fog go in the chronicle; yearly history gets `fog` days\n- Visible: grey wash, slow drifting fog banks over the map, flat faint surf, no gulls, sea glints hidden; \"sea fog\" in pale grey next to the date\n- Watch: the live world's first fog (spring/autumn most likely) and a daytime wolf attack; test seeds see ~1 fog death per 20-30 years"
  }
 ]

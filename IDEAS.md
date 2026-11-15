@@ -137,4 +137,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Smoke could follow the sim: no smoke from a house when the woodpile is empty (late-game timber shortage shows on screen).
   - A real wind in w.wx (direction per day) would let smoke, rain and storm damage all lean the same way.
   - Gulls could steal from the fish catch, or flock behind the sowers in spring; crows in the fields in autumn.
-  - Fog days (a new weather kind) would hide the sea glints and muffle the surf; fishers stay in.
+  - Fog days (a new weather kind) would hide the sea glints and muffle the surf; fishers stay in. (done, see below)
+- Sea fog is done (SIM_VERSION 13; WEATHER.fog, w.stats.fogs count, yearly `fog` days, wx.b attacks / wx.x kills per spell;
+  FOG_SPEED, FOG_BOLD in sim.js; fog banks in skyFx()). In fog: no fishing, no new hunts, 2 tiles/h off paths, wolves out by day.
+  Test seeds: ~3-4 fog deaths per 100 years, a couple of them in the first decade on small islands. Answers it invites:
+  - A fog horn or a beacon fire on the beach: people within earshot count as "not alone", so the wolf turns away.
+  - Work in pairs on fog days (woodcutters go out two by two), or keep everyone inside the village ring until it lifts.
+  - Lost in the fog: a child or elder wanders off and the village goes out searching (found by a path, or by the hearth smoke).
+  - Fog lore: elders read a still, warm evening over cold sea and call people in early the next day.
+  - A boat caught out in fog (once there are boats) drifts to another isle and brings back news.
