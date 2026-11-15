@@ -1,9 +1,17 @@
 // Bundles src/ into a single self-contained dist/index.html (plus a preview variant).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-const sim = readFileSync('src/sim.js', 'utf8').replace(/^export \{[^}]*\};?$/gm, '').replace(/^export /gm, '');
+const src = readFileSync('src/sim.js', 'utf8');
+// every name sim.js exports, so render.js sees the same S.* in the bundle as it does under Node
+const names = new Set();
+for (const m of src.matchAll(/^export (?:const|let|function) (\w+)/gm)) names.add(m[1]); // one name per export line
+for (const m of src.matchAll(/^export \{([^}]*)\}/gm)) for (const n of m[1].split(',')) if (n.trim()) names.add(n.trim());
+const sim = src.replace(/^export \{[^}]*\};?$/gm, '').replace(/^export /gm, '');
 const render = readFileSync('src/render.js', 'utf8').replace(/^import .*$/gm, '');
-const js = `(() => {\nconst S = (() => {\n${sim}\nreturn { SIM_VERSION, TICK_MS, HOURS_PER_DAY, DAYS_PER_SEASON, DAYS_PER_YEAR, TICKS_PER_DAY, TICKS_PER_YEAR, SEASONS, MAP, T, TECHS, rnd, hash, clock, tickAt, ageY, genesis, migrate, step, advanceTo, summary, fingerprint };\n})();\n${render}\n})();`;
+const used = new Set([...render.matchAll(/\bS\.([A-Za-z_]\w*)/g)].map((m) => m[1]));
+const missing = [...used].filter((n) => !names.has(n));
+if (missing.length) { console.error('render.js uses names sim.js does not export: ' + missing.join(', ')); process.exit(1); }
+const js = `(() => {\nconst S = (() => {\n${sim}\nreturn { ${[...names].join(', ')} };\n})();\n${render}\n})();`;
 const html = readFileSync('src/index.html', 'utf8');
 
 mkdirSync('dist', { recursive: true });

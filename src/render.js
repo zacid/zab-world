@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', idle: '#d9d9d9', gather: '#d9d9d9' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
@@ -45,7 +45,8 @@ let base = { s: 1, x: 0, y: 0 };
 function computeView() {
   if (!w) return;
   let x0 = w.fire.x - 9, x1 = w.fire.x + 10, y0 = w.fire.y - 7, y1 = w.fire.y + 8;
-  for (const o of [...w.buildings, ...w.fields]) { x0 = Math.min(x0, o.x - 4); x1 = Math.max(x1, o.x + 5); y0 = Math.min(y0, o.y - 4); y1 = Math.max(y1, o.y + 5); }
+  const yard = w.yard ? [w.yard, { x: w.yard.x + S.YARD_W - 1, y: w.yard.y + S.YARD_H - 1 }] : [];
+  for (const o of [...w.buildings, ...w.fields, ...yard]) { x0 = Math.min(x0, o.x - 4); x1 = Math.max(x1, o.x + 5); y0 = Math.min(y0, o.y - 4); y1 = Math.max(y1, o.y + 5); }
   const bw = (x1 - x0) * TILE, bh = (y1 - y0) * TILE;
   let fit = Math.min(cv.width / bw, cv.height / bh) * 0.8 * zoom;
   fit = Math.min(fit, 9 * dpr);
@@ -88,6 +89,10 @@ function doing(p) {
   const a = Math.floor(S.ageY(w, p));
   if (p.sick) return p.asleep ? 'tossing with fever' : 'laid up with fever';
   if (p.asleep) return 'asleep at home';
+  if (p.task && p.task.k === 'mourn') {
+    const g = w.yard && p.mourn && w.graves.find((o) => o.s === p.mourn[1]);
+    return g ? `mourning at ${g.n}'s grave` : 'mourning at a graveside';
+  }
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
@@ -105,7 +110,9 @@ function drawWho() {
   if (!p) {
     if (!gone) { const k = known.get(follow); gone = k ? k.name : 'They'; }
     const last = mentions(gone, 1)[0];
+    const g = (w.graves || []).find((o) => o.id === follow);
     el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div><b>${esc(gone)}</b><div class="m">is no longer among the living.</div>` +
+      (g ? `<div class="do">${esc(graveText(g))}; lies in the burying ground since ${when(g.d)}.</div>` : '') +
       (last ? `<div class="ev"><span class="when">${last.s}</span>${esc(last.text)}</div>` : '');
     el.hidden = false; return;
   }
@@ -231,6 +238,7 @@ function drawTerrain() {
       for (let k = 0; k < 6; k++) { const hh = S.hash(f.x * 6 + k, f.y, 23); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 7, k < 3 ? '#2a1a10' : '#7a5636', 2, 1); }
     }
   }
+  drawYard(pal);
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -285,6 +293,52 @@ function drawTerrain() {
   }
 }
 const wxNow = () => (w.wx ? w.wx.k : 'clear');
+// the burying ground: a low dry-stone wall with a gap toward the hearth, graves in rows inside.
+// A new grave is bare earth under a wooden stake, with flowers for the first weeks; within a year
+// it has grassed over and a grey stone stands at its head.
+function yardGate(Y) {
+  const dx = Y.x + S.YARD_W / 2 - w.fire.x, dy = Y.y + S.YARD_H / 2 - w.fire.y;
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'w' : 'e') : dy > 0 ? 'n' : 's'; // the wall that faces the village
+}
+function drawYard(pal) {
+  const Y = w.yard;
+  if (!Y) return;
+  const X0 = Y.x * TILE, Y0 = Y.y * TILE, W = S.YARD_W * TILE, H = S.YARD_H * TILE;
+  const wall = pal.snow ? '#c4c0b8' : '#8d8a80', dark = pal.snow ? '#9a968e' : '#5f5c55', gate = yardGate(Y);
+  for (let k = 0; k < W; k++) {
+    const gap = k >= W / 2 - 2 && k < W / 2 + 2;
+    if (!(gate === 'n' && gap)) px(tc, X0 + k, Y0, k % 3 ? wall : dark);
+    if (!(gate === 's' && gap)) px(tc, X0 + k, Y0 + H - 1, k % 3 ? wall : dark);
+  }
+  for (let k = 1; k < H - 1; k++) {
+    const gap = k >= H / 2 - 2 && k < H / 2 + 2;
+    if (!(gate === 'w' && gap)) px(tc, X0, Y0 + k, k % 3 ? wall : dark);
+    if (!(gate === 'e' && gap)) px(tc, X0 + W - 1, Y0 + k, k % 3 ? wall : dark);
+  }
+  for (const g of w.graves) {
+    const p = S.gravePos(Y, g.s), cx = Math.round(p.x * TILE), cy = Math.round(p.y * TILE);
+    const age = w.t - g.d;
+    if (age < S.TICKS_PER_YEAR) {
+      px(tc, cx - 1, cy - 1, pal.snow ? '#d9dde2' : '#6e4b2c', 2, 1); px(tc, cx - 1, cy, '#5a3d24', 2, 1);
+      px(tc, cx - 1, cy - 2, '#9a6a3c', 1, 1); // a stake until the stone is cut
+      if (age < 20 * S.TICKS_PER_DAY && !pal.snow) px(tc, cx, cy - 1, (g.id & 1) ? '#f28ab0' : '#f7d34a');
+    } else {
+      px(tc, cx - 1, cy - 1, pal.snow ? '#eef3f7' : pal.grass[2], 2, 2);
+      px(tc, cx - 1, cy - 2, age > 20 * S.TICKS_PER_YEAR ? '#7d7a72' : '#b8b8b0', 2, 1);
+    }
+  }
+}
+function graveAt(mx, my) {
+  if (!w.yard) return null;
+  let best = null, bd = 0.3;
+  for (const g of w.graves) {
+    const p = S.gravePos(w.yard, g.s), d = Math.max(Math.abs(p.x - mx) * 1.6, Math.abs(p.y - 0.12 - my));
+    if (d < bd) { bd = d; best = g; }
+  }
+  return best;
+}
+const when = (t) => { const c = S.clock(t); return `Y${c.year} ${S.SEASONS[c.season]}`; };
+const graveText = (g) => `${g.n} ${g.why}, aged ${Math.floor((g.d - g.b) / S.TICKS_PER_YEAR)}`;
 
 // ---------- time ----------
 function nowTickF() { return (Date.now() - w.epoch) / S.TICK_MS; }
@@ -471,6 +525,10 @@ function frame() {
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = graveAt(mx, my))) {
+      const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
+      tip.innerHTML = `<b>${esc(best.n)}</b><br>${esc(best.why)}, aged ${Math.floor((best.d - best.b) / S.TICKS_PER_YEAR)}<br><span class="m">laid to rest ${when(best.d)}${kin.length ? `<br>child of ${kin.map(esc).join(' &amp; ')}` : ''}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else tip.hidden = true;
   }
   requestAnimationFrame(frame);
@@ -579,11 +637,13 @@ function updatePanels() {
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
+    ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');
   for (const p of w.people) if (!known.has(p.id)) known.set(p.id, { name: p.name, sex: p.sex });
+  for (const g of w.graves || []) if (!known.has(g.id)) known.set(g.id, { name: g.n, sex: g.x });
   drawWho();
   drawSpark();
   if (!$('sky').hidden) drawSky();

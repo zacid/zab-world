@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 10;
+export const SIM_VERSION = 11;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -47,6 +47,7 @@ export const TECHS = {
   fencing:  { name: 'Fences',    desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
   midsummer: { name: 'Midsummer', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
   paths:    { name: 'Footpaths', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
+  burial:   { name: 'Burying ground', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
 };
 
 // ---------- weather ----------
@@ -120,6 +121,12 @@ export const WEAR_SEEN = 6;     // grass looks trampled from here
 export const PATH_AT = 24;      // and is a bare-earth path from here
 const PATH_SPEED = 4;           // tiles per hour along a path (3 off it)
 const WEAR_HEAL = [1, 1, 1, 0]; // grass heals spring to autumn; under snow nothing grows back
+// ---------- burying ground ----------
+export const YARD_W = 4;               // tiles inside the low wall
+export const YARD_H = 3;
+export const GRAVE_COLS = 10;          // graves per row; five rows
+const GRAVE_CAP = 50;
+const MOURN_FROM = 9, MOURN_TO = 12;   // hours the family stands at the graveside the morning after
 // where the dancers stand: 24 points on a circle of radius 1, 15 degrees apart (written out, no trig in the step)
 const RING = [[1, 0], [0.966, 0.259], [0.866, 0.5], [0.707, 0.707], [0.5, 0.866], [0.259, 0.966], [0, 1], [-0.259, 0.966],
   [-0.5, 0.866], [-0.707, 0.707], [-0.866, 0.5], [-0.966, 0.259], [-1, 0], [-0.966, -0.259], [-0.866, -0.5], [-0.707, -0.707],
@@ -234,6 +241,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
+    graves: [], yard: null,
   };
   // name the island
   let nm = '';
@@ -1102,12 +1110,85 @@ function fever(w, c, fx) {
     : `${p.name} wakes burning hot, shivering, and cannot stand.`);
 }
 
+// ---------- the burying ground ----------
+// At the first death the village walls off a quiet patch of ground nearby. Every grave has a place in
+// rows inside the wall; the morning after a death the family stands at the graveside. When the rows
+// are full the oldest stone has long sunk into the grass, and the newest grave is dug in its place.
+function findYardSite(w) {
+  let best = null, bs = 1e9;
+  const { x: fx, y: fy } = w.fire;
+  for (let y = 2; y < MAP - YARD_H - 2; y++) for (let x = 2; x < MAP - YARD_W - 2; x++) {
+    const cx = x + YARD_W / 2, cy = y + YARD_H / 2;
+    const dd = d2(cx, cy, fx + 0.5, fy + 0.5);
+    if (dd < 36 || dd > 196) continue;
+    let ok = true, trees = 0;
+    for (let yy = y - 1; yy <= y + YARD_H && ok; yy++) for (let xx = x - 1; xx <= x + YARD_W; xx++) {
+      const t = tile(w, xx, yy), inside = yy >= y && yy < y + YARD_H && xx >= x && xx < x + YARD_W;
+      if (t === T.BUILD || (inside && t !== T.GRASS && t !== T.FOREST)) { ok = false; break; }
+      if (inside && t === T.FOREST) trees++;
+    }
+    if (!ok) continue;
+    const sc = Math.abs(Math.sqrt(dd) - 8) + trees * 0.7 + hash(x, y, w.seed + 13);
+    if (sc >= bs || !lineOfLand(w, fx + 0.5, fy + 0.5, cx, cy)) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+// the middle of grave s, in tile units
+export function gravePos(yard, s) {
+  return { x: yard.x + (2 + (s % GRAVE_COLS) * 3) / 8, y: yard.y + (4 + Math.floor(s / GRAVE_COLS) * 4) / 8 };
+}
+function bury(w, p, why) {
+  if (!w.graves) return;
+  let first = false;
+  if (!w.yard) {
+    const s = findYardSite(w);
+    if (!s) return; // nowhere fit yet: the body is given to the sea, and the next death tries again
+    for (let y = s.y; y < s.y + YARD_H; y++) for (let x = s.x; x < s.x + YARD_W; x++) {
+      const i = idx(x, y);
+      w.timber += w.wood[i]; w.wood[i] = 0;
+      setTile(w, i, T.BUILD);
+    }
+    w.yard = { x: s.x, y: s.y, n: 0, sunk: 0 };
+    first = true;
+  }
+  const Y = w.yard;
+  const used = new Array(GRAVE_CAP).fill(false);
+  for (const g of w.graves) used[g.s] = true;
+  let s = used.indexOf(false), old = null;
+  if (s < 0) { old = w.graves.shift(); s = old.s; Y.sunk++; }
+  w.graves.push({ id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why, m: p.mother, f: p.father, s });
+  Y.n++;
+  // the morning after, the family stands at the graveside
+  const day = clock(w.t).day + 1;
+  let kin = 0;
+  for (const o of w.people) {
+    if (o.dead || o === p) continue;
+    if (o.id === p.partner || o.mother === p.id || o.father === p.id || p.mother === o.id || p.father === o.id ||
+      sibling(o, p) || (p.home != null && o.home === p.home)) { o.mourn = [day, s]; kin++; }
+  }
+  if (first) {
+    w.techs.push('burial');
+    const dx = Y.x + YARD_W / 2 - w.fire.x, dy = Y.y + YARD_H / 2 - w.fire.y;
+    const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'east' : 'west') : dy > 0 ? 'south' : 'north';
+    const who = elder(w);
+    milestone(w, `${who && who !== p ? `${who.name} walks out to a quiet patch of ground ${side} of the village and sets a ring of stones there.` : `The islanders set a ring of stones on a quiet patch of ground ${side} of the village.`} ${p.name} is laid in the earth inside it${kin ? `, and ${kin === 1 ? 'one mourner stands' : `${kin} mourners stand`} at the graveside next morning` : ''}. ${w.name} has a burying ground.`);
+  } else if (old) log(w, `The oldest stone in the burying ground, ${old.n}'s, has sunk into the grass. ${p.name} is laid in the same earth.`, 'death');
+  else if (Y.n === GRAVE_CAP) log(w, `The last row in the burying ground is filled. ${GRAVE_CAP} lie there now.`, 'info');
+}
+function mournSpot(w, p, s) {
+  const g = gravePos(w.yard, s), k = p.id % 6;
+  // a half ring below the grave, nearest kin in front
+  return { k: 'mourn', x: Math.round((g.x - 0.5 + [0, -0.4, 0.4, -0.75, 0.75, 0][k]) * 1000) / 1000, y: Math.round((g.y - 0.5 + [0.45, 0.4, 0.4, 0.2, 0.2, 0.75][k]) * 1000) / 1000, h: 99 };
+}
+
 function die(w, p, why) {
   p.dead = true;
   release(w, p);
-  for (const o of w.people) if (o.partner === p.id) o.partner = null;
   w.stats.deaths++; w.stats.yd++;
   log(w, `${p.name} ${why}, aged ${Math.floor(ageY(w, p))}.`, 'death');
+  bury(w, p, why);
+  for (const o of w.people) if (o.partner === p.id) o.partner = null;
 }
 
 function lifeAndDeath(w, c) {
@@ -1498,7 +1579,16 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest')) p.task = null;
+  if (p.mourn) { // the morning after a death in the family: to the graveside
+    const [d, s] = p.mourn;
+    if (c.day > d || (c.day === d && h >= MOURN_TO) || !w.yard) delete p.mourn;
+    else if (c.day === d && h >= MOURN_FROM && !(p.task && (p.task.k === 'hunt' || p.task.k === 'haul'))) {
+      if (!p.task || p.task.k !== 'mourn') { release(w, p); p.task = mournSpot(w, p, s); }
+      walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
+      return;
+    }
+  }
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn')) p.task = null;
   // daytime
   if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
@@ -1652,6 +1742,11 @@ const MIGRATIONS = {
     if (!Array.isArray(w.wear) || w.wear.length !== MAP * MAP) w.wear = new Array(MAP * MAP).fill(0);
     w.paths = w.paths || 0;
   },
+  // v10 -> v11: the burying ground. Nothing to dig yet; the first death after this founds it.
+  10: (w) => {
+    w.graves = w.graves || [];
+    if (w.yard === undefined) w.yard = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1683,6 +1778,7 @@ export function summary(w) {
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
+    graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
   };
 }
 

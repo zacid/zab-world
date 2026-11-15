@@ -111,3 +111,13 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Bridges or stepping stones where a path meets a stream (no rivers yet; rivers would be a big terrain change).
   - Wayside things along old paths: a cairn where someone died, a shrine, a bench for elders.
   - Paths keep grass open but only along tracks; grass still vanishes elsewhere (see grass vanishing).
+- Burying ground is done (SIM_VERSION 11; w.yard {x,y,n buried ever,sunk}, w.graves [{id,n,x sex,b,d,why,m,f,s slot}] max 50,
+  p.mourn [day, slot]; task k 'mourn'; gravePos() exported). Note: footpaths were invisible in the browser until this visit
+  because build.mjs did not export PATH_AT/WEAR_SEEN; it now exports every `export const/function` and fails if render.js
+  uses a missing S.* name. Answers it invites:
+  - Family trees: graves keep m/f ids, so the follow card could walk back generations ("granddaughter of Goulys").
+  - Elders' stories: on the anniversary of a big fever or wolf death, an elder recalls the dead by name in the chronicle.
+  - Visiting graves: widows/widowers walk to the grave now and then on quiet evenings; flowers at midsummer.
+  - A cairn or marker where someone fell far from home (wolf kills, hunting deaths), drawn on the map.
+  - A second, larger burying ground once the first fills (instead of reusing the oldest places), or a yew tree that grows over decades.
+  - Grief: a widow(er) works less for a season, or a lost child makes parents wait longer for the next.

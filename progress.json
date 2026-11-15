@@ -53,5 +53,10 @@
   "at": "2026-11-15T01:30:51.916Z",
   "title": "Add footpaths worn into the grass by daily walking",
   "body": "- SIM_VERSION 10 (w.wear per tile): each hour's walk wears the grass it crosses; grass heals 1/day spring to autumn, not under snow\n- Tiles worn to 24+ become bare-earth paths: walking on them is 4 tiles/h instead of 3, and the woods cannot regrow over them\n- New tech Footpaths is noticed in-world once a track of 12+ path tiles leads 7+ tiles out from the hearth (the live world should see it within weeks of game time)\n- Visible: scuffed grass, then ragged dirt tracks that join houses, beach and fields (grey slush in winter); Paths row in the panel\n- Watch: trails to the beach and woodlots stay open as forest closes in; ~90-120 path tiles on test seeds"
+ },
+ {
+  "at": "2026-11-15T01:59:33.227Z",
+  "title": "Add a burying ground where families mourn their dead",
+  "body": "- SIM_VERSION 11 (w.graves, w.yard, p.mourn): the first death walls off a 4x3 plot 6-14 tiles from the hearth; new custom Burying ground is logged in the chronicle\n- Each grave keeps name, age, cause and parents; 50 places in rows, after which the oldest stone sinks and its place is reused\n- The morning after a death, partner, parents, children, siblings and housemates stand at the graveside 9:00-12:00 (shown in grey-blue)\n- Visible: dry-stone wall with a gate toward the village, fresh mounds with a stake and flowers, grassed graves with stones; hover a grave for who lies there; Graves row in the panel\n- Fix build: export every sim constant to the page, so footpaths (PATH_AT, WEAR_SEEN) now actually draw in the browser"
  }
 ]
