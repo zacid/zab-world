@@ -67,3 +67,10 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Hunter as a lasting role: the same pairs keep going out; skill could grow with each kill.
   - Deer on the meadows would give a non-dangerous quarry and keep grass open (see grass vanishing).
   - If the wolf pack is held at 2 too long, a lone wolf could turn bold (attacks by day) as a twist.
+- Fences are done (tech 'fencing', SIM_VERSION 7; f.fence, fauna.fences/held/turned/broke, task key g<fieldId>,
+  yearly `fences` standing). Raid nights fall to ~3-4 a year. Answers it invites:
+  - Hedges: plant a living hawthorn hedge that takes years to grow but never rots (slow, cheap, lasting).
+  - Boars that are shut out of the grain could turn hungry and bold, or root up the gardens near the houses.
+  - Pigs: once the fences stand, piglets caught at the lair could be penned and fattened (first livestock).
+  - A fence/raids row in the graph panel would show the boar years at a glance.
+  - Fences cost timber every year (~20% rot + storms); late-game timber shortages could leave fences unmended.

@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 6;
+export const SIM_VERSION = 7;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -44,6 +44,7 @@ export const TECHS = {
   fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
   granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
   hunting:  { name: 'Hunting',   desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
+  fencing:  { name: 'Fences',    desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
 };
 
 // ---------- weather ----------
@@ -84,6 +85,14 @@ const HUNT_REACH = 24 * 24;  // a lair farther than this from the hearth is out 
 const HUNT_KEEP = 3;         // hunters leave the last two of a herd, so it can breed again
 const MEAT = { boar: 45, wolf: 12 };
 const HIDE_WARM = 0.3;       // hides over every doorway cut winter firewood by up to 30%
+
+// ---------- fences ----------
+const FENCE_COST = 3;        // timber for the stakes and rods around one field
+const FENCE_WORK = 3;        // hours of weaving
+const FENCE_HOLD = 0.85;     // chance a fence turns a boar away; otherwise it shoulders through
+const FENCE_ROT = 0.2;       // share of fences that rot through over a year
+const FENCE_STORM = 0.02;    // chance per storm day that a fence blows down
+const FENCE_LEARN = 8;       // raids before someone thinks of a fence
 
 // ---------- randomness ----------
 export function rnd(w) {
@@ -368,7 +377,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -378,6 +387,9 @@ function daily(w, c, fx) {
     for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
     w.stats.yw = w.stats.yr = w.stats.yk = 0;
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
+    let rot = 0; // wattle rots at the stakes over a wet year
+    for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
+    if (rot) log(w, `${plural(rot, 'fence has', 'fences have')} rotted at the stakes over the year.`, 'info');
   }
   if (w.beasts) wilds(w, c);
   weather(w, c);
@@ -488,6 +500,7 @@ function storm(w) {
     if (f.stage !== 'ripe' && !(f.stage === 'planted' && f.growth >= 0.5)) continue;
     if (rnd(w) < STORM_FLATTEN) { f.stage = 'fallow'; f.growth = 0; f.flat = 1; s.f++; w.stats.yf = (w.stats.yf || 0) + 1; }
   }
+  for (const f of w.fields) if (f.fence && rnd(w) < FENCE_STORM) { delete f.fence; s.g = (s.g || 0) + 1; }
   // and now and then it takes a roof
   if (rnd(w) < STORM_ROOF) {
     const standing = w.buildings.filter((b) => b.progress >= 1);
@@ -502,10 +515,11 @@ function storm(w) {
 function endSpell(w, s) {
   const n = s.n, len = spellLen(n);
   let text = null, k = 'bad', big = false;
-  if (s.k === 'storm' && (n >= 3 || s.f || s.r)) {
+  if (s.k === 'storm' && (n >= 3 || s.f || s.r || s.g >= 3)) {
     const hurt = [];
     if (s.f) hurt.push(`${plural(s.f, 'field', 'fields')} flattened`);
     if (s.r) hurt.push(`${plural(s.r, 'roof', 'roofs')} torn away`);
+    if (s.g) hurt.push(`${plural(s.g, 'fence', 'fences')} blown down`);
     text = n === 1 ? `A storm tears across ${w.name}` : `${len} of storms batter ${w.name}`;
     text += hurt.length ? `: ${hurt.join(', ')}.` : ', but the village holds.';
     big = n >= 7 || s.r >= 3 || s.f >= Math.max(10, w.fields.length >> 3);
@@ -608,15 +622,22 @@ function prowl(w, c) {
     if (b.k === 'wolf') wolf(w, b, wolfOut && b.rest <= w.t);
     else boar(w, b, boarOut);
   }
+  if (h === 6 && !F.hit && F.turned && !F.held) {
+    F.held = 1;
+    milestone(w, `Boars snuffle along the new fences all night and find no way in. In the morning the grain stands untouched.`);
+  }
   if (h === 6 && F.hit) {
     w.stats.yr = (w.stats.yr || 0) + 1;
-    const text = `Boars root through ${plural(F.hit, 'field', 'fields')} by the woods in the night.`;
+    const text = F.broke
+      ? `A boar shoulders through ${F.broke === 1 ? 'a fence' : F.broke + ' fences'} and roots through ${plural(F.hit, 'field', 'fields')} in the night.`
+      : `Boars root through ${plural(F.hit, 'field', 'fields')} by the woods in the night.`;
     if (!F.raids) milestone(w, `${text} The grain is trampled and torn up. Nobody on ${w.name} has an answer for them yet.`);
     else log(w, text, 'bad');
     F.raids++; F.hit = 0;
     learnHunting(w);
+    if (F.raids >= FENCE_LEARN) learnFencing(w);
   }
-  if (h === 6) F.raid = 0;
+  if (h === 6) { F.raid = 0; F.turned = 0; F.broke = 0; }
 }
 
 function wolf(w, b, active) {
@@ -720,25 +741,51 @@ function boar(w, b, active) {
   if (!moveBeast(b, b.tx + 0.5 + off, b.ty + 0.5 - off, BOAR_SPEED) || b.f == null) return;
   if (--b.h > 0) return;
   const f = w.fields.find((o) => o.id === b.f);
+  if (f && f.fence && (f.stage === 'planted' || f.stage === 'ripe')) { delete f.fence; F.broke = (F.broke || 0) + 1; }
   if (f && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - 0.3) * 10000) / 10000); f.root = 1; F.hit++; }
   else if (f && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.4) * 100) / 100); f.root = 1; F.hit++; }
   b.f = null; b.tx = home.x; b.ty = home.y;
 }
 
 // standing grain beside the trees, where a boar can slip out of cover
+function byWoods(w, f) {
+  for (let yy = f.y - 2; yy <= f.y + 2; yy++) for (let xx = f.x - 2; xx <= f.x + 2; xx++) if (tile(w, xx, yy) === T.FOREST) return true;
+  return false;
+}
 function pickCrop(w, b) {
   const near = [];
-  for (const f of w.fields) {
-    if (f.stage !== 'planted' && f.stage !== 'ripe') continue;
-    let wood = false;
-    for (let yy = f.y - 2; yy <= f.y + 2 && !wood; yy++) for (let xx = f.x - 2; xx <= f.x + 2; xx++) if (tile(w, xx, yy) === T.FOREST) { wood = true; break; }
-    if (wood) near.push(f);
-  }
+  for (const f of w.fields) if ((f.stage === 'planted' || f.stage === 'ripe') && byWoods(w, f)) near.push(f);
   for (let k = 0; k < 6 && near.length; k++) {
     const f = near[ri(w, near.length)];
-    if (lineOfLand(w, b.x, b.y, f.x + 0.5, f.y + 0.5)) return f;
+    if (!lineOfLand(w, b.x, b.y, f.x + 0.5, f.y + 0.5)) continue;
+    if (f.fence && rnd(w) < FENCE_HOLD) { w.fauna.turned = 1; return null; } // the wattle holds: the boar gives up for the night
+    return f;
   }
   return null;
+}
+
+// ---------- fences ----------
+function learnFencing(w) {
+  if (w.techs.includes('fencing') || !w.techs.includes('farming') || !w.techs.includes('woodcut')) return;
+  w.techs.push('fencing');
+  const who = elder(w);
+  milestone(w, who
+    ? `${who.name} drives a row of stakes along the trampled grain and weaves hazel rods between them. ${w.name} learns to fence its fields.`
+    : `The islanders weave hazel between stakes to keep the boars from the grain. ${w.name} learns to fence its fields.`);
+}
+// fields within two tiles of the trees, where the boars come out; relisted whenever a tile changes
+function exposed(w) {
+  const c = cacheOf(w);
+  if (c.exTv !== c.tv || c.exN !== w.fields.length) {
+    c.exTv = c.tv; c.exN = w.fields.length; c.ex = [];
+    for (const f of w.fields) if (byWoods(w, f)) c.ex.push(f);
+  }
+  return c.ex;
+}
+function fenceTask(w, p, c) {
+  if (c.season === 3 || w.timber < FENCE_COST + HOUSE_COST || !w.techs.includes('fencing')) return null;
+  const f = nearest(exposed(w), p, (o) => !o.fence && w.res['g' + o.id] == null);
+  return f && { k: 'fence', key: 'g' + f.id, x: f.x, y: f.y, h: FENCE_WORK };
 }
 
 // ---------- the hunt ----------
@@ -1025,6 +1072,9 @@ function pickTask(w, p, c) {
   // the hunt
   const hk = hunt(w, p, c);
   if (hk) return hk;
+  // fences around the grain by the woods
+  const gk = fenceTask(w, p, c);
+  if (gk) return gk;
   // timber
   if (w.timber < woodTarget(w)) {
     const bt = nearestTimber(w, p);
@@ -1252,6 +1302,13 @@ function finish(w, p, t, c, fx) {
     if (tt === T.FOREST) { const got = w.wood[idx(t.x, t.y)]; w.timber += got; w.wood[idx(t.x, t.y)] = 0; if (got) pop('+' + got, 'wood'); }
     const f = addField(w, { x: t.x, y: t.y });
     if (f && w.fields.length % 10 === 0) log(w, `${w.fields.length} fields now ring the village.`, 'good');
+  } else if (t.k === 'fence') {
+    const f = w.fields.find((o) => 'g' + o.id === t.key);
+    if (!f || f.fence || w.timber < FENCE_COST) return;
+    w.timber -= FENCE_COST; f.fence = 1;
+    w.fauna.fences = (w.fauna.fences || 0) + 1;
+    pop('fenced', 'wood');
+    if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
   } else if (t.k === 'forage') {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
@@ -1321,6 +1378,10 @@ const MIGRATIONS = {
     if (w.fauna) { w.fauna.hunt = w.fauna.hunt || 0; w.fauna.sb = w.fauna.sb || 0; w.fauna.sw = w.fauna.sw || 0; }
     learnHunting(w);
   },
+  // v6 -> v7: fences. Fields by the woods can be fenced once the boars have raided often enough.
+  6: (w) => {
+    if (w.fauna) { w.fauna.fences = w.fauna.fences || 0; if (w.fauna.raids >= FENCE_LEARN) learnFencing(w); }
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1347,6 +1408,7 @@ export function summary(w) {
     wolves: (w.beasts || []).filter((b) => b.k === 'wolf').length, boars: (w.beasts || []).filter((b) => b.k === 'boar').length,
     afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,
     hunting: w.techs.includes('hunting'), hides: w.hides || 0,
+    fencing: w.techs.includes('fencing'), fenced: w.fields.filter((f) => f.fence).length,
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
   };
 }

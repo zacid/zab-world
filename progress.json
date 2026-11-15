@@ -28,5 +28,10 @@
   "at": "2026-11-14T23:59:41.709Z",
   "title": "Speed up the simulation about 4x with identical results",
   "body": "- Cache the best field site until a tile changes; keep a daily list of tall trees near the hearth\n- Find the nearest fishing spot by 8x8 map blocks; index houses by id; per-hour lists of ripe/fallow fields and unfinished buildings\n- Same world, same choices: fingerprints match the old code for 100 years on seed 4242 and 15 years on the live world\n- Seed 4242: 2773 -> 631 ms per year on average, ~1.5 s at 331 people (was ~8 s); browsers catch up faster on load\n- Watch: tiles must now change through setTile() in the step path, or the field-site cache goes stale"
+ },
+ {
+  "at": "2026-11-15T00:13:35.148Z",
+  "title": "Add wattle fences to keep boars out of the fields",
+  "body": "- New tech Fences (SIM_VERSION 7), learned after the 8th boar raid; the live world (2 raids so far) should learn it in early summer of Y1\n- Idle workers fence fields within 2 tiles of the woods (3 timber, 3 h, not in winter); a fence turns a boar away for the night 85% of the time\n- Fences wear out: 20% rot each new year, 2% per storm day blow down, and a boar that gets through breaks the fence, so mending never ends\n- Raid nights drop from ~10 to ~3.5 a year; fences drawn as woven hazel edges with stakes around each fenced block; Fields row shows how many are fenced\n- Watch: the first fence and the first night the boars are turned away in the chronicle"
  }
 ]

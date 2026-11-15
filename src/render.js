@@ -113,6 +113,19 @@ function drawTerrain() {
       for (let k = 0; k < 6; k++) { const hh = S.hash(f.x * 6 + k, f.y, 23); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 7, k < 3 ? '#2a1a10' : '#7a5636', 2, 1); }
     }
   }
+  // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
+  const fenced = new Set();
+  for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
+  for (const f of w.fields) {
+    if (!f.fence) continue;
+    const X = f.x * TILE, Y = f.y * TILE, rod = pal.snow ? '#a89a86' : '#9a7a4e', stake = '#5e4026';
+    const open = (ax, ay) => !fenced.has((f.y + ay) * S.MAP + f.x + ax);
+    if (open(0, -1)) { px(tc, X, Y, rod, 8, 1); px(tc, X + 3, Y, stake); }
+    if (open(0, 1)) { px(tc, X, Y + 7, rod, 8, 1); px(tc, X + 4, Y + 7, stake); }
+    if (open(-1, 0)) { px(tc, X, Y, rod, 1, 8); px(tc, X, Y + 4, stake); }
+    if (open(1, 0)) { px(tc, X + 7, Y, rod, 1, 8); px(tc, X + 7, Y + 3, stake); }
+    for (const [cx, cy] of [[0, 0], [7, 0], [0, 7], [7, 7]]) px(tc, X + cx, Y + cy, stake);
+  }
   // fire ring, stores
   const fx = w.fire.x * TILE, fy = w.fire.y * TILE;
   px(tc, fx - 8, fy, '#7d6a4e', 24, 8);
@@ -292,7 +305,7 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
+      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
         hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
@@ -382,7 +395,7 @@ function updatePanels() {
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
-    ['field', 'Fields', s.fields],
+    ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced)</span>` : s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
