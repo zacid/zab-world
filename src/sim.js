@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 8;
+export const SIM_VERSION = 9;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -103,6 +103,14 @@ const FEST_LEARN = 10;       // people on the island before anyone thinks to kee
 const FEST_WOOD = 12;        // timber heaped on the bonfire (at most a quarter of the pile)
 const FEST_FEAST = 2;        // extra food each person eats, if the stores can spare it
 const FEST_PAIR = 0.4;       // chance a single woman finds a partner in the firelight
+// ---------- fever ----------
+const FEVER_SEED = 0.0012;   // daily chance a fever takes hold, x crowding, x village size, x season
+const FEVER_SEASON = [0.5, 0.25, 1, 1.6]; // worst in autumn and winter, when everyone is shut in together
+const FEVER_HOUSE = 0.1;     // daily chance per sick housemate that it passes to you
+const FEVER_TOWN = 0.04;    // daily chance x share of the village that is sick (met at the fire, the fields, the shore)
+const FEVER_DAYS = 6;        // laid up for 6-10 days
+const FEVER_IMMUNE = 4;      // years a survivor cannot catch it again
+const FEVER_CASTAWAY = 0.15; // chance a castaway brings it ashore
 // where the dancers stand: 24 points on a circle of radius 1, 15 degrees apart (written out, no trig in the step)
 const RING = [[1, 0], [0.966, 0.259], [0.866, 0.5], [0.707, 0.707], [0.5, 0.866], [0.259, 0.966], [0, 1], [-0.259, 0.966],
   [-0.5, 0.866], [-0.707, 0.707], [-0.866, 0.5], [-0.966, 0.259], [-1, 0], [-0.966, -0.259], [-0.866, -0.5], [-0.707, -0.707],
@@ -215,6 +223,7 @@ export function genesis(seed, epoch) {
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
+    fever: { k: 0, n: 0, d: 0, all: 0 },
   };
   // name the island
   let nm = '';
@@ -392,7 +401,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -400,7 +409,7 @@ function daily(w, c, fx) {
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
     for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
-    w.stats.yw = w.stats.yr = w.stats.yk = 0;
+    w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = 0;
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
     for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
@@ -447,6 +456,7 @@ function daily(w, c, fx) {
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
   } else w.stats.cold = false;
 
+  if (w.fever) fever(w, c, fx);
   lifeAndDeath(w, c);
   pairing(w);
   housing(w);
@@ -479,6 +489,10 @@ function daily(w, c, fx) {
     let text = `${a.name}, a castaway, washes ashore`;
     if (n === 2) { const b = addPerson(w, a.sex === 'f' ? 'm' : 'f', 18 + ri(w, 12), null, null, null); b.partner = a.id; a.partner = b.id; text = `${a.name} and ${b.name} drift ashore on a raft`; }
     log(w, text + '.', 'good');
+    if (w.fever && rnd(w) < FEVER_CASTAWAY) { // half drowned and shaking, and the shaking is not only the sea
+      fall(w, a, fx);
+      if (w.fever.n === 1) feverBegins(w, a, `${a.name} came out of the sea shivering, and the shivering does not stop.`);
+    }
   }
 }
 
@@ -947,6 +961,80 @@ function strike(w, p, t) {
   } else if (q === 'wolf') log(w, `${who} ${mate ? 'follow' : 'follows'} wolf tracks to the den, but the pack slips away into the trees.`, 'info');
 }
 
+// ---------- fever ----------
+// A fever that comes mostly in the cold months, when everyone is shut in together. It runs through a
+// house first, then out into the village; it is the very young and the old that it takes. Those who
+// get up again are spared it for a few years, so each outbreak burns itself out.
+function fall(w, p, fx) {
+  const F = w.fever;
+  p.sick = w.t + (FEVER_DAYS + ri(w, 5)) * TICKS_PER_DAY;
+  F.n++; F.all = (F.all || 0) + 1;
+  w.stats.yi = (w.stats.yi || 0) + 1;
+  if (fx) fx.push({ x: p.x, y: p.y - 0.5, text: 'fever', color: 'sick' });
+}
+function feverBegins(w, p, how) {
+  const F = w.fever;
+  F.k++; F.who = p.name;
+  if (F.k === 1) milestone(w, `A fever comes to ${w.name}. ${how} Nobody on ${w.name} has seen its like, and nobody knows what to do but keep the fire going and wait.`);
+  else log(w, `The fever is back. ${how}`, 'bad');
+}
+function fever(w, c, fx) {
+  const F = w.fever, pop = w.people.length;
+  // fevers break, or kill
+  let sick = 0;
+  for (const p of w.people) {
+    if (p.dead) continue;
+    if (p.imm && p.imm <= w.t) delete p.imm;
+    if (p.sick && p.sick <= w.t) { delete p.sick; p.imm = w.t + FEVER_IMMUNE * TICKS_PER_YEAR; continue; }
+    if (!p.sick) continue;
+    const a = ageY(w, p);
+    let risk = 0.002;
+    if (a < 3) risk += 0.02; else if (a < 6) risk += 0.008;
+    if (a > 55) risk += 0.006 + (a - 55) * 0.001;
+    if (p.hunger > 4) risk *= 2;
+    if (w.stats.cold) risk *= 2;
+    if (rnd(w) < risk) { F.d++; F.lost = (F.lost || 0) + 1; die(w, p, 'died of the fever'); continue; }
+    sick++;
+  }
+  if (!sick && F.n) { // the last one is up again: the outbreak is over
+    const year = clock(w.t).year;
+    const text = F.d
+      ? `The fever leaves ${w.name}. It laid ${plural(F.n, 'islander', 'islanders')} low and took ${F.d} of them.`
+      : `The fever leaves ${w.name}. ${F.n === 1 ? `${F.who} is up again` : F.n === 2 ? 'Both who fell ill are up again' : `All ${F.n} who fell ill are up again`}, and nobody was lost.`;
+    if (F.d >= 3) milestone(w, `${text} They will speak of the fever of year ${year} for a long time.`);
+    else if (F.k === 1) milestone(w, text);
+    else log(w, text, F.d ? 'bad' : 'good');
+    F.n = F.d = 0; delete F.who;
+  }
+  if (sick) { // it passes through a house first, then out into the village
+    const at = new Map();
+    for (const p of w.people) if (p.sick && !p.dead && p.home != null) at.set(p.home, (at.get(p.home) || 0) + 1);
+    const k = c.season === 3 ? 1.4 : c.season === 1 ? 0.6 : 1;
+    const town = (FEVER_TOWN * sick) / Math.max(1, pop);
+    const caught = [];
+    for (const p of w.people) {
+      if (p.dead || p.sick || p.imm) continue;
+      const h = p.home != null ? at.get(p.home) || 0 : 0;
+      if (rnd(w) < Math.min(0.6, (h * FEVER_HOUSE + town) * k)) caught.push(p);
+    }
+    for (const p of caught) fall(w, p, fx);
+    return;
+  }
+  // a fever takes hold more easily where people are packed in, and where there are more of them
+  if (pop < 4) return;
+  const homes = new Set();
+  for (const p of w.people) if (!p.dead && p.home != null) homes.add(p.home);
+  const crowd = pop / Math.max(1, homes.size) / 4;
+  if (rnd(w) >= FEVER_SEED * crowd * (1 + pop / 50) * FEVER_SEASON[c.season]) return;
+  const open = w.people.filter((p) => !p.dead && !p.imm);
+  if (!open.length) return;
+  const p = open[ri(w, open.length)], a = ageY(w, p);
+  fall(w, p, fx);
+  feverBegins(w, p, a < 14
+    ? `${p.name} will not eat, burns hot to the touch and cries through the night.`
+    : `${p.name} wakes burning hot, shivering, and cannot stand.`);
+}
+
 function die(w, p, why) {
   p.dead = true;
   release(w, p);
@@ -1314,17 +1402,22 @@ function act(w, p, c, fx) {
   const night = h >= 21 || h < (afraid ? 7 : 6);
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
-  if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO) { // midsummer: everyone to the bonfire
+  if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
     if (p.task && p.task.k !== 'fest') release(w, p);
     if (!p.task) p.task = festSpot(w);
     p.asleep = false;
     moveToward(p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
-  if (night || storm) { // in a storm nobody works outdoors: they wait it out at home
+  if (night || storm || p.sick) { // in a storm nobody works outdoors: they wait it out at home. The sick keep to their beds
     if (p.task && p.task.k !== 'home') release(w, p);
     const home = homeOf(w, p);
     const off = (p.id % 3) * 0.25 - 0.25;
+    if (!night && !storm) { // by day the sick lie wrapped up in the doorway, out of the smoke
+      p.asleep = false;
+      moveToward(p, home.x + 0.5 + off, home.y + 1.25);
+      return;
+    }
     if (moveToward(p, home.x + 0.5 + off, home.y + 0.5)) p.asleep = p.home != null;
     return;
   }
@@ -1482,6 +1575,11 @@ const MIGRATIONS = {
     w.fest = w.fest || { y: 0, on: -1, n: 0, k: 0 };
     learnMidsummer(w);
   },
+  // v8 -> v9: fever. Sickness can now take hold in crowded houses and spread through the village.
+  8: (w) => {
+    w.fever = w.fever || { k: 0, n: 0, d: 0, all: 0 };
+    w.stats.yi = w.stats.yi || 0;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1511,6 +1609,7 @@ export function summary(w) {
     fencing: w.techs.includes('fencing'), fenced: w.fields.filter((f) => f.fence).length,
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
+    sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
   };
 }
 

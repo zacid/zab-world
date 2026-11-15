@@ -43,5 +43,10 @@
   "at": "2026-11-15T00:51:05.670Z",
   "title": "Add click-to-follow: a life card for any islander",
   "body": "- Click a villager to follow them: the camera glides to them and keeps them centred, with thin white brackets around them (dashed round their house while they sleep)\n- A card shows name, age, what they are doing, parents, partner, children and housemates; click any name to follow that person instead\n- The card also lists the last three log entries that mention them; if they die it says so and shows how\n- Drag to look around (the card stays, \"find\" brings the camera back); click empty ground, press Esc or the cross to let go\n- Render only: no change to the simulation, saved state or SIM_VERSION"
+ },
+ {
+  "at": "2026-11-15T01:19:07.381Z",
+  "title": "Add fever outbreaks that spread through crowded houses",
+  "body": "- SIM_VERSION 9 (w.fever, p.sick, p.imm): a fever can take hold any day, most often in autumn and winter, more in crowded houses and bigger villages; castaways bring it ashore 15% of the time\n- It spreads 10%/day per sick housemate plus a little across the village; 6-10 days in bed, then 4 years immune, so outbreaks burn out\n- Sick islanders stop working and skip midsummer; infants and elders are most at risk (~3-4% of cases die, double when hungry or cold); 100-yr pop on seed 20261114 drops ~199 -> 151\n- Visible: sick lie under a blanket in their doorway, pale green \"fever\" pops, \"n sick\" on the People row, \"laid up with fever\" on the follow card\n- Watch: the first fever on Hais (likely within the first in-world year or two); outbreak ends are logged, and ones that take 3+ lives go in the chronicle"
  }
 ]

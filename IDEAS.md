@@ -90,3 +90,13 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     "the best hunter on Hais" and the chronicle can name heroes.
   - Mood or hunger on the card once the sim tracks it per person.
   - A shareable link (#follow=Name) so people can watch the same islander across visits.
+- Fever is done (SIM_VERSION 9; w.fever {k outbreaks, n/d this outbreak, all cases, lost deaths, who}, p.sick until-tick,
+  p.imm until-tick, yearly `sick`). Constants FEVER_* in sim.js. ~60-90 outbreaks per 100 years, most 1-10 cases, a big one
+  (50-100 cases) every decade or two late game; ~3.5% of cases die, mostly under-3s and over-55s. Answers it invites:
+  - Herbal medicine: a herb-woman/healer role who gathers willow bark and feverfew from the woods (wild stock), halving
+    fever deaths and shortening WOUND_DAYS; learned after the first fever deaths.
+  - Nursing: a healthy housemate staying home to tend the sick cuts the risk (costs a worker).
+  - Isolation: a sick hut away from the houses, so spread is per hut, not per house (cuts FEVER_HOUSE).
+  - Crowding matters: more houses (or stone longhouses) lower the outbreak odds; tie house building to it.
+  - Mourning: the chronicle could name the dead of a bad fever year; a burial ground on the map.
+  - A yearly `sick` row in the graph panel would show the fever years at a glance.
