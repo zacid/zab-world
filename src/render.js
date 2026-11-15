@@ -10,8 +10,8 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9' };
-const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e' };
+const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
 const FRAME = ['........', '...bb...', '..b..b..', '.b....b.', '.bbbbbb.', '.b....b.', '.b....b.', '........'];
@@ -93,6 +93,8 @@ function doing(p) {
     const g = w.yard && p.mourn && w.graves.find((o) => o.s === p.mourn[1]);
     return g ? `mourning at ${g.n}'s grave` : 'mourning at a graveside';
   }
+  if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
+  if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
@@ -130,6 +132,7 @@ function drawWho() {
   const ev = mentions(p.name, 3);
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
     `<b>${esc(p.name)}</b> <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
+    (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
     `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''}</div>` +
     kin.map(([l, v]) => `<div class="kin"><span class="m">${l}</span> ${v}</div>`).join('') +
     ev.map((e) => `<div class="ev"><span class="when">${e.s}</span>${esc(e.text)}</div>`).join('');
@@ -271,6 +274,9 @@ function drawTerrain() {
     const hides = Math.min(3, w.hides || 0);
     for (let k = 0; k < hides; k++) { px(tc, rx + 1 + k * 3, ry + 1, k === 1 ? '#8a6c4c' : '#a4825a', 3, 4); px(tc, rx + 2 + k * 3, ry + 2, '#6e5238', 1, 2); }
   }
+  // the healer's house: bundles of herbs hang drying under the eaves, one for every ten in store
+  const healer = w.heal && w.heal.id != null ? w.people.find((p) => p.id === w.heal.id) : null;
+  const herbHome = healer && healer.home != null ? healer.home : null;
   // houses
   for (const b of w.buildings) {
     if (b.kind === 'granary') {
@@ -293,6 +299,13 @@ function drawTerrain() {
     if (pal.snow && b.progress >= 1) {
       px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
       if (wxNow() === 'snow') { px(tc, b.x * TILE + 1, b.y * TILE + 2, '#eef3f7', 6, 1); px(tc, b.x * TILE + 3, b.y * TILE, '#eef3f7', 2, 1); }
+    }
+    if (b.id === herbHome && b.progress >= 1) {
+      const n = Math.min(3, Math.ceil(w.heal.s / 10));
+      for (let k = 0; k < n; k++) {
+        const hx = b.x * TILE + [1, 6, 3][k], hy = b.y * TILE + 4;
+        px(tc, hx, hy, '#6e5238', 1, 1); px(tc, hx, hy + 1, ['#7aa860', '#a5b86a', '#6e9a58'][k], 1, 2);
+      }
     }
   }
 }
@@ -511,6 +524,14 @@ function frame() {
         const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : '#4d3527';
         px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, q === 'wolf' ? '#b4b7bc' : q === 'deer' ? '#efe6d2' : '#7a5444', 1, 1);
       }
+    }
+    if (w.heal && w.heal.id === p.id && age >= 14) { // the healer's basket on the hip, green leaves showing
+      px(sc, X - 1, Y + 2, '#8a5a32', 1, 2); px(sc, X - 1, Y + 1, '#8fcf7e', 1, 1);
+      if (p.task && p.task.k === 'tend' && !moving) { // stooped over the bed with a steaming bowl
+        px(sc, X + 3, Y + 2, '#a08868', 2, 1);
+        if (Math.floor(now / 400 + p.id) % 3) px(sc, X + 3 + (Math.floor(now / 800) % 2), Y + 1, 'rgba(220,235,210,0.6)', 1, 1);
+      }
+      if (p.task && p.task.k === 'herb' && !moving && Math.floor(now / 350 + p.id) % 2) px(sc, X + 1, Y + 3, '#8fcf7e', 2, 1); // bent to pick
     }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     shown.push({ p, x, y });
@@ -732,6 +753,7 @@ function updatePanels() {
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
+    ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');

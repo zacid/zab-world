@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 13;
+export const SIM_VERSION = 14;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -48,6 +48,7 @@ export const TECHS = {
   midsummer: { name: 'Midsummer', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
   paths:    { name: 'Footpaths', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
   burial:   { name: 'Burying ground', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
+  herbs:    { name: 'Herb lore', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
 };
 
 // ---------- weather ----------
@@ -128,6 +129,15 @@ const FEVER_TOWN = 0.04;    // daily chance x share of the village that is sick 
 const FEVER_DAYS = 6;        // laid up for 6-10 days
 const FEVER_IMMUNE = 4;      // years a survivor cannot catch it again
 const FEVER_CASTAWAY = 0.15; // chance a castaway brings it ashore
+
+const HERB_LEARN = 8;        // fever cases nursed before anyone goes looking for a cure (or one death)
+const HERB_CAP = 30;         // dried bundles that hang under one roof
+const HERB_LOW = 10;         // below this the healer goes out for more even while people are ill
+const HERB_REACH = 14;       // how far from the hearth the healer looks for the wood's edge
+const HERB_FEVER = 0.5;      // a fever patient tended the day before is half as likely to die of it
+const HERB_WOUND = 2;        // days each tending takes off a wound's healing
+const HERB_KEEP = 0.6;       // share of the bundles still good after a year
+const HEAL_OLD = 62;         // at this age the healer hands the basket on
 // ---------- footpaths ----------
 // Every step on open grass wears it a little; the grass grows back a little each day. Where people
 // walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
@@ -256,7 +266,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null,
+    graves: [], yard: null, heal: null,
   };
   // name the island
   let nm = '';
@@ -491,6 +501,7 @@ function daily(w, c, fx) {
   } else w.stats.cold = false;
 
   if (w.fever) fever(w, c, fx);
+  if (w.heal !== undefined) herbs(w, c);
   lifeAndDeath(w, c);
   pairing(w);
   housing(w);
@@ -1234,14 +1245,17 @@ function fever(w, c, fx) {
     if (a > 55) risk += 0.006 + (a - 55) * 0.001;
     if (p.hunger > 4) risk *= 2;
     if (w.stats.cold) risk *= 2;
+    if (p.tend === c.day - 1) risk *= HERB_FEVER; // willow bark and broth, spooned in yesterday
     if (rnd(w) < risk) { F.d++; F.lost = (F.lost || 0) + 1; die(w, p, 'died of the fever'); continue; }
     sick++;
   }
   if (!sick && F.n) { // the last one is up again: the outbreak is over
     const year = clock(w.t).year;
-    const text = F.d
+    let text = F.d
       ? `The fever leaves ${w.name}. It laid ${plural(F.n, 'islander', 'islanders')} low and took ${F.d} of them.`
       : `The fever leaves ${w.name}. ${F.n === 1 ? `${F.who} is up again` : F.n === 2 ? 'Both who fell ill are up again' : `All ${F.n} who fell ill are up again`}, and nobody was lost.`;
+    if (F.t && w.heal && w.heal.nm) text += ` ${w.heal.nm} went from bed to bed with willow bark ${F.t === 1 ? 'once' : `${F.t} times`}.`;
+    delete F.t;
     if (F.d >= 3) milestone(w, `${text} They will speak of the fever of year ${year} for a long time.`);
     else if (F.k === 1) milestone(w, text);
     else log(w, text, F.d ? 'bad' : 'good');
@@ -1274,6 +1288,77 @@ function fever(w, c, fx) {
   feverBegins(w, p, a < 14
     ? `${p.name} will not eat, burns hot to the touch and cries through the night.`
     : `${p.name} wakes burning hot, shivering, and cannot stand.`);
+}
+
+// ---------- herb lore ----------
+// After the fever has taken someone (or worn the village out nursing it), one islander goes looking for
+// a cure at the wood's edge. From then on there is always one healer on the island (w.heal: id, nm name,
+// s bundles of dried herbs, n tendings ever, k healers so far). The healer gathers willow bark and
+// bitter leaves from spring to autumn and spends a bundle a day on each person lying sick or bitten:
+// a tended fever is half as deadly, a tended wound closes days sooner. In a long winter outbreak the
+// bundles can run out. When the healer dies or grows too old, the basket passes to a daughter, a
+// housemate, or the woman best placed to carry it on.
+const aliveId = (w, id) => (id == null ? null : w.people.find((p) => p.id === id && !p.dead) || null);
+function heir(w, old) {
+  let best = null, bs = 1e9;
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || p === old || a < 16 || a > 50 || p.sick) continue;
+    const tier = old && (p.mother === old.id || p.father === old.id) ? 0 : old && old.home != null && p.home === old.home ? 1 : p.sex === 'f' ? 2 : 3;
+    const sc = tier * 100 + Math.abs(a - 28);
+    if (sc < bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+const pron = (p) => (p.sex === 'f' ? 'she' : 'he'), poss = (p) => (p.sex === 'f' ? 'her' : 'his');
+function learnHerbs(w) {
+  const F = w.fever, who = heir(w, null);
+  if (!who) return;
+  w.techs.push('herbs');
+  w.heal = { id: who.id, nm: who.name, s: 6, n: 0, k: 1 };
+  const lost = (w.graves || []).filter((g) => g.why === 'died of the fever').pop();
+  milestone(w, `${lost ? `After ${lost.n} is laid in the earth, ${who.name}` : `Worn out by nursing the fever, ${who.name}`} walks to the edge of the woods and comes back with willow bark and bitter leaves. ${who.sex === 'f' ? 'She' : 'He'} steeps them by the fire and spoons the brew into the sick. ${w.name} learns the herb lore, and has a healer.`);
+  if (F) F.t = 0;
+}
+function herbs(w, c) {
+  if (!w.techs.includes('herbs')) {
+    if (w.fever && ((w.fever.lost || 0) >= 1 || (w.fever.all || 0) >= HERB_LEARN)) learnHerbs(w);
+    return;
+  }
+  const H = w.heal;
+  if (c.doy === 0) H.s = Math.floor(H.s * HERB_KEEP); // last year's leaves crumble to dust
+  const cur = aliveId(w, H.id);
+  if (cur && ageY(w, cur) < HEAL_OLD) return;
+  const next = heir(w, cur || (H.id != null ? { id: H.id, home: null } : null)); // the dead healer's children still come first
+  if (!next) { if (!cur) H.id = null; return; }
+  const before = H.nm;
+  H.id = next.id; H.nm = next.name; H.k++;
+  if (cur) milestone(w, `${cur.name} is too stiff now to walk to the woods. ${pron(cur)[0].toUpperCase() + pron(cur).slice(1)} hands ${poss(cur)} herb basket to ${next.name}, and the names of every leaf with it.`);
+  else milestone(w, `With ${before} gone, ${next.name} takes down the herb basket from its peg. ${w.name} has its ${['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'][H.k] || `${H.k}th`} healer.`);
+}
+// the healer's own work: the sick first, then the woods when the bundles run low
+function healerTend(w, p, c) {
+  const H = w.heal;
+  if (!H || H.id !== p.id || H.s < 1) return null;
+  let best = null, bd = 1e9;
+  for (const o of w.people) {
+    if (o === p || o.dead || !(o.sick || o.hurt) || o.tend === c.day || w.res['n' + o.id] != null) continue;
+    const h = homeOf(w, o), dd = d2(h.x, h.y, p.x, p.y);
+    if (dd < bd) { bd = dd; best = { o, h }; }
+  }
+  return best && { k: 'tend', key: 'n' + best.o.id, x: best.h.x, y: best.h.y + 1, h: 1, o: best.o.id };
+}
+function healerGather(w, p, c) {
+  const H = w.heal;
+  if (!H || H.id !== p.id || c.season === 3 || c.hour > 13 || H.s >= HERB_CAP || (w.wx && w.wx.k === 'fog')) return null;
+  if (H.s >= HERB_LOW && w.people.some((o) => o.sick || o.hurt)) return null;
+  for (let tries = 0; tries < 10; tries++) { // willow and feverfew grow where the trees meet the open
+    const x = w.fire.x + ri(w, HERB_REACH * 2 + 1) - HERB_REACH, y = w.fire.y + ri(w, HERB_REACH * 2 + 1) - HERB_REACH;
+    if (tile(w, x, y) !== T.FOREST) continue;
+    if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const t = tile(w, x + a, y + b); return t === T.GRASS || t === T.SAND || t === T.FIELD; })) continue;
+    if (lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) return { k: 'herb', x, y, h: 3 };
+  }
+  return null;
 }
 
 // ---------- the burying ground ----------
@@ -1520,6 +1605,11 @@ function nearestFree(w, list, p, stage, pre) {
 function pickTask(w, p, c) {
   const free = (k) => w.res[k] == null;
   const L = workLists(w);
+  // the healer looks in on the sick and the bitten before anything else
+  if (w.heal && w.heal.id === p.id) {
+    const nk = healerTend(w, p, c);
+    if (nk) return nk;
+  }
   // harvest
   let f = nearestFree(w, L.ripe, p, 'ripe', 'f');
   if (f) return { k: 'harvest', key: 'f' + f.id, x: f.x, y: f.y, h: 4 };
@@ -1536,6 +1626,11 @@ function pickTask(w, p, c) {
   if (w.food < w.people.length * 20) {
     const tk = fish(w, p);
     if (tk) return tk;
+  }
+  // then out to the wood's edge if the bundles are running low
+  if (w.heal && w.heal.id === p.id) {
+    const hk = healerGather(w, p, c);
+    if (hk) return hk;
   }
   // construction
   let b = nearest(L.raw, p, (o) => o.progress < 1 && free('b' + o.id));
@@ -1821,6 +1916,19 @@ function finish(w, p, t, c, fx) {
     w.fauna.fences = (w.fauna.fences || 0) + 1;
     pop('fenced', 'wood');
     if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
+  } else if (t.k === 'tend') {
+    const o = w.people.find((q) => q.id === t.o), H = w.heal;
+    if (!o || o.dead || !(o.sick || o.hurt) || !H || H.s < 1) return;
+    H.s--; H.n++; o.tend = c.day;
+    if (o.sick && w.fever) w.fever.t = (w.fever.t || 0) + 1;
+    if (o.hurt) o.hurt = Math.max(w.t + 1, o.hurt - HERB_WOUND * TICKS_PER_DAY);
+    pop('tended', 'herb');
+  } else if (t.k === 'herb') {
+    const H = w.heal;
+    if (!H) return;
+    const got = Math.min(HERB_CAP - H.s, 4 + ri(w, 3));
+    H.s += got;
+    if (got > 0) pop('+' + got + ' herbs', 'herb');
   } else if (t.k === 'forage') {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
@@ -1935,6 +2043,10 @@ const MIGRATIONS = {
     w.stats.fogs = w.stats.fogs || 0;
     w.stats.yg = w.stats.yg || 0;
   },
+  // v13 -> v14: herb lore. Nothing to change yet; the first fever death (or a long nursing) teaches it.
+  13: (w) => {
+    if (w.heal === undefined) w.heal = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1968,6 +2080,7 @@ export function summary(w) {
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
+    herbs: w.heal ? w.heal.s : 0, healer: (w.heal && w.heal.id != null && w.heal.nm) || null, tended: (w.heal && w.heal.n) || 0,
   };
 }
 

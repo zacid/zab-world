@@ -73,5 +73,10 @@
   "at": "2026-11-15T04:35:23.786Z",
   "title": "Add sea fog: wolves hunt by day in the grey",
   "body": "- SIM_VERSION 13: new weather kind 'fog' (spring 7%, summer 3%, autumn 10%, winter 5% of new spells; holds 55%); crops grow at 0.8x\n- In fog nobody fishes or sets out to hunt, walking off a path drops to 2 tiles/h (paths stay 4), and wolves leave the trees by day at half their dusk boldness\n- First fog bank is a chronicle milestone; spells of 4+ days or with a wolf attack are logged, wolf kills in fog go in the chronicle; yearly history gets `fog` days\n- Visible: grey wash, slow drifting fog banks over the map, flat faint surf, no gulls, sea glints hidden; \"sea fog\" in pale grey next to the date\n- Watch: the live world's first fog (spring/autumn most likely) and a daytime wolf attack; test seeds see ~1 fog death per 20-30 years"
+ },
+ {
+  "at": "2026-11-15T05:00:42.838Z",
+  "title": "Add herb lore and a village healer",
+  "body": "- SIM_VERSION 14 (w.heal, p.tend): new tech Herb lore, learned after the first fever death or 8 fever cases; one islander becomes the healer\n- The healer tends each sick or bitten islander once a day (1 herb bundle): a tended fever is half as deadly, each tending takes 2 days off a wound\n- Herbs are gathered at the wood's edge spring to autumn (cap 30, 40% crumble each new year), so a long winter outbreak can run the bundles dry\n- The basket passes to the healer's child, a housemate, or a woman of ~28 when the healer dies or turns 62; each new healer goes in the chronicle\n- Visible: green healer with a basket, herb bundles under the healer's eaves, a Herbs row in the panel, \"herb-woman\" on the follow card. Watch for the first fever on Hais (test seeds learn herb lore around Y5-6)"
  }
 ]

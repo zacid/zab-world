@@ -146,3 +146,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Lost in the fog: a child or elder wanders off and the village goes out searching (found by a path, or by the hearth smoke).
   - Fog lore: elders read a still, warm evening over cold sea and call people in early the next day.
   - A boat caught out in fog (once there are boats) drifts to another isle and brings back news.
+- Herb lore is done (SIM_VERSION 14; tech 'herbs', w.heal {id, nm, s bundles, n tendings, k healers}, p.tend day tended,
+  w.fever.t tendings this outbreak; HERB_* / HEAL_OLD in sim.js; task kinds 'tend' (key n<personId>) and 'herb').
+  Test seeds learn it ~Y5-6; 4-5 healers per 100 years, all died before 62 so the "too stiff" handover never fired;
+  100-yr pop on seed 20261114 rose ~151 -> 190. Answers it invites:
+  - Why do healers die young? They walk alone to the wood's edge; check causes, maybe the healer takes a companion.
+  - Big winter outbreaks (50-60 cases) empty the 30 bundles fast: a herb garden by the healer's house (spring
+    planting, cap +20) or a drying shed would be the next step.
+  - A healer's renown: count lives tended and name them in the chronicle at death ("Morlin, who nursed 300 through the fever").
+  - Birth help: a healer at a birth lowers infant risk (a < 2), and childbed could become a real danger first.
+  - Herbs for the cold: a warming brew cuts "died of the cold" for the frail in bitter snaps.
+  - Coppicing was measured and skipped for now: on seed 4242 tall trees within 20 tiles fall 1000 -> 322 by Y100
+    and timber stays ~2000, so the woods only run out after ~Y120. Worth doing before the live world reaches Y100.
