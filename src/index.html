@@ -46,6 +46,16 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #tip { position:absolute; background:var(--panel); border:1px solid var(--line); padding:6px 9px; pointer-events:none; font-size:13px; }
 #tip .m { color:var(--muted); }
 #catch { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid var(--accent); color:var(--accent); background:var(--panel); padding:10px 16px; }
+#who { left:12px; top:56px; width:270px; max-height:calc(100% - 330px); overflow:auto; scrollbar-width:thin; font-size:13px; }
+#who .hd { display:flex; } #who .x { margin-left:auto; cursor:pointer; color:var(--fg); }
+#who .x:hover, #who a:hover { color:var(--accent); }
+#who b { font-weight:normal; font-size:15px; color:var(--accent); }
+#who .m { color:var(--muted); } #who .bad { color:var(--bad); }
+#who .do { margin:2px 0 6px; }
+#who .kin { padding:1px 0; }
+#who a { color:var(--fg); text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; }
+#who .ev { margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,.12); color:#cfd3d8; }
+#who .when { color:var(--muted); margin-right:6px; font-size:11px; }
 [hidden] { display:none !important; }
 @media (max-width: 760px) {
   #title { font-size:22px; } #top { top:8px; }
@@ -53,6 +63,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   #res { left:8px; bottom:8px; min-width:0; font-size:13px; padding:8px 10px; }
   #skybtn { left:8px; top:auto; bottom:8px; right:auto; transform:translateY(-160px); }
   #logbtn { display:block; right:8px; bottom:8px; }
+  #who { left:8px; right:8px; top:64px; width:auto; max-height:34%; font-size:12px; }
   #chron { display:none; right:8px; left:8px; width:auto; bottom:52px; max-height:55%; }
   #app.logopen #chron { display:flex; }
 }
@@ -67,6 +78,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   <div class="panel" id="graph"><canvas id="spark"></canvas><div id="sparkcap"></div></div>
   <div class="panel" id="chron"><div class="hd">Chronicle</div><div id="log"></div></div>
   <button class="btn" id="logbtn">Chronicle</button>
+  <div class="panel" id="who" hidden></div>
   <div id="tip" hidden></div>
   <div id="catch" hidden></div>
   <div id="sky" hidden>

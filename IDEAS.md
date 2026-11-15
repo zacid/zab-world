@@ -82,3 +82,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Visitors: a boat from another isle that comes for the midsummer fire, bringing a bride/groom or trade goods.
   - A thin year (no feast, small fire) could lower births the next year; a lavish one could raise them.
   - Festival memory: elders recall "the year of the great storm midsummer" in later entries.
+- Follow card is done (render.js only: follow/track/cam, known id->name cache, card #who). Answers it invites:
+  - Dead parents loaded from the save show no name (dead people are dropped from w.people). A small
+    w.ancestry ring {id, name, mother, father, died} in the sim would give real family trees and
+    "granddaughter of the first settler" lines; needs a SIM_VERSION bump.
+  - Per-person memory: count of fish caught, boars taken, houses built, so the card can say
+    "the best hunter on Hais" and the chronicle can name heroes.
+  - Mood or hunger on the card once the sim tracks it per person.
+  - A shareable link (#follow=Name) so people can watch the same islander across visits.

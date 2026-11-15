@@ -38,5 +38,10 @@
   "at": "2026-11-15T00:30:39.181Z",
   "title": "Add a midsummer festival with bonfire and ring dance",
   "body": "- New custom Midsummer (SIM_VERSION 8, w.fest); the live world learns it on load, new worlds at 10 people\n- On summer day 46 work stops at 16:00: everyone gathers at a big bonfire (up to 12 timber), feasts 2 food each if stores allow, and dances until 23:00; rain delays it up to 4 days, a storm until it clears\n- At 21:00 each single woman has a 40% chance to pair up in the firelight; the year's festival is logged, the 1st and every 25th go in the chronicle\n- Visible: tall flickering bonfire with rising sparks, villagers in rings turning around it with flower crowns, \"midsummer fire\" next to the date\n- Watch: the first midsummer on Hais this summer (Y1, about 70 game days away)"
+ },
+ {
+  "at": "2026-11-15T00:51:05.670Z",
+  "title": "Add click-to-follow: a life card for any islander",
+  "body": "- Click a villager to follow them: the camera glides to them and keeps them centred, with thin white brackets around them (dashed round their house while they sleep)\n- A card shows name, age, what they are doing, parents, partner, children and housemates; click any name to follow that person instead\n- The card also lists the last three log entries that mention them; if they die it says so and shows how\n- Drag to look around (the card stays, \"find\" brings the camera back); click empty ground, press Esc or the cross to let go\n- Render only: no change to the simulation, saved state or SIM_VERSION"
  }
 ]

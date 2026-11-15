@@ -41,6 +41,7 @@ function resize() {
   computeView();
 }
 // camera: frame the settlement, widening as it grows
+let base = { s: 1, x: 0, y: 0 };
 function computeView() {
   if (!w) return;
   let x0 = w.fire.x - 9, x1 = w.fire.x + 10, y0 = w.fire.y - 7, y1 = w.fire.y + 8;
@@ -48,9 +49,91 @@ function computeView() {
   const bw = (x1 - x0) * TILE, bh = (y1 - y0) * TILE;
   let fit = Math.min(cv.width / bw, cv.height / bh) * 0.8 * zoom;
   fit = Math.min(fit, 9 * dpr);
-  const s = fit >= 2 ? Math.round(fit) : fit;
-  const cx = ((x0 + x1) / 2) * TILE, cy = ((y0 + y1) / 2) * TILE;
-  view = { s, ox: Math.round(cv.width / 2 - cx * s + pan.x * dpr), oy: Math.round(cv.height / 2 - cy * s + pan.y * dpr) };
+  base = { s: fit >= 2 ? Math.round(fit) : fit, x: ((x0 + x1) / 2) * TILE, y: ((y0 + y1) / 2) * TILE };
+  applyView();
+}
+// cam (scene px) overrides the settlement centre while someone is followed, and glides back afterwards
+function applyView() {
+  const c = cam || base, s = base.s;
+  view = { s, ox: Math.round(cv.width / 2 - c.x * s + pan.x * dpr), oy: Math.round(cv.height / 2 - c.y * s + pan.y * dpr) };
+}
+
+// ---------- following one islander ----------
+// Render-only: nothing here is saved or touches the simulation.
+let follow = null, track = false, cam = null, returning = false, gone = null, lastShown = [];
+const known = new Map(); // id -> { name, sex }, so the dead keep their names on the card
+function startFollow(id) {
+  cam = { x: (cv.width / 2 - view.ox) / view.s, y: (cv.height / 2 - view.oy) / view.s }; // glide from where we are
+  follow = id; track = true; returning = false; gone = null;
+  const p = w.people.find((q) => q.id === id);
+  if (p) known.set(id, { name: p.name, sex: p.sex });
+  pan = { x: 0, y: 0 };
+  zoom = Math.max(zoom, 1.6);
+  computeView();
+  drawWho();
+}
+function stopFollow() {
+  if (cam) { cam = { x: cam.x - (pan.x * dpr) / base.s, y: cam.y - (pan.y * dpr) / base.s }; pan = { x: 0, y: 0 }; }
+  follow = null; track = false; gone = null; returning = !!cam;
+  $('who').hidden = true;
+}
+function moveCam(target) {
+  if (!cam) return;
+  const t = target || base;
+  cam.x += (t.x - cam.x) * 0.12; cam.y += (t.y - cam.y) * 0.12;
+  if (!target && Math.abs(t.x - cam.x) + Math.abs(t.y - cam.y) < 0.5) { cam = null; returning = false; }
+  applyView();
+}
+function doing(p) {
+  const a = Math.floor(S.ageY(w, p));
+  if (p.asleep) return 'asleep at home';
+  return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
+    hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+function link(id) {
+  const o = w.people.find((q) => q.id === id), k = known.get(id);
+  if (o) return `<a data-id="${id}">${esc(o.name)}</a>`;
+  return k ? `<span class="m">${esc(k.name)} †</span>` : '';
+}
+// the card: who they are, what they're doing, their family, and the last things the island said of them
+function drawWho() {
+  const el = $('who');
+  if (follow == null) { el.hidden = true; return; }
+  const p = w.people.find((q) => q.id === follow);
+  if (!p) {
+    if (!gone) { const k = known.get(follow); gone = k ? k.name : 'They'; }
+    const last = mentions(gone, 1)[0];
+    el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div><b>${esc(gone)}</b><div class="m">is no longer among the living.</div>` +
+      (last ? `<div class="ev"><span class="when">${last.s}</span>${esc(last.text)}</div>` : '');
+    el.hidden = false; return;
+  }
+  const a = Math.floor(S.ageY(w, p));
+  const kin = [];
+  const parents = [p.mother, p.father].filter((id) => id != null).map(link).filter(Boolean);
+  if (parents.length) kin.push(['child of', parents.join(' &amp; ')]);
+  if (p.partner != null) kin.push([p.sex === 'f' ? 'wife of' : 'husband of', link(p.partner)]);
+  const kids = w.people.filter((o) => o.mother === p.id || o.father === p.id).sort((x, y) => x.born - y.born);
+  if (kids.length) kin.push([kids.length === 1 ? 'child' : 'children', kids.map((o) => link(o.id)).join(', ')]);
+  if (p.home != null) {
+    const mates = w.people.filter((o) => o.home === p.home && o.id !== p.id && o.id !== p.partner && !kids.includes(o));
+    if (mates.length) kin.push(['shares a roof with', mates.map((o) => link(o.id)).join(', ')]);
+  } else kin.push(['home', '<span class="bad">none yet</span>']);
+  const ev = mentions(p.name, 3);
+  el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
+    `<b>${esc(p.name)}</b> <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
+    `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''}</div>` +
+    kin.map(([l, v]) => `<div class="kin"><span class="m">${l}</span> ${v}</div>`).join('') +
+    ev.map((e) => `<div class="ev"><span class="when">${e.s}</span>${esc(e.text)}</div>`).join('');
+  el.hidden = false;
+}
+function mentions(name, n) {
+  const re = new RegExp(`\\b${name.replace(/[^\w]/g, '')}\\b`), out = [], seen = new Set();
+  for (const e of [...w.log].reverse()) {
+    if (out.length >= n) break;
+    if (re.test(e.text) && !seen.has(e.text + e.t)) { seen.add(e.text + e.t); out.push(e); }
+  }
+  return out;
 }
 
 // ---------- terrain ----------
@@ -261,6 +344,19 @@ function frame() {
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     shown.push({ p, x, y });
   }
+  lastShown = shown;
+  // keep the followed islander in the middle of the screen (at home while they sleep)
+  let fpos = null;
+  if (follow != null) {
+    const o = shown.find((q) => q.p.id === follow);
+    if (o) fpos = { x: o.x * TILE, y: o.y * TILE - 1, awake: true };
+    else {
+      const p = w.people.find((q) => q.id === follow), b = p && p.home != null && w.buildings.find((q) => q.id === p.home);
+      if (b) fpos = { x: b.x * TILE + 4, y: b.y * TILE + 4, awake: false };
+    }
+  }
+  if (track && fpos) moveCam(fpos);
+  else if (returning) moveCam(null);
   const beasts = drawBeasts(frac, now);
   // the day's sky colours the land
   const wx = wxNow();
@@ -289,6 +385,18 @@ function frame() {
   skyFx(wx, now);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(scene, view.ox, view.oy, PX * view.s, PX * view.s);
+  if (fpos) { // thin white corner brackets around whoever is followed; dashed round the house while they sleep
+    const sx = view.ox + fpos.x * view.s, sy = view.oy + fpos.y * view.s;
+    const r = Math.max(7 * dpr, (fpos.awake ? 4 : 6) * view.s), l = r * 0.45 + Math.sin(now / 300) * dpr;
+    ctx.strokeStyle = 'rgba(232,232,232,0.85)'; ctx.lineWidth = dpr;
+    if (!fpos.awake) ctx.setLineDash([2 * dpr, 2 * dpr]);
+    ctx.beginPath();
+    for (const [ax, ay] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const cx = sx + ax * r, cy = sy + ay * r;
+      ctx.moveTo(cx - ax * l, cy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy - ay * l);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
 
   // popups
   const fs = Math.round(11 * dpr);
@@ -318,10 +426,8 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
-        hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
-      tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
+      tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else tip.hidden = true;
   }
@@ -434,6 +540,8 @@ function updatePanels() {
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');
+  for (const p of w.people) if (!known.has(p.id)) known.set(p.id, { name: p.name, sex: p.sex });
+  drawWho();
   drawSpark();
   if (!$('sky').hidden) drawSky();
 }
@@ -497,13 +605,34 @@ async function boot() {
   window.addEventListener('resize', () => { resize(); if (w) updatePanels(); });
   cv.addEventListener('mousemove', (e) => {
     const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top };
-    if (drag) { pan.x = drag.px + e.clientX - drag.x; pan.y = drag.py + e.clientY - drag.y; computeView(); }
+    if (drag) dragTo(e);
   });
-  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener('pointermove', (e) => { if (drag && e.pointerType !== 'mouse') { pan.x = drag.px + e.clientX - drag.x; pan.y = drag.py + e.clientY - drag.y; computeView(); } });
-  cv.addEventListener('pointerup', () => { drag = null; });
+  // a drag pans (and lets go of the camera, though the card stays); a click without a drag picks someone to follow
+  const dragTo = (e) => {
+    if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 5 && !drag.moved) return;
+    if (!drag.moved) { drag.moved = true; returning = false; if (track) { track = false; drawWho(); } }
+    pan.x = drag.px + e.clientX - drag.x; pan.y = drag.py + e.clientY - drag.y; applyView();
+  };
+  cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y, moved: false }; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointermove', (e) => { if (drag && e.pointerType !== 'mouse') dragTo(e); });
+  cv.addEventListener('pointerup', (e) => {
+    const d = drag; drag = null;
+    if (!d || d.moved || !w) return;
+    const r = cv.getBoundingClientRect();
+    const mx = ((e.clientX - r.left) * dpr - view.ox) / (TILE * view.s), my = ((e.clientY - r.top) * dpr - view.oy) / (TILE * view.s);
+    let best = null, bd = e.pointerType === 'mouse' ? 0.6 : 1.2;
+    for (const o of lastShown) { const dd = Math.hypot(o.x - mx, o.y - 0.2 - my); if (dd < bd) { bd = dd; best = o.p; } }
+    if (best) startFollow(best.id);
+    else if (follow != null) stopFollow();
+  });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.35, Math.min(4, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); computeView(); }, { passive: false });
-  cv.addEventListener('dblclick', () => { zoom = 1; pan = { x: 0, y: 0 }; computeView(); });
+  cv.addEventListener('dblclick', () => { zoom = 1; pan = { x: 0, y: 0 }; if (follow != null) stopFollow(); cam = null; returning = false; computeView(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && follow != null) stopFollow(); });
+  $('who').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-id],[data-close]');
+    if (!a) return;
+    if (a.hasAttribute('data-close')) stopFollow(); else startFollow(+a.dataset.id);
+  });
   cv.addEventListener('mouseleave', () => { mouse = null; $('tip').hidden = true; });
   $('skybtn').onclick = () => { $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) drawSky(); };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
