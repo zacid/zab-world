@@ -83,5 +83,10 @@
   "at": "2026-11-15T07:07:31.455Z",
   "title": "Show dates in the sky and a list of changes",
   "body": "- Each star shows the game date it was learned\n- Hover a star to see the real date it was added\n- New panel in the sky lists every change with its date"
+ },
+ {
+  "at": "2026-11-15T07:28:57.979Z",
+  "title": "Add a History view with one entry per island year",
+  "body": "- New History button opens a timeline of every island year, newest first\n- Each year shows its real date, people, births, deaths, harvest and main events\n- Population chart over the whole life of the island"
  }
 ]

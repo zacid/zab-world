@@ -802,6 +802,73 @@ function drawTimeline() {
   $('tlhd').textContent = `Changes to the island · ${progress.length}`;
 }
 
+// ---------- history: one entry per island year, with the real day it fell on ----------
+const realDay = (ms) => new Date(ms).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+function drawHistory() {
+  if (!w) return;
+  const YMS = S.TICKS_PER_YEAR * S.TICK_MS, c = S.clock(w.t), s = S.summary(w);
+  const yearly = w.hist.yearly || [];
+  $('hhd').textContent = `History of ${w.name}`;
+  $('hsub').textContent = `founded ${realWhen(new Date(w.epoch).toISOString())} · year ${c.year} now · one island year passes each real day`;
+  // events of each year from the chronicle (major moments only)
+  const ev = {};
+  for (const e of w.chronicle || []) (ev[S.clock(e.t).year] ||= []).push(e);
+  const row = (y, now) => {
+    const h = yearly.find((r) => r.y === y);
+    const start = w.epoch + (y - 1) * YMS;
+    const when = now ? `${realDay(start)} – now` : `${realDay(start)} ${new Date(start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} – ${realDay(start + YMS)}`;
+    let st = '';
+    if (h) {
+      st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
+      const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`].filter(Boolean);
+      if (xs.length) st += `<br>${xs.join(' · ')}`;
+    } else if (now) {
+      st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
+    }
+    const list = (ev[y] || []).map((e) => `<div class="ev"><span class="se">${esc(S.SEASONS[S.clock(e.t).season])}</span>${esc(e.text)}</div>`).join('');
+    return `<div class="yr${now ? ' now' : ''}"><div class="yh"><b>Year ${y}${now ? ' · in progress' : ''}</b><span class="rd">${esc(when)}</span></div>`
+      + (st ? `<div class="ys">${st}</div>` : '') + (list || '<div class="quiet">A quiet year.</div>') + '</div>';
+  };
+  let html = '';
+  for (let y = c.year; y >= 1; y--) html += row(y, y === c.year);
+  $('hyears').innerHTML = html;
+  drawHistChart();
+}
+function drawHistChart() {
+  const cvs = $('hspark'), g = cvs.getContext('2d');
+  const W = (cvs.width = cvs.clientWidth * dpr), H = (cvs.height = cvs.clientHeight * dpr);
+  g.clearRect(0, 0, W, H);
+  // whole years if there are a few of them, otherwise the days of this young island
+  const yearly = w.hist.yearly || [];
+  let pts, cap;
+  if (yearly.length >= 2) {
+    pts = [...yearly.map((r) => [r.y, r.pop]), [yearly[yearly.length - 1].y + S.clock(w.t).doy / S.DAYS_PER_YEAR, w.people.length]];
+    cap = [`population by year, 1–${yearly.length}`, `peak ${w.stats.peak}`];
+  } else {
+    pts = (w.hist.daily || []).map((r) => [r[0], r[1]]);
+    cap = ['population by day so far (years appear once a few have passed)', `now ${w.people.length}`];
+  }
+  if (pts.length < 2) pts = [[0, w.people.length], [1, w.people.length]];
+  const x0 = pts[0][0], x1 = pts[pts.length - 1][0] || 1;
+  const vals = pts.map((p) => p[1]), lo = 0, hi = Math.max(10, ...vals) * 1.1;
+  const X = (x) => 4 * dpr + ((x - x0) / Math.max(1e-9, x1 - x0)) * (W - 8 * dpr), Y = (v) => H - 3 * dpr - ((v - lo) / (hi - lo)) * (H - 10 * dpr);
+  g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = dpr;
+  for (const f of [0.25, 0.5, 0.75]) { g.beginPath(); g.moveTo(0, Y(hi * f)); g.lineTo(W, Y(hi * f)); g.stroke(); }
+  g.fillStyle = 'rgba(89,240,139,0.08)'; g.beginPath(); g.moveTo(X(pts[0][0]), H);
+  for (const p of pts) g.lineTo(X(p[0]), Y(p[1]));
+  g.lineTo(X(pts[pts.length - 1][0]), H); g.fill();
+  g.strokeStyle = '#59f08b'; g.lineWidth = 1.5 * dpr; g.beginPath();
+  pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke();
+  g.fillStyle = '#8a8f98'; g.font = `${Math.round(11 * dpr)}px "Share Tech Mono", monospace`; g.textAlign = 'left';
+  g.fillText(String(Math.round(hi * 0.75)), 4 * dpr, Y(hi * 0.75) - 3 * dpr);
+  $('hcap').innerHTML = cap.map((t) => `<span>${esc(t)}</span>`).join('');
+}
+function showHistory(on) {
+  $('hist').hidden = !on; $('histbtn').classList.toggle('on', on);
+  if (on) { $('sky').hidden = true; $('skybtn').classList.remove('on'); drawHistory(); }
+}
+
 // ---------- the sky: discoveries as constellations ----------
 function drawSky() {
   const cvs = $('skyc'), g = cvs.getContext('2d');
@@ -876,14 +943,16 @@ async function boot() {
   });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.35, Math.min(4, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); computeView(); }, { passive: false });
   cv.addEventListener('dblclick', () => { zoom = 1; pan = { x: 0, y: 0 }; if (follow != null) stopFollow(); cam = null; returning = false; computeView(); });
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && follow != null) stopFollow(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('hist').hidden) return showHistory(false); if (e.key === 'Escape' && follow != null) stopFollow(); });
   $('who').addEventListener('click', (e) => {
     const a = e.target.closest('[data-id],[data-close]');
     if (!a) return;
     if (a.hasAttribute('data-close')) stopFollow(); else startFollow(+a.dataset.id);
   });
   cv.addEventListener('mouseleave', () => { mouse = null; $('tip').hidden = true; });
-  $('skybtn').onclick = () => { $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
+  $('histbtn').onclick = () => showHistory($('hist').hidden);
+  $('histback').onclick = () => showHistory(false);
+  $('skybtn').onclick = () => { if (!$('hist').hidden) showHistory(false); $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
   try {
     const r = await fetch('world/state.json', { cache: 'no-store' });

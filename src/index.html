@@ -39,6 +39,27 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 .btn:hover, .btn.on { border-color:var(--accent); color:var(--accent); }
 #skybtn { left:12px; top:12px; }
 #logbtn { display:none; }
+#histbtn { left:12px; top:54px; }
+#hist { position:absolute; inset:0; background:#03050a; overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+#histback { left:12px; top:12px; position:fixed; z-index:2; }
+#hwrap { max-width:760px; margin:0 auto; padding:16px 16px 40px; }
+#hhd { text-align:center; font-size:24px; margin-top:4px; }
+#hsub { text-align:center; color:var(--muted); margin:4px 0 14px; }
+#hchart { position:relative; padding:10px 12px; }
+#hspark { width:100%; height:120px; display:block; }
+#hcap { color:var(--muted); font-size:12px; margin-top:6px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.yr { border-left:1px solid rgba(255,255,255,.25); margin:18px 0 0 6px; padding:0 0 0 14px; position:relative; }
+.yr::before { content:""; position:absolute; left:-5px; top:5px; width:9px; height:9px; background:#04070d; border:1px solid var(--fg); transform:rotate(45deg); }
+.yr.now::before { border-color:var(--accent); background:var(--accent); }
+.yr .yh { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; }
+.yr .yh b { font-weight:normal; font-size:17px; }
+.yr.now .yh b { color:var(--accent); }
+.yr .rd { color:var(--muted); font-size:12px; }
+.yr .ys { color:var(--muted); margin:3px 0 5px; font-size:13px; }
+.yr .ys .up { color:var(--accent); } .yr .ys .dn { color:var(--bad); }
+.yr .ev { padding:2px 0; font-size:13px; }
+.yr .ev .se { color:var(--muted); display:inline-block; width:62px; font-size:12px; }
+.yr .quiet { color:var(--muted); font-size:13px; }
 #sky { position:absolute; inset:0; background:#020308; }
 #skyc { width:100%; height:100%; display:block; }
 #skyhd { position:absolute; top:14px; left:0; right:0; text-align:center; font-size:24px; pointer-events:none; }
@@ -72,6 +93,9 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   #who { left:8px; right:8px; top:64px; width:auto; max-height:34%; font-size:12px; }
   #chron { display:none; right:8px; left:8px; width:auto; bottom:52px; max-height:55%; }
   #app.logopen #chron { display:flex; }
+  #histbtn { left:8px; top:auto; bottom:8px; transform:translateY(-200px); }
+  #hwrap { padding-top:54px; }
+  .yr .ev .se { width:auto; margin-right:8px; }
   #tl { top:52px; left:8px; right:8px; width:auto; max-height:30%; }
 }
 </style>
@@ -81,6 +105,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   <canvas id="c"></canvas>
   <div id="top"><div id="title">…</div><div id="when"></div><div id="badge" hidden>demo · fast-forwarded world</div></div>
   <button class="btn" id="skybtn">✦ Sky</button>
+  <button class="btn" id="histbtn">≡ History</button>
   <div class="panel" id="res"></div>
   <div class="panel" id="graph"><canvas id="spark"></canvas><div id="sparkcap"></div></div>
   <div class="panel" id="chron"><div class="hd">Chronicle</div><div id="log"></div></div>
@@ -88,6 +113,15 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   <div class="panel" id="who" hidden></div>
   <div id="tip" hidden></div>
   <div id="catch" hidden></div>
+  <div id="hist" hidden>
+    <button class="btn" id="histback">← Island</button>
+    <div id="hwrap">
+      <div id="hhd"></div>
+      <div id="hsub"></div>
+      <div class="panel" id="hchart"><canvas id="hspark"></canvas><div id="hcap"></div></div>
+      <div id="hyears"></div>
+    </div>
+  </div>
   <div id="sky" hidden>
     <canvas id="skyc"></canvas>
     <div id="skyhd">Discoveries</div>
