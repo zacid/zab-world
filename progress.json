@@ -63,5 +63,10 @@
   "at": "2026-11-15T02:25:24.639Z",
   "title": "Add a deer herd that grazes the open meadow by day",
   "body": "- SIM_VERSION 12: four deer join the beasts (k 'deer'); they feed on the widest grass 9+ tiles from the hearth (fauna.mead) from 05:00 to 21:00 and lie up in nearby trees (fauna.bed) at night\n- Deer bolt when a grown islander comes within ~3.5 tiles, and nibble saplings (wood <= 3) back to grass, so their meadow stays open\n- Herd size follows open grass (1 deer per 45 tiles, 2-8); fawns in spring, one leaves in autumn if the meadow has shrunk; wolves take ~1 in winter and then lie up for two days\n- Hunters stalk deer in autumn only (2 a year, never below 3): +30 meat and a hide; panel, tooltip and follow card show deer\n- Watch: the first venison on Hais this autumn, and the herd thinning as fields eat the grass in later decades"
+ },
+ {
+  "at": "2026-11-15T02:54:06.266Z",
+  "title": "Add surf, chimney smoke and gulls to the map",
+  "body": "- Waves run up to every beach and draw back; rain and storms push the foam wider and faster, with spray in storms\n- Lived-in houses smoke: all day in winter and on cold or snowy days, mornings and evenings in spring and autumn, only at supper in summer; storms flatten the smoke sideways\n- Gulls wheel over the shallows by day and drift over to whoever is fishing; fewer in winter, none at night or in storms\n- Render only: no change to the simulation, saved state or SIM_VERSION\n- Watch: the first winter on Hais, when every roof should be smoking"
  }
 ]

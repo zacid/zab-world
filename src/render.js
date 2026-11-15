@@ -200,12 +200,16 @@ function drawTerrain() {
   const c = clockNow();
   const pal = PAL[c.season];
   tc.clearRect(0, 0, PX, PX);
+  surf = [];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, t = w.tiles[i], X = x * TILE, Y = y * TILE;
     const h = S.hash(x, y, 3);
     if (t === S.T.WATER) {
-      const shore = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const tt = (w.tiles[(y + b) * N + x + a]); return x + a >= 0 && x + a < N && y + b >= 0 && y + b < N && tt !== S.T.WATER; });
-      if (shore) { px(tc, X, Y, '#0b1a2b', 8, 8); if (h < 0.5) px(tc, X + ((h * 80) | 0) % 7, Y + ((h * 300) | 0) % 7, '#1d3550', 2, 1); }
+      const land = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([a, b]) => x + a >= 0 && x + a < N && y + b >= 0 && y + b < N && w.tiles[(y + b) * N + x + a] !== S.T.WATER);
+      if (land.length) {
+        px(tc, X, Y, '#0b1a2b', 8, 8); if (h < 0.5) px(tc, X + ((h * 80) | 0) % 7, Y + ((h * 300) | 0) % 7, '#1d3550', 2, 1);
+        for (const [a, b] of land) surf.push({ X, Y, a, b, h: S.hash(x * 2 + a, y * 2 + b, 51) });
+      }
       continue;
     }
     if (t === S.T.SAND) {
@@ -353,6 +357,71 @@ function darkness(hf) { // hf = fractional hour
 // ---------- frame ----------
 const sparks = Array.from({ length: 260 }, (_, i) => ({ x: S.hash(i, 1, 5), y: S.hash(i, 2, 5), p: S.hash(i, 3, 5) * 6.28, s: S.hash(i, 4, 5) }));
 
+// ---------- ambience: surf on the beach, smoke from the roofs, gulls over the shallows ----------
+// Render-only: none of this is saved or touches the simulation.
+let surf = []; // water tiles that touch land: { X, Y, a, b } with (a, b) pointing at the land
+const gulls = [];
+function ambience(c, hf, now, layer) {
+  const wx = wxNow(), storm = wx === 'storm', dark = darkness(hf);
+  if (layer === 'below') {
+    // waves run up the sand and draw back; storms throw up a wide white fringe
+    const reach = storm ? 4 : wx === 'rain' ? 3 : 2, period = storm ? 1500 : 2600;
+    for (const s of surf) {
+      const ph = ((now / period + s.h) % 1), k = ph < 0.6 ? ph / 0.6 : (1 - ph) / 0.4; // in fast, out slow
+      const d = reach - Math.round(k * reach), a = (0.25 + 0.45 * k) * (1 - dark * 0.6);
+      sc.fillStyle = `rgba(220,235,245,${a.toFixed(3)})`;
+      const gap = ((s.h * 64) | 0) % 8; // a break in the foam, so it does not read as a ruled line
+      for (let j = 0; j < 8; j++) {
+        if (j === gap || j === (gap + 1) % 8) continue;
+        const o = 7 - d; // distance in from the far side of the tile
+        if (s.a) sc.fillRect(s.X + (s.a > 0 ? o : 7 - o), s.Y + j, 1, 1);
+        else sc.fillRect(s.X + j, s.Y + (s.b > 0 ? o : 7 - o), 1, 1);
+      }
+      if (storm && k > 0.7) { sc.fillStyle = 'rgba(240,248,255,0.5)'; sc.fillRect(s.X + 2 + ((s.h * 40) | 0) % 4, s.Y + 2 + ((s.h * 90) | 0) % 4, 2, 1); }
+    }
+    return;
+  }
+  // smoke: every lived-in house keeps a fire. In winter and on cold days it smokes all day;
+  // in spring and autumn mornings and evenings; in summer only while supper cooks.
+  const cold = wx === 'cold' || wx === 'snow';
+  const lit = c.season === 3 || cold ? 1 : c.season === 1 ? (hf >= 18 && hf < 21 ? 0.6 : 0) : (hf < 9 || hf >= 17 ? 0.8 : 0.25);
+  if (lit > 0) {
+    const homes = new Set();
+    for (const p of w.people) if (p.home != null) homes.add(p.home);
+    const wind = storm ? 1.6 : wx === 'rain' ? 0.6 : 0.3, rise = storm ? 6 : 14;
+    const col = dark > 0.3 ? '170,170,180' : '205,205,210';
+    for (const b of w.buildings) {
+      if (b.kind === 'granary' || b.progress < 1 || b.dmg || !homes.has(b.id)) continue;
+      const n = lit >= 0.8 ? 5 : 3, X0 = b.x * TILE + 5, Y0 = b.y * TILE + 1;
+      for (let i = 0; i < n; i++) {
+        const t = (now / 3400 + i / n + S.hash(b.id, 3, 61)) % 1;
+        const y = Y0 - t * rise, x = X0 + t * t * rise * wind + Math.sin(now / 900 + b.id + i * 2) * t * 1.5;
+        const r = t < 0.35 ? 1 : 2;
+        sc.fillStyle = `rgba(${col},${((1 - t) * 0.45 * lit).toFixed(3)})`;
+        sc.fillRect(Math.round(x), Math.round(y), r, r);
+      }
+    }
+  }
+  // gulls: a few wheel over the shallows by day, drawn to whoever is fishing; gone at night and in storms
+  const want = dark > 0.3 || storm || !surf.length ? 0 : c.season === 3 ? 2 : 4;
+  const fishers = w.people.filter((p) => !p.asleep && p.task && p.task.k === 'fish');
+  for (let g = 0; g < want; g++) {
+    const f = fishers.length ? fishers[g % fishers.length] : null;
+    const s = surf[Math.floor(S.hash(g, 5, 71) * surf.length)];
+    const ax = f ? f.x * TILE + 6 : s.X + 4, ay = f ? f.y * TILE - 2 : s.Y + 4;
+    let o = gulls[g];
+    if (!o) o = gulls[g] = { x: ax, y: ay };
+    o.x += (ax - o.x) * 0.01; o.y += (ay - o.y) * 0.01; // drift over to a new fisher, never jump
+    const r = 7 + g * 3, sp = (g & 1 ? -1 : 1) / (1400 + g * 300);
+    const X = Math.round(o.x + Math.cos(now * sp + g * 2) * r), Y = Math.round(o.y + Math.sin(now * sp + g * 2) * r * 0.6) - 6;
+    const flap = Math.floor(now / 220 + g * 3) % 4 < 2;
+    sc.fillStyle = `rgba(240,240,240,${(0.9 - dark).toFixed(3)})`;
+    if (flap) { sc.fillRect(X, Y, 1, 1); sc.fillRect(X + 2, Y, 1, 1); sc.fillRect(X + 1, Y + 1, 1, 1); }
+    else sc.fillRect(X, Y + 1, 3, 1);
+  }
+  gulls.length = Math.min(gulls.length, want);
+}
+
 function frame() {
   if (!w) return requestAnimationFrame(frame);
   const target = S.tickAt(w, Date.now());
@@ -385,6 +454,7 @@ function frame() {
   // scene at native resolution
   sc.clearRect(0, 0, PX, PX);
   sc.drawImage(terr, 0, 0);
+  ambience(c, hf, now, 'below');
   // fire
   const fx0 = w.fire.x * TILE, fy0 = w.fire.y * TILE;
   const fl = Math.floor(now / 140) % 3;
@@ -454,6 +524,7 @@ function frame() {
   if (track && fpos) moveCam(fpos);
   else if (returning) moveCam(null);
   const beasts = drawBeasts(frac, now);
+  ambience(c, hf, now, 'above');
   // the day's sky colours the land
   const wx = wxNow();
   const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)' }[wx];

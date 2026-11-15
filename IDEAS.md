@@ -133,3 +133,8 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Children could watch the deer at dawn; a hunter who takes many becomes "the stalker" in the chronicle.
   - deer() scans every person each hour per deer (~4% of a late-game year); a per-hour list of adults
     outside the village would cut that if the herd grows.
+- Ambience is done (render.js only: ambience() with surf[] from drawTerrain, house smoke, gulls[]). Answers it invites:
+  - Smoke could follow the sim: no smoke from a house when the woodpile is empty (late-game timber shortage shows on screen).
+  - A real wind in w.wx (direction per day) would let smoke, rain and storm damage all lean the same way.
+  - Gulls could steal from the fish catch, or flock behind the sowers in spring; crows in the fields in autumn.
+  - Fog days (a new weather kind) would hide the sea glints and muffle the surf; fishers stay in.
