@@ -44,6 +44,11 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #skyhd { position:absolute; top:14px; left:0; right:0; text-align:center; font-size:24px; pointer-events:none; }
 #skytip { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:min(560px, calc(100% - 32px)); text-align:center; border:1px solid var(--line); background:var(--panel); padding:10px 14px; }
 #sky .btn { left:12px; top:12px; }
+#tl { right:12px; top:12px; width:320px; max-height:calc(100% - 140px); display:flex; flex-direction:column; }
+#tlog { overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+#tlog div { padding:3px 0; border-bottom:1px dashed rgba(255,255,255,.07); }
+#tlog .when { display:block; color:var(--muted); font-size:12px; }
+#skytip .m { color:var(--muted); margin-top:4px; font-size:12px; }
 #tip { position:absolute; background:var(--panel); border:1px solid var(--line); padding:6px 9px; pointer-events:none; font-size:13px; }
 #tip .m { color:var(--muted); }
 #catch { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border:1px solid var(--accent); color:var(--accent); background:var(--panel); padding:10px 16px; }
@@ -67,6 +72,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   #who { left:8px; right:8px; top:64px; width:auto; max-height:34%; font-size:12px; }
   #chron { display:none; right:8px; left:8px; width:auto; bottom:52px; max-height:55%; }
   #app.logopen #chron { display:flex; }
+  #tl { top:52px; left:8px; right:8px; width:auto; max-height:30%; }
 }
 </style>
 </head>
@@ -86,6 +92,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
     <canvas id="skyc"></canvas>
     <div id="skyhd">Discoveries</div>
     <button class="btn" onclick="document.getElementById('skybtn').click()">← Island</button>
+    <div class="panel" id="tl"><div class="hd" id="tlhd">Changes to the island</div><div id="tlog"></div></div>
     <div id="skytip">Each star is something the islanders have learned. New stars appear when spare power reaches the island.</div>
   </div>
 </div>

@@ -779,6 +779,29 @@ function drawSpark() {
   $('sparkcap').textContent = `population ${lo}–${hi}, last ${Math.min(360, d.length)} days`;
 }
 
+// ---------- dates for the sky ----------
+const realWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+function gameWhen(id, long) {
+  const t = w.learned && w.learned[id];
+  if (t == null) return long ? 'before records began' : '';
+  if (t === 0) return long ? 'at the founding' : 'founding';
+  const c = S.clock(t);
+  return long ? `in year ${c.year}, ${S.SEASONS[c.season].toLowerCase()} day ${c.dos}` : `Y${c.year} ${S.SEASONS[c.season]} ${c.dos}`;
+}
+let progress = null;
+async function loadProgress() {
+  if (progress) return;
+  try { const r = await fetch('progress.json', { cache: 'no-store' }); progress = r.ok ? await r.json() : []; } catch { progress = []; }
+  drawTimeline();
+}
+function drawTimeline() {
+  if (!progress || !w) return;
+  const rows = [...progress].reverse().map((e) => `<div><span class="when">${esc(realWhen(e.at))}</span>${esc(e.title)}</div>`);
+  rows.push(`<div><span class="when">${esc(realWhen(new Date(w.epoch).toISOString()))}</span>${esc(w.name)} is founded</div>`);
+  $('tlog').innerHTML = rows.join('');
+  $('tlhd').textContent = `Changes to the island · ${progress.length}`;
+}
+
 // ---------- the sky: discoveries as constellations ----------
 function drawSky() {
   const cvs = $('skyc'), g = cvs.getContext('2d');
@@ -811,11 +834,17 @@ function drawSky() {
     g.lineTo(x, y + r * 2); g.lineTo(x - r * 0.4, y + r * 0.4); g.lineTo(x - r * 2, y); g.lineTo(x - r * 0.4, y - r * 0.4); g.fill();
     if (lit) { const gg = g.createRadialGradient(x, y, 0, x, y, r * 4); gg.addColorStop(0, 'rgba(89,240,139,0.35)'); gg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gg; g.fillRect(x - r * 4, y - r * 4, r * 8, r * 8); }
     g.fillStyle = lit ? '#e8e8e8' : '#777'; g.fillText(S.TECHS[id].name, x, y + r * 4.2);
+    g.font = `${Math.round(11 * dpr)}px "Share Tech Mono", monospace`;
+    g.fillStyle = lit ? 'rgba(89,240,139,0.75)' : '#555';
+    g.fillText(lit ? gameWhen(id) : 'not yet learned', x, y + r * 4.2 + 14 * dpr);
+    g.font = `${Math.round(13 * dpr)}px "Share Tech Mono", monospace`;
   }
   cvs.onmousemove = (e) => {
     const r = cvs.getBoundingClientRect(), mx = (e.clientX - r.left) * dpr, my = (e.clientY - r.top) * dpr;
     const hit = ids.find((id) => Math.hypot(pos[id].x - mx, pos[id].y - my) < 18 * dpr);
-    $('skytip').textContent = hit ? `${S.TECHS[hit].name}: ${S.TECHS[hit].desc}` : 'Each star is something the islanders have learned. New stars appear when spare power reaches the island.';
+    if (!hit) { $('skytip').textContent = 'Each star is something the islanders have learned. New stars appear when spare power reaches the island.'; return; }
+    const T = S.TECHS[hit], lit = w.techs.includes(hit);
+    $('skytip').innerHTML = `${esc(T.name)}: ${esc(T.desc)}<div class="m">${T.added ? 'came to the island ' + esc(realWhen(T.added)) + ' · ' : ''}${lit ? 'learned ' + esc(gameWhen(hit, true)) : 'not learned yet'}</div>`;
   };
 }
 
@@ -854,7 +883,7 @@ async function boot() {
     if (a.hasAttribute('data-close')) stopFollow(); else startFollow(+a.dataset.id);
   });
   cv.addEventListener('mouseleave', () => { mouse = null; $('tip').hidden = true; });
-  $('skybtn').onclick = () => { $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) drawSky(); };
+  $('skybtn').onclick = () => { $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
   try {
     const r = await fetch('world/state.json', { cache: 'no-store' });

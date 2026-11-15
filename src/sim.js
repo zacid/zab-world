@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 14;
+export const SIM_VERSION = 15;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -36,19 +36,19 @@ const FISH_CAP = 240;        // fish in the shallows around the island
 const FISH_REGEN = 5;        // per day, spring to autumn (2 in winter)
 
 export const TECHS = {
-  fire:     { name: 'Fire',      desc: 'A hearth at the heart of the village. Warmth, light, cooked food.', req: [] },
-  shelter:  { name: 'Shelter',   desc: 'Timber houses keep families together through winter.', req: ['fire'] },
-  gather:   { name: 'Gathering', desc: 'Berries, roots and nuts foraged from the wild.', req: ['fire'] },
-  farming:  { name: 'Farming',   desc: 'Grain planted in spring, harvested before the frost.', req: ['gather'] },
-  woodcut:  { name: 'Woodcutting', desc: 'Stone axes fell trees for timber and firewood.', req: ['fire'] },
-  fishing:  { name: 'Fishing',   desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
-  granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
-  hunting:  { name: 'Hunting',   desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
-  fencing:  { name: 'Fences',    desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
-  midsummer: { name: 'Midsummer', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
-  paths:    { name: 'Footpaths', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
-  burial:   { name: 'Burying ground', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
-  herbs:    { name: 'Herb lore', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
+  fire:     { name: 'Fire',      added: '2026-11-14T20:14Z', desc: 'A hearth at the heart of the village. Warmth, light, cooked food.', req: [] },
+  shelter:  { name: 'Shelter',   added: '2026-11-14T20:14Z', desc: 'Timber houses keep families together through winter.', req: ['fire'] },
+  gather:   { name: 'Gathering', added: '2026-11-14T20:14Z', desc: 'Berries, roots and nuts foraged from the wild.', req: ['fire'] },
+  farming:  { name: 'Farming',   added: '2026-11-14T20:14Z', desc: 'Grain planted in spring, harvested before the frost.', req: ['gather'] },
+  woodcut:  { name: 'Woodcutting', added: '2026-11-14T20:14Z', desc: 'Stone axes fell trees for timber and firewood.', req: ['fire'] },
+  fishing:  { name: 'Fishing',   added: '2026-11-14T20:33Z', desc: 'Spears and lines cast from the beach. Food in every season, even winter.', req: ['gather'] },
+  granary:  { name: 'Granaries', added: '2026-11-14T20:47Z', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
+  hunting:  { name: 'Hunting',   added: '2026-11-14T22:21Z', desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
+  fencing:  { name: 'Fences',    added: '2026-11-15T00:13Z', desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
+  midsummer: { name: 'Midsummer', added: '2026-11-15T00:30Z', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
+  paths:    { name: 'Footpaths', added: '2026-11-15T01:30Z', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
+  burial:   { name: 'Burying ground', added: '2026-11-15T01:59Z', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
+  herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
 };
 
 // ---------- weather ----------
@@ -260,13 +260,14 @@ export function genesis(seed, epoch) {
     fire: { x: 0, y: 0 }, food: 500, timber: 30, wild: 200, harvest: 1,
     buildings: [], fields: [], people: [], nextId: 1, res: {}, prog: {},
     techs: ['fire', 'shelter', 'gather', 'farming', 'woodcut'],
+    learned: { fire: 0, shelter: 0, gather: 0, farming: 0, woodcut: 0 },
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null,
+    graves: [], yard: null, heal: null, nLearned: 5,
   };
   // name the island
   let nm = '';
@@ -411,7 +412,15 @@ export function step(w, fx) {
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
+  if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
+}
+
+// the hour each discovery was made, for the sky
+function noteLearned(w) {
+  w.learned ||= {};
+  for (const id of w.techs) if (!(id in w.learned)) w.learned[id] = w.t;
+  w.nLearned = w.techs.length;
 }
 
 export function advanceTo(w, target, fx, maxSteps = Infinity) {
@@ -2046,6 +2055,17 @@ const MIGRATIONS = {
   // v13 -> v14: herb lore. Nothing to change yet; the first fever death (or a long nursing) teaches it.
   13: (w) => {
     if (w.heal === undefined) w.heal = null;
+  },
+  // v14 -> v15: remember when each discovery was made. Older ones are read back from the chronicle.
+  14: (w) => {
+    const seen = { fishing: /learns to fish/, granary: /learns to build granaries/, hunting: /learn to hunt/, midsummer: /longest day/,
+      fencing: /fence/i, paths: /path/i, burial: /bur(y|ial)/i, herbs: /herb|healer/i };
+    w.learned = { fire: 0, shelter: 0, gather: 0, farming: 0, woodcut: 0 };
+    for (const id of w.techs) if (!(id in w.learned)) {
+      const e = seen[id] && (w.log || []).find((l) => l.k === 'major' && seen[id].test(l.text));
+      w.learned[id] = e ? e.t : w.t;
+    }
+    w.nLearned = w.techs.length;
   },
 };
 export function migrate(w) {
