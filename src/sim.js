@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 11;
+export const SIM_VERSION = 12;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -86,7 +86,17 @@ const HUNT_GAP = 6;          // days between hunts
 const HUNT_WORK = 3;         // hours spent tracking and closing in at the lair
 const HUNT_REACH = 24 * 24;  // a lair farther than this from the hearth is out of a day's reach
 const HUNT_KEEP = 3;         // hunters leave the last two of a herd, so it can breed again
-const MEAT = { boar: 45, wolf: 12 };
+const MEAT = { boar: 45, wolf: 12, deer: 30 };
+// ---------- deer ----------
+const DEER_SPEED = 1.5;      // tiles per hour, grazing along
+const DEER_FLEE = 4;         // bounding away
+const DEER_SHY = 12;         // a grown person this close (squared) sends them off
+const DEER_PER = 45;         // open grass tiles it takes to feed one deer
+const DEER_MAX = 8;
+const DEER_KEEP = 4;         // hunters leave three, and only hunt them in autumn
+const DEER_YEAR = 2;         // and take no more than two a year
+const DEER_BROWSE = 3;       // saplings this small are nibbled back to grass where the herd feeds
+const WOLF_DEER = 0.012;     // chance per winter day that the pack pulls down a deer (and leaves people be a while)
 const HIDE_WARM = 0.3;       // hides over every doorway cut winter firewood by up to 30%
 
 // ---------- fences ----------
@@ -610,13 +620,39 @@ function findLairs(w) {
     if (b > ls && lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) { ls = b; lair = { x, y }; }
   }
   F.den = den; F.lair = lair;
+  findMeadow(w);
   for (const b of w.beasts) {
-    const home = b.k === 'wolf' ? den : lair;
+    const home = beastHome(w, b.k);
     if (!b.out && home) { b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; }
   }
 }
+// the deer feed on the widest stretch of open grass away from the houses, and lie up in the nearest trees
+function findMeadow(w) {
+  const F = w.fauna, { x: fx, y: fy } = w.fire;
+  let mead = null, ms = -1e9;
+  for (let y = 2; y < MAP - 2; y++) for (let x = 2; x < MAP - 2; x++) {
+    if (w.tiles[idx(x, y)] !== T.GRASS) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < 81 || nearBuild(w, x, y, 2)) continue;
+    let n = 0;
+    for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (tile(w, xx, yy) === T.GRASS) n++;
+    if (n < 12) continue;
+    const s = n + Math.sqrt(dd) * 0.3 + hash(x, y, w.seed + 43) * 2;
+    if (s > ms && lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) { ms = s; mead = { x, y }; }
+  }
+  F.mead = mead; F.bed = null;
+  if (!mead) return;
+  let bd = 1e9;
+  for (let y = mead.y - 10; y <= mead.y + 10; y++) for (let x = mead.x - 10; x <= mead.x + 10; x++) {
+    if (tile(w, x, y) !== T.FOREST) continue;
+    const dd = d2(x, y, mead.x, mead.y) + hash(x, y, w.seed + 44);
+    if (dd < bd && lineOfLand(w, mead.x + 0.5, mead.y + 0.5, x + 0.5, y + 0.5)) { bd = dd; F.bed = { x, y }; }
+  }
+  if (!F.bed) F.bed = { x: mead.x, y: mead.y };
+}
+const beastHome = (w, k) => (k === 'wolf' ? w.fauna.den : k === 'deer' ? w.fauna.bed : w.fauna.lair);
 function addBeast(w, k) {
-  const home = (k === 'wolf' ? w.fauna.den : w.fauna.lair) || w.fire;
+  const home = beastHome(w, k) || w.fire;
   const b = { id: w.nextId++, k, x: home.x + 0.5, y: home.y + 0.5, px: 0, py: 0, out: 0, tx: null, ty: null, h: 0, prey: null, f: null, rest: 0 };
   b.px = b.x; b.py = b.y;
   w.beasts.push(b);
@@ -628,6 +664,7 @@ function stockWilds(w) {
   findLairs(w);
   for (let i = 0; i < 3; i++) addBeast(w, 'wolf');
   for (let i = 0; i < 3; i++) addBeast(w, 'boar');
+  for (let i = 0; i < 4; i++) addBeast(w, 'deer');
 }
 
 // once a day: wounds heal, lairs shift as the woods change, litters are born and the weak leave
@@ -635,6 +672,8 @@ function wilds(w, c) {
   const F = w.fauna;
   for (const p of w.people) if (p.hurt && p.hurt <= w.t) delete p.hurt;
   if (c.day % 30 === 0 || (F.den && tile(w, F.den.x, F.den.y) !== T.FOREST) || (F.lair && tile(w, F.lair.x, F.lair.y) !== T.FOREST)) findLairs(w);
+  else if (!F.mead || tile(w, F.mead.x, F.mead.y) !== T.GRASS) findMeadow(w);
+  deerDay(w, c);
   if (c.doy !== 45 && c.doy !== 300) return;
   let forest = 0;
   for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] === T.FOREST) forest++;
@@ -652,6 +691,44 @@ function wilds(w, c) {
       log(w, k === 'wolf' ? 'The woods are thinner now. One wolf has left the pack.' : 'With less cover in the woods, the boars are fewer.', 'info');
     }
   }
+  // the deer follow the open grass: more meadow, more fawns; fields and young woods crowd them out
+  let grass = 0;
+  for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] === T.GRASS) grass++;
+  const cap = Math.max(2, Math.min(DEER_MAX, Math.round(grass / DEER_PER)));
+  const herd = w.beasts.filter((b) => b.k === 'deer');
+  if (c.doy === 45 && F.mead && herd.length >= 2 && herd.length < cap) {
+    const n = Math.min(cap - herd.length, 1 + ri(w, 1 + (herd.length >> 1)));
+    for (let i = 0; i < n; i++) addBeast(w, 'deer');
+    log(w, n === 1 ? 'A spotted fawn wobbles after its mother on the meadow.' : `${plural(n, 'fawn', 'fawns')} stand trembling in the long grass beside the does.`, 'info');
+  } else if (c.doy === 300 && herd.length > cap) {
+    const gone = herd[herd.length - 1];
+    w.beasts = w.beasts.filter((b) => b !== gone);
+    log(w, 'The meadows are smaller now. Fewer deer come out of the trees to graze.', 'info');
+  }
+}
+
+// once a day: the herd nibbles back the saplings creeping onto its meadow, and in winter the pack may hunt it
+function deerDay(w, c) {
+  const F = w.fauna;
+  let n = 0;
+  for (const b of w.beasts) if (b.k === 'deer') n++;
+  if (!n || !F.mead) return;
+  for (let k = 0; k < n; k++) {
+    const x = F.mead.x + ri(w, 11) - 5, y = F.mead.y + ri(w, 11) - 5;
+    if (!inMap(x, y)) continue;
+    const i = idx(x, y);
+    if (w.tiles[i] === T.FOREST && w.wood[i] <= DEER_BROWSE) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
+  }
+  if (c.season !== 3 || n <= 3 || !F.den) return;
+  const pack = w.beasts.filter((b) => b.k === 'wolf');
+  if (pack.length < 2 || rnd(w) >= WOLF_DEER) return;
+  const prey = w.beasts.filter((b) => b.k === 'deer').pop();
+  w.beasts = w.beasts.filter((b) => b !== prey);
+  for (const b of pack) b.rest = Math.max(b.rest || 0, w.t + 48); // a full belly: the pack lies up for two days
+  F.dw = (F.dw || 0) + 1;
+  const text = 'The wolves run down a deer on the frozen meadow. At dawn the frost on the grass is trampled and red.';
+  if (F.dw === 1) milestone(w, `${text} While the pack has deer to chase, it leaves the village be.`);
+  else log(w, text, 'info');
 }
 
 const moveBeast = (b, tx, ty, sp) => moveToward(b, tx, ty, sp);
@@ -666,9 +743,11 @@ function prowl(w, c) {
   // boars raid the growing grain on spring and summer nights
   if (h === 21) F.raid = !storm && F.lair && c.season < 2 && w.fields.some((f) => f.stage === 'planted' || f.stage === 'ripe') && rnd(w) < BOAR_RAID ? 1 : 0;
   const boarOut = !!F.raid && !storm && (h >= 21 || h < 5);
+  const deerOut = !storm && !!F.mead && h >= 5 && h < 21; // out on the grass by day, lying up in the trees by night
   for (const b of w.beasts) {
     b.px = b.x; b.py = b.y;
     if (b.k === 'wolf') wolf(w, b, wolfOut && b.rest <= w.t);
+    else if (b.k === 'deer') deer(w, b, deerOut);
     else boar(w, b, boarOut);
   }
   if (h === 6 && !F.hit && F.turned && !F.held) {
@@ -794,6 +873,45 @@ function boar(w, b, active) {
   if (f && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - 0.3) * 10000) / 10000); f.root = 1; F.hit++; }
   else if (f && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.4) * 100) / 100); f.root = 1; F.hit++; }
   b.f = null; b.tx = home.x; b.ty = home.y;
+}
+
+// deer graze the meadow by day, a few steps at a time, and bound off when anyone grown comes close
+function deer(w, b, active) {
+  const F = w.fauna, bed = F.bed || F.mead || { x: Math.floor(b.x), y: Math.floor(b.y) };
+  if (!active) {
+    b.tx = null; b.run = 0;
+    if (b.out && moveBeast(b, bed.x + 0.5, bed.y + 0.5, DEER_FLEE)) b.out = 0;
+    return;
+  }
+  if (!b.out) { b.out = 1; b.x = b.px = bed.x + 0.5; b.y = b.py = bed.y + 0.5; b.tx = null; b.run = 0; }
+  let near = null, nd = DEER_SHY;
+  const grown = w.t - 14 * TICKS_PER_YEAR;
+  for (const p of w.people) {
+    if (p.dead || p.asleep || p.born > grown) continue;
+    const dd = d2(p.x, p.y, b.x, b.y);
+    if (dd < nd) { nd = dd; near = p; }
+  }
+  if (near) {
+    const dx = b.x - near.x, dy = b.y - near.y, dd = Math.sqrt(dx * dx + dy * dy) || 1;
+    let tx = Math.floor(b.x + (dx / dd) * 6), ty = Math.floor(b.y + (dy / dd) * 6);
+    const tt = tile(w, tx, ty);
+    if (tt === T.WATER || tt === T.BUILD || !lineOfLand(w, b.x, b.y, tx + 0.5, ty + 0.5)) { tx = bed.x; ty = bed.y; }
+    b.tx = tx; b.ty = ty; b.h = 1; b.run = 1;
+  }
+  if (b.tx == null) {
+    const m = F.mead || bed;
+    b.tx = m.x; b.ty = m.y;
+    for (let k = 0; k < 6; k++) {
+      const x = m.x + ri(w, 9) - 4, y = m.y + ri(w, 9) - 4;
+      if (tile(w, x, y) === T.GRASS && lineOfLand(w, b.x, b.y, x + 0.5, y + 0.5)) { b.tx = x; b.ty = y; break; }
+    }
+    b.h = 2 + ri(w, 3);
+  }
+  const off = (b.id % 3) * 0.3 - 0.3;
+  const far = d2(b.x, b.y, b.tx + 0.5, b.ty + 0.5) > 16; // out from the trees at a walk, then a step at a time
+  if (!moveBeast(b, b.tx + 0.5 + off, b.ty + 0.5 - off, b.run ? DEER_FLEE : far ? SPEED : DEER_SPEED)) return;
+  b.run = 0;
+  if (--b.h <= 0) b.tx = null;
 }
 
 // standing grain beside the trees, where a boar can slip out of cover
@@ -976,10 +1094,11 @@ function learnHunting(w) {
 // what is worth tracking today: the pack in winter or after it has drawn blood, otherwise the boars
 function quarry(w, c) {
   const F = w.fauna;
-  let wolves = 0, boars = 0;
-  for (const b of w.beasts) if (b.k === 'wolf') wolves++; else boars++;
+  let wolves = 0, boars = 0, deer = 0;
+  for (const b of w.beasts) if (b.k === 'wolf') wolves++; else if (b.k === 'deer') deer++; else boars++;
   if (F.den && wolves >= HUNT_KEEP && (c.season === 3 || F.fear > w.t)) return 'wolf';
   if (F.lair && boars >= HUNT_KEEP) return 'boar';
+  if (F.mead && deer >= DEER_KEEP && c.season === 2 && !(F.dy && F.dy[0] === c.year && F.dy[1] >= DEER_YEAR)) return 'deer'; // the autumn deer hunt, when they are fat from summer grass
   return null;
 }
 // can a hunter setting out now reach the lair and finish before the village comes in for the evening?
@@ -999,7 +1118,7 @@ function hunt(w, p, c) {
   if ((F.hunt || 0) > w.t) return null;
   const q = quarry(w, c);
   if (!q) return null;
-  const at = q === 'wolf' ? F.den : F.lair;
+  const at = q === 'wolf' ? F.den : q === 'deer' ? F.mead : F.lair;
   if (d2(at.x, at.y, w.fire.x, w.fire.y) > HUNT_REACH || !inDaylight(w, p, c, at.x, at.y) || !lineOfLand(w, p.x, p.y, at.x + 0.5, at.y + 0.5)) return null;
   F.hunt = w.t + HUNT_GAP * TICKS_PER_DAY;
   return { k: 'hunt', key: 'h0', x: at.x, y: at.y, h: HUNT_WORK, q };
@@ -1008,11 +1127,30 @@ function hunt(w, p, c) {
 function strike(w, p, t) {
   const F = w.fauna, q = t.q;
   const herd = w.beasts.filter((b) => b.k === q);
-  if (herd.length < HUNT_KEEP) return;
+  if (herd.length < (q === 'deer' ? DEER_KEEP : HUNT_KEEP)) return;
   const mate = w.people.find((o) => o !== p && !o.dead && o.task && o.task.key === 'h1' && d2(o.x, o.y, p.x, p.y) < 9);
-  const odds = (q === 'boar' ? 0.5 : 0.35) * (mate ? 1 : 0.55);
-  const harm = (q === 'boar' ? 0.08 : 0.1) * (mate ? 1 : 2);
+  const odds = (q === 'boar' ? 0.5 : q === 'deer' ? 0.45 : 0.35) * (mate ? 1 : 0.55);
+  const harm = (q === 'boar' ? 0.08 : q === 'deer' ? 0.02 : 0.1) * (mate ? 1 : 2);
   const r = rnd(w), who = mate ? `${p.name} and ${mate.name}` : p.name;
+  if (q === 'deer') {
+    if (r < odds) {
+      const prey = herd[herd.length - 1];
+      w.beasts = w.beasts.filter((b) => b !== prey);
+      w.hides = (w.hides || 0) + 1;
+      w.stats.yk = (w.stats.yk || 0) + 1;
+      p.haul = q;
+      F.sd = (F.sd || 0) + 1;
+      const yr = clock(w.t).year;
+      F.dy = F.dy && F.dy[0] === yr ? [yr, F.dy[1] + 1] : [yr, 1];
+      const text = `${who} ${mate ? 'creep' : 'creeps'} up through the long grass downwind and ${mate ? 'bring' : 'brings'} down a deer.`;
+      if (F.sd === 1) milestone(w, `${text} The first venison on ${w.name}; the hide is pegged out to dry and the bones are kept for needles.`);
+      else log(w, text, 'good');
+    } else if (r < odds + harm) {
+      p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+      log(w, `A stag lashes out at ${p.name} with its hooves and crashes away. ${p.sex === 'f' ? 'She' : 'He'} limps home empty-handed.`, 'bad');
+    } else if (r < odds + harm + 0.3) log(w, `${who} ${mate ? 'stalk' : 'stalks'} the deer all morning, but a doe barks and the herd is gone into the trees.`, 'info');
+    return;
+  }
   if (r < odds) {
     const prey = herd.find((b) => !b.out) || herd[herd.length - 1];
     w.beasts = w.beasts.filter((b) => b !== prey);
@@ -1747,6 +1885,22 @@ const MIGRATIONS = {
     w.graves = w.graves || [];
     if (w.yard === undefined) w.yard = null;
   },
+  // v11 -> v12: deer. A small herd comes out of the trees to graze the open meadow.
+  11: (w) => {
+    if (!w.fauna || !w.beasts) return;
+    findMeadow(w);
+    if (w.beasts.some((b) => b.k === 'deer')) return;
+    for (let i = 0; i < 4; i++) addBeast(w, 'deer');
+    const who = elder(w), m = w.fauna.mead;
+    let where = 'far';
+    if (m) {
+      const dx = m.x - w.fire.x, dy = m.y - w.fire.y, ns = dy < 0 ? 'north' : 'south', ew = dx < 0 ? 'west' : 'east';
+      where = Math.abs(dy) * 2 < Math.abs(dx) ? ew : Math.abs(dx) * 2 < Math.abs(dy) ? ns : `${ns}-${ew}`;
+    }
+    milestone(w, who
+      ? `At first light ${who.name} sees four deer grazing on the open grass ${where} of the village. They lift their heads, stare, and are gone into the trees. Not everything in the woods of ${w.name} has teeth.`
+      : `Deer are seen grazing on the open grass at first light.`);
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1775,6 +1929,7 @@ export function summary(w) {
     hunting: w.techs.includes('hunting'), hides: w.hides || 0,
     fencing: w.techs.includes('fencing'), fenced: w.fields.filter((f) => f.fence).length,
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
+    deer: (w.beasts || []).filter((b) => b.k === 'deer').length, deerTaken: (w.fauna && w.fauna.sd) || 0,
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,

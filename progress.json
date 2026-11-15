@@ -58,5 +58,10 @@
   "at": "2026-11-15T01:59:33.227Z",
   "title": "Add a burying ground where families mourn their dead",
   "body": "- SIM_VERSION 11 (w.graves, w.yard, p.mourn): the first death walls off a 4x3 plot 6-14 tiles from the hearth; new custom Burying ground is logged in the chronicle\n- Each grave keeps name, age, cause and parents; 50 places in rows, after which the oldest stone sinks and its place is reused\n- The morning after a death, partner, parents, children, siblings and housemates stand at the graveside 9:00-12:00 (shown in grey-blue)\n- Visible: dry-stone wall with a gate toward the village, fresh mounds with a stake and flowers, grassed graves with stones; hover a grave for who lies there; Graves row in the panel\n- Fix build: export every sim constant to the page, so footpaths (PATH_AT, WEAR_SEEN) now actually draw in the browser"
+ },
+ {
+  "at": "2026-11-15T02:25:24.639Z",
+  "title": "Add a deer herd that grazes the open meadow by day",
+  "body": "- SIM_VERSION 12: four deer join the beasts (k 'deer'); they feed on the widest grass 9+ tiles from the hearth (fauna.mead) from 05:00 to 21:00 and lie up in nearby trees (fauna.bed) at night\n- Deer bolt when a grown islander comes within ~3.5 tiles, and nibble saplings (wood <= 3) back to grass, so their meadow stays open\n- Herd size follows open grass (1 deer per 45 tiles, 2-8); fawns in spring, one leaves in autumn if the meadow has shrunk; wolves take ~1 in winter and then lie up for two days\n- Hunters stalk deer in autumn only (2 a year, never below 3): +30 meat and a hide; panel, tooltip and follow card show deer\n- Watch: the first venison on Hais this autumn, and the herd thinning as fields eat the grass in later decades"
  }
 ]

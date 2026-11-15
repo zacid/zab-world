@@ -94,7 +94,7 @@ function doing(p) {
     return g ? `mourning at ${g.n}'s grave` : 'mourning at a graveside';
   }
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
-    hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
+    hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
 function link(id) {
@@ -433,8 +433,8 @@ function frame() {
         px(sc, X + 3 + jab, Y - 2, '#b49a6a', 1, 5); px(sc, X + 3 + jab, Y - 3, '#e8e8e8', 1, 1);
       }
       if (p.task && p.task.k === 'haul') { // the kill slung over a shoulder
-        const fur = p.task.q === 'wolf' ? '#8a8d93' : '#4d3527';
-        px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, p.task.q === 'wolf' ? '#b4b7bc' : '#7a5444', 1, 1);
+        const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : '#4d3527';
+        px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, q === 'wolf' ? '#b4b7bc' : q === 'deer' ? '#efe6d2' : '#7a5444', 1, 1);
       }
     }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
@@ -515,10 +515,12 @@ function frame() {
     for (const o of beasts) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; beast = o.b; best = null; } }
     const tip = $('tip');
     if (beast) {
+      const still = beast.x === beast.px && beast.y === beast.py;
       const what = beast.k === 'wolf'
         ? (beast.prey != null ? 'stalking someone' : 'prowling the treeline')
-        : (beast.f != null && beast.x === beast.px && beast.y === beast.py ? 'rooting in the grain' : 'trotting through the dark');
-      tip.innerHTML = `<b>${beast.k === 'wolf' ? 'Grey wolf' : 'Wild boar'}</b><br><span class="m">${what}</span>`;
+        : beast.k === 'deer' ? (beast.run ? 'bounding away' : still ? 'grazing' : 'wandering the meadow')
+        : (beast.f != null && still ? 'rooting in the grain' : 'trotting through the dark');
+      tip.innerHTML = `<b>${beast.k === 'wolf' ? 'Grey wolf' : beast.k === 'deer' ? 'Red deer' : 'Wild boar'}</b><br><span class="m">${what}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
@@ -591,6 +593,11 @@ const BOAR = ['.BBB..', 'bbbbbs', 'bbbbbt', '.d..d.'];
 const BOAR_RUN = ['.BBB..', 'bbbbbs', 'bbbbbt', 'd....d'];
 const BOAR_ROOT = ['.BBB..', 'bbbbb.', 'bbbbbs', '.d..dt'];
 const BCOL = { b: '#4d3527', B: '#2e2018', s: '#7a5444', t: '#efe6d2', d: '#2a1d15' };
+// deer stand taller: 6x5, head up and ears pricked, or head down in the grass
+const DEER = ['....e.', '....hn', 'tbbbb.', '.bbbb.', '.l..l.'];
+const DEER_RUN = ['....e.', '....hn', 'tbbbb.', '.bbbb.', 'l....l'];
+const DEER_GRAZE = ['......', '......', 'tbbbb.', '.bbbbh', '.l..ln'];
+const DCOL = { b: '#9a6a3c', h: '#8a5c32', e: '#6e4a2a', n: '#2a1d15', t: '#efe6d2', l: '#5a3d22' };
 const facing = new Map();
 function drawBeasts(frac, now) {
   const out = [];
@@ -605,8 +612,9 @@ function drawBeasts(frac, now) {
     const stepF = Math.floor(now / 160 + b.id) % 2;
     let rows;
     if (b.k === 'wolf') rows = moving && stepF ? WOLF_RUN : WOLF;
+    else if (b.k === 'deer') rows = moving ? (stepF ? DEER_RUN : DEER) : Math.floor(now / 900 + b.id * 1.7) % 4 ? DEER_GRAZE : DEER;
     else rows = !moving && b.f != null ? (Math.floor(now / 380 + b.id) % 2 ? BOAR_ROOT : BOAR) : moving && stepF ? BOAR_RUN : BOAR;
-    const map = b.k === 'wolf' ? WCOL : BCOL;
+    const map = b.k === 'wolf' ? WCOL : b.k === 'deer' ? DCOL : BCOL;
     for (let r = 0; r < rows.length; r++) for (let k = 0; k < 6; k++) {
       const ch = rows[r][k];
       if (ch !== '.' && map[ch]) px(sc, face > 0 ? X + k : X + 5 - k, Y + r, map[ch]);
@@ -635,7 +643,7 @@ function updatePanels() {
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced)</span>` : s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
-    ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
+    ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),

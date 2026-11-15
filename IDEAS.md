@@ -121,3 +121,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A cairn or marker where someone fell far from home (wolf kills, hunting deaths), drawn on the map.
   - A second, larger burying ground once the first fills (instead of reusing the oldest places), or a yew tree that grows over decades.
   - Grief: a widow(er) works less for a season, or a lost child makes parents wait longer for the next.
+- Deer are done (SIM_VERSION 12; beasts k 'deer', fauna.mead/bed meadow and bedding spot, fauna.sd taken, fauna.dy [year, n],
+  fauna.dw wolf kills; deer()/deerDay()/findMeadow() in sim.js; DEER_* constants). On test seeds the herd sits at 3-5 while
+  grass is wide, then 2-3 once fields take the meadows (~Y30+). Answers it invites:
+  - Grass still shrinks 550 -> ~90 tiles over 100 years; browsing only holds the herd's own meadow. Common grazing land
+    (fields not allowed within N tiles of the meadow) or hay meadows would keep it, and give the deer a real future.
+  - Antler and bone: needles, combs, picks; a bone-carver craft once deer are taken every autumn.
+  - Tame the fawns: a hand-reared doe (first livestock) or goats/sheep later on the open grass.
+  - Wolves follow the deer: when the herd is down to 2 in a hard winter, the pack could turn back to the village.
+  - Deer could graze young grain at the edge of the fields in spring (a second reason for fences).
+  - Children could watch the deer at dawn; a hunter who takes many becomes "the stalker" in the chronicle.
+  - deer() scans every person each hour per deer (~4% of a late-game year); a per-hour list of adults
+    outside the village would cut that if the herd grows.
