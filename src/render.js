@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', idle: '#d9d9d9', gather: '#d9d9d9' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', idle: '#d9d9d9', gather: '#d9d9d9' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
@@ -216,17 +216,29 @@ function frame() {
   // fire
   const fx0 = w.fire.x * TILE, fy0 = w.fire.y * TILE;
   const fl = Math.floor(now / 140) % 3;
-  px(sc, fx0 + 3, fy0 + 3, '#f0742b', 2, 3); px(sc, fx0 + 3 + (fl === 1 ? 1 : 0), fy0 + 2 - (fl === 2 ? 1 : 0), '#ffc23d', 1, 2); px(sc, fx0 + 4 - (fl === 0 ? 1 : 0), fy0 + 4, '#ffe48a', 1, 1);
+  const fest = festNow(c);
+  if (fest) bonfire(fx0, fy0, now);
+  else { px(sc, fx0 + 3, fy0 + 3, '#f0742b', 2, 3); px(sc, fx0 + 3 + (fl === 1 ? 1 : 0), fy0 + 2 - (fl === 2 ? 1 : 0), '#ffc23d', 1, 2); px(sc, fx0 + 4 - (fl === 0 ? 1 : 0), fy0 + 4, '#ffe48a', 1, 1); }
   // people
   const shown = [];
+  const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
   for (const p of w.people) {
     if (p.asleep) continue;
-    const x = p.px + (p.x - p.px) * frac, y = p.py + (p.y - p.py) * frac;
-    const X = Math.round(x * TILE) - 1, Y = Math.round(y * TILE) - 3;
-    const age = S.ageY(w, p);
+    let x = p.px + (p.x - p.px) * frac, y = p.py + (p.y - p.py) * frac;
     const moving = p.x !== p.px || p.y !== p.py;
-    const step = moving ? Math.floor(now / 180 + p.id) % 2 : 0;
+    const dancing = fest && p.task && p.task.k === 'fest' && !moving;
+    let hop = 0;
+    if (dancing) { // the ring turns around the bonfire, each ring the other way, everyone skipping
+      const dx = x - fcx, dy = y - fcy, r = Math.hypot(dx, dy) || 1;
+      const a = Math.atan2(dy, dx) + ((p.task.r || 0) % 2 ? -1 : 1) * (now / (2400 * r));
+      x = fcx + Math.cos(a) * r; y = fcy + Math.sin(a) * r;
+      hop = Math.floor(now / 240 + p.id) % 2;
+    }
+    const X = Math.round(x * TILE) - 1, Y = Math.round(y * TILE) - 3 - hop;
+    const age = S.ageY(w, p);
+    const step = moving || dancing ? Math.floor(now / 180 + p.id) % 2 : 0;
     const col = age < 14 ? '#f4f4f4' : age >= 65 ? '#a3a3a3' : ROLE[p.task ? p.task.k : 'idle'] || '#d9d9d9';
+    if (dancing) px(sc, X + (age < 14 ? 1 : 0), Y + (age < 14 ? 0 : -1), CROWN[p.id % CROWN.length], age < 14 ? 1 : 3, 1); // a crown of summer flowers
     if (age < 14) {
       px(sc, X + 1, Y + 1, '#f1c9a5'); px(sc, X, Y + 2, col, 3, 1); px(sc, X + step, Y + 3, '#555', 1, 1); px(sc, X + 2 - step, Y + 3, '#555', 1, 1);
     } else {
@@ -264,7 +276,8 @@ function frame() {
       px(sc, b.x * TILE + 2, b.y * TILE + 5, '#ffcf6a'); px(sc, b.x * TILE + 5, b.y * TILE + 5, '#ffcf6a');
       glow(sc, b.x * TILE + 4, b.y * TILE + 5, 7, `rgba(255,190,90,${(dark * 0.35).toFixed(3)})`);
     }
-    glow(sc, fx0 + 4, fy0 + 4, 22 + Math.sin(now / 200) * 1.5, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
+    glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : 0.55)).toFixed(3)})`);
+    if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
       const ex = o.X + (o.face > 0 ? 5 : 0), ey = o.Y + 1;
@@ -305,7 +318,7 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
-      const job = a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
+      const job = p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
         hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : 'hunting boar', haul: `carrying a ${p.task && p.task.q === 'wolf' ? 'wolf' : 'boar'} home` })[p.task ? p.task.k : 'idle'];
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${job}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}`;
@@ -313,6 +326,25 @@ function frame() {
     } else tip.hidden = true;
   }
   requestAnimationFrame(frame);
+}
+// ---------- midsummer ----------
+const CROWN = ['#f28ab0', '#f7d34a', '#ffffff', '#b98af0', '#f28ab0'];
+function festNow(c) { return !!(w.fest && w.fest.on === c.day && c.hour >= 16 && c.hour < 23); }
+// the midsummer bonfire: a stack of logs, tall flickering flames and sparks drifting up into the dark
+function bonfire(X, Y, now) {
+  px(sc, X + 1, Y + 6, '#6e4a2a', 6, 1); px(sc, X + 2, Y + 5, '#8a5a32', 4, 1);
+  const f = Math.floor(now / 110);
+  for (let k = 0; k < 6; k++) { // six tongues of flame, each its own height, licking upward
+    const hgt = 4 + Math.floor(S.hash(k, f, 61) * 5) + (k === 2 || k === 3 ? 3 : 0);
+    px(sc, X + 1 + k, Y + 6 - hgt, '#e0521f', 1, hgt);
+    px(sc, X + 1 + k, Y + 6 - Math.floor(hgt * 0.7), '#f59a2e', 1, Math.floor(hgt * 0.7));
+    if (k > 0 && k < 5) px(sc, X + 1 + k, Y + 6 - Math.floor(hgt * 0.4), '#ffe48a', 1, Math.floor(hgt * 0.4));
+  }
+  for (let i = 0; i < 10; i++) { // sparks rise, drift and wink out
+    const life = 1600 + S.hash(i, 3, 62) * 1400, t = ((now + S.hash(i, 4, 62) * life) % life) / life;
+    const sx = X + 4 + (S.hash(i, 5, 62) - 0.5) * 6 + Math.sin(now / 400 + i) * 2 * t, sy = Y - 2 - t * 22;
+    if (t < 0.85) px(sc, sx | 0, sy | 0, t < 0.4 ? '#ffe48a' : '#f59a2e');
+  }
 }
 // rain, snow and lightning over the scene, at native pixel size so they stay crisp
 const drops = Array.from({ length: 900 }, (_, i) => ({ x: S.hash(i, 1, 31), y: S.hash(i, 2, 31), s: S.hash(i, 3, 31) }));
@@ -389,7 +421,7 @@ function updatePanels() {
   const s = S.summary(w), c = S.clock(w.t);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>`;
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>`],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],

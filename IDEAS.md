@@ -74,3 +74,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Pigs: once the fences stand, piglets caught at the lair could be penned and fattened (first livestock).
   - A fence/raids row in the graph panel would show the boar years at a glance.
   - Fences cost timber every year (~20% rot + storms); late-game timber shortages could leave fences unmended.
+- Midsummer is done (tech 'midsummer', SIM_VERSION 8; w.fest: y last year held, on day, n count, k ring slots;
+  task k 'fest' with ring index r). Festival pairing rarely fires because daily pairing already finds most
+  matches; the live world has a lone castaway woman and no single men. Answers it invites:
+  - A harvest festival in autumn (thanksgiving at the granary) or a midwinter fire that lifts spirits in cold snaps.
+  - Games at the festival: a footrace or spear throw whose winner is named in the chronicle (seeds a hunter/hero role).
+  - Visitors: a boat from another isle that comes for the midsummer fire, bringing a bride/groom or trade goods.
+  - A thin year (no feast, small fire) could lower births the next year; a lavish one could raise them.
+  - Festival memory: elders recall "the year of the great storm midsummer" in later entries.

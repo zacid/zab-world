@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 7;
+export const SIM_VERSION = 8;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -45,6 +45,7 @@ export const TECHS = {
   granary:  { name: 'Granaries', desc: 'Raised timber stores keep grain dry and safe from rot and mice.', req: ['farming', 'woodcut'] },
   hunting:  { name: 'Hunting',   desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
   fencing:  { name: 'Fences',    desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
+  midsummer: { name: 'Midsummer', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
 };
 
 // ---------- weather ----------
@@ -93,6 +94,19 @@ const FENCE_HOLD = 0.85;     // chance a fence turns a boar away; otherwise it s
 const FENCE_ROT = 0.2;       // share of fences that rot through over a year
 const FENCE_STORM = 0.02;    // chance per storm day that a fence blows down
 const FENCE_LEARN = 8;       // raids before someone thinks of a fence
+
+// ---------- midsummer ----------
+const FEST_DAY = 135;        // day of the year (summer day 46); rain puts it off a few days, a storm until it passes
+const FEST_LAST = 165;       // after this the summer is too far gone and the year goes without
+const FEST_FROM = 16, FEST_TO = 23; // hours of the gathering; nobody goes home until it ends
+const FEST_LEARN = 10;       // people on the island before anyone thinks to keep the day
+const FEST_WOOD = 12;        // timber heaped on the bonfire (at most a quarter of the pile)
+const FEST_FEAST = 2;        // extra food each person eats, if the stores can spare it
+const FEST_PAIR = 0.4;       // chance a single woman finds a partner in the firelight
+// where the dancers stand: 24 points on a circle of radius 1, 15 degrees apart (written out, no trig in the step)
+const RING = [[1, 0], [0.966, 0.259], [0.866, 0.5], [0.707, 0.707], [0.5, 0.866], [0.259, 0.966], [0, 1], [-0.259, 0.966],
+  [-0.5, 0.866], [-0.707, 0.707], [-0.866, 0.5], [-0.966, 0.259], [-1, 0], [-0.966, -0.259], [-0.866, -0.5], [-0.707, -0.707],
+  [-0.5, -0.866], [-0.259, -0.966], [0, -1], [0.259, -0.966], [0.5, -0.866], [0.707, -0.707], [0.866, -0.5], [0.966, -0.259]];
 
 // ---------- randomness ----------
 export function rnd(w) {
@@ -200,7 +214,7 @@ export function genesis(seed, epoch) {
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
-    beasts: [], fauna: null,
+    beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
   };
   // name the island
   let nm = '';
@@ -341,6 +355,7 @@ export function step(w, fx) {
   for (const p of w.people) { p.px = p.x; p.py = p.y; }
   if (c.hour === 0) daily(w, c, fx);
   if (c.hour === 19) supper(w);
+  if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
@@ -393,6 +408,7 @@ function daily(w, c, fx) {
   }
   if (w.beasts) wilds(w, c);
   weather(w, c);
+  festDay(w, c);
   const wx = w.wx.k;
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
@@ -764,6 +780,75 @@ function pickCrop(w, b) {
   return null;
 }
 
+// ---------- midsummer ----------
+// Once a year, on the longest day, the village stops work early and gathers at a great bonfire:
+// a feast from the stores, a ring dance until late, and single folk pair off in the firelight.
+function learnMidsummer(w) {
+  if (w.techs.includes('midsummer')) return;
+  w.techs.push('midsummer');
+  w.fest = w.fest || { y: 0, on: -1, n: 0, k: 0 };
+  const who = elder(w);
+  milestone(w, who
+    ? `${who.name} says the longest day should not pass like any other. On midsummer evening the work will stop, the fire will be built high, and all of ${w.name} will dance around it.`
+    : `The islanders agree that the longest day should be kept with a great fire and a dance.`);
+}
+// at the day's reckoning: is today the day? Rain puts it off a few days, a storm until it blows over
+function festDay(w, c) {
+  if (!w.techs.includes('midsummer')) {
+    if (c.doy >= FEST_DAY && c.doy <= FEST_LAST && w.people.length >= FEST_LEARN && w.techs.includes('farming')) learnMidsummer(w);
+    else return;
+  }
+  const F = w.fest;
+  if (F.y >= c.year || c.doy < FEST_DAY || c.doy > FEST_LAST || w.people.length < 2) return;
+  const wait = c.doy - FEST_DAY, wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'storm' || (wx === 'rain' && wait < 4)) {
+    if (wait === 0) log(w, wx === 'storm' ? 'A storm on midsummer day. The bonfire must wait.' : 'Rain on midsummer day. The bonfire is put off until the sky clears.', 'info');
+    return;
+  }
+  F.y = c.year; F.on = c.day; F.wait = wait;
+}
+// a place in the ring: twelve close round the fire, then wider rings of twenty-four
+function festSpot(w) {
+  const F = w.fest, n = F.k++;
+  let ring = 0, j = n;
+  if (j >= 12) { j -= 12; ring = 1 + Math.floor(j / 24); j %= 24; }
+  const r = 2.5 + Math.min(ring, 5), [ux, uy] = RING[ring === 0 ? j * 2 : (j + ring) % 24];
+  return { k: 'fest', x: Math.round((w.fire.x + ux * r) * 1000) / 1000, y: Math.round((w.fire.y + uy * r) * 1000) / 1000, h: 99, r: ring };
+}
+function midsummer(w, c, fx) {
+  const F = w.fest, h = c.hour, pop = w.people.length;
+  if (h === FEST_FROM) {
+    F.k = 0; F.pairs = [];
+    F.wood = Math.min(FEST_WOOD, Math.floor(w.timber / 4));
+    w.timber = Math.round((w.timber - F.wood) * 100) / 100;
+    if (fx) fx.push({ x: w.fire.x + 0.5, y: w.fire.y - 1, text: 'midsummer', color: 'food' });
+  } else if (h === 19) { // after the plain supper, a feast from what the stores can spare
+    F.feast = Math.max(0, Math.min(pop * FEST_FEAST, Math.floor(w.food - pop * 60)));
+    w.food = Math.round((w.food - F.feast) * 100) / 100;
+    if (F.feast >= pop) for (const p of w.people) p.hunger = 0;
+  } else if (h === 21) { // late in the dance, the unpaired find each other
+    for (const f of w.people) {
+      if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= FEST_PAIR) continue;
+      const m = mate(w, f);
+      if (!m) continue;
+      f.partner = m.id; m.partner = f.id; f.wants = true;
+      F.pairs.push(`${f.name} and ${m.name}`);
+    }
+  } else if (h === 22) {
+    F.n = (F.n || 0) + 1;
+    const feast = F.feast >= pop ? ' and feast on the best of the stores' : F.feast > 0 ? ' and share what the stores can spare' : ' on empty stomachs';
+    const fire = F.wood >= 6 ? 'a towering bonfire' : F.wood > 0 ? 'a small bonfire' : 'the hearth, with no wood to spare for more';
+    let text = `${F.wait ? `After ${plural(F.wait, 'day', 'days')} of waiting for the sky to clear, midsummer` : 'Midsummer'} on ${w.name}: ${pop} ${pop === 1 ? 'soul dances' : 'people dance'} around ${fire}${feast}.`;
+    const P = F.pairs;
+    if (P.length === 1) text += ` ${P[0]} are pledged in the firelight.`;
+    else if (P.length > 1) text += ` ${P.length} couples are pledged in the firelight: ${P.slice(0, 3).join(', ')}${P.length > 3 ? ' and more' : ''}.`;
+    if (F.n === 1) milestone(w, `${text} The first midsummer fire on ${w.name} burns until nearly midnight.`);
+    else if (F.n % 25 === 0) milestone(w, `${text} It is the ${F.n}th midsummer kept on ${w.name}.`);
+    else log(w, text, P.length ? 'love' : 'good');
+    delete F.pairs; delete F.feast; delete F.wood; delete F.wait;
+  }
+}
+
 // ---------- fences ----------
 function learnFencing(w) {
   if (w.techs.includes('fencing') || !w.techs.includes('farming') || !w.techs.includes('woodcut')) return;
@@ -913,13 +998,16 @@ function lifeAndDeath(w, c) {
 }
 
 const sibling = (a, b) => (a.mother != null && a.mother === b.mother) || (a.father != null && a.father === b.father);
+function mate(w, f) {
+  const fa = ageY(w, f);
+  return w.people.find((o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
+    Math.abs(ageY(w, o) - fa) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id);
+}
 function pairing(w) {
   for (const f of w.people) {
     if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17) continue;
     if (rnd(w) >= 0.012) continue;
-    const fa = ageY(w, f);
-    const m = w.people.find((o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
-      Math.abs(ageY(w, o) - fa) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id);
+    const m = mate(w, f);
     if (!m) continue;
     f.partner = m.id; m.partner = f.id; f.wants = true;
     log(w, `${f.name} and ${m.name} are joined at the fire.`, 'love');
@@ -1226,6 +1314,13 @@ function act(w, p, c, fx) {
   const night = h >= 21 || h < (afraid ? 7 : 6);
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
+  if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO) { // midsummer: everyone to the bonfire
+    if (p.task && p.task.k !== 'fest') release(w, p);
+    if (!p.task) p.task = festSpot(w);
+    p.asleep = false;
+    moveToward(p, p.task.x + 0.5, p.task.y + 0.5);
+    return;
+  }
   if (night || storm) { // in a storm nobody works outdoors: they wait it out at home
     if (p.task && p.task.k !== 'home') release(w, p);
     const home = homeOf(w, p);
@@ -1243,7 +1338,7 @@ function act(w, p, c, fx) {
     moveToward(p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home')) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest')) p.task = null;
   // daytime
   if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
@@ -1382,6 +1477,11 @@ const MIGRATIONS = {
   6: (w) => {
     if (w.fauna) { w.fauna.fences = w.fauna.fences || 0; if (w.fauna.raids >= FENCE_LEARN) learnFencing(w); }
   },
+  // v7 -> v8: midsummer. The longest day is kept with a bonfire, a feast and a dance.
+  7: (w) => {
+    w.fest = w.fest || { y: 0, on: -1, n: 0, k: 0 };
+    learnMidsummer(w);
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -1410,6 +1510,7 @@ export function summary(w) {
     hunting: w.techs.includes('hunting'), hides: w.hides || 0,
     fencing: w.techs.includes('fencing'), fenced: w.fields.filter((f) => f.fence).length,
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
+    festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
   };
 }
 

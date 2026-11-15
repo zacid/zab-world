@@ -33,5 +33,10 @@
   "at": "2026-11-15T00:13:35.148Z",
   "title": "Add wattle fences to keep boars out of the fields",
   "body": "- New tech Fences (SIM_VERSION 7), learned after the 8th boar raid; the live world (2 raids so far) should learn it in early summer of Y1\n- Idle workers fence fields within 2 tiles of the woods (3 timber, 3 h, not in winter); a fence turns a boar away for the night 85% of the time\n- Fences wear out: 20% rot each new year, 2% per storm day blow down, and a boar that gets through breaks the fence, so mending never ends\n- Raid nights drop from ~10 to ~3.5 a year; fences drawn as woven hazel edges with stakes around each fenced block; Fields row shows how many are fenced\n- Watch: the first fence and the first night the boars are turned away in the chronicle"
+ },
+ {
+  "at": "2026-11-15T00:30:39.181Z",
+  "title": "Add a midsummer festival with bonfire and ring dance",
+  "body": "- New custom Midsummer (SIM_VERSION 8, w.fest); the live world learns it on load, new worlds at 10 people\n- On summer day 46 work stops at 16:00: everyone gathers at a big bonfire (up to 12 timber), feasts 2 food each if stores allow, and dances until 23:00; rain delays it up to 4 days, a storm until it clears\n- At 21:00 each single woman has a 40% chance to pair up in the firelight; the year's festival is logged, the 1st and every 25th go in the chronicle\n- Visible: tall flickering bonfire with rising sparks, villagers in rings turning around it with flower crowns, \"midsummer fire\" next to the date\n- Watch: the first midsummer on Hais this summer (Y1, about 70 game days away)"
  }
 ]
