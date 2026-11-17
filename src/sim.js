@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 15;
+export const SIM_VERSION = 16;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -138,6 +138,22 @@ const HERB_FEVER = 0.5;      // a fever patient tended the day before is half as
 const HERB_WOUND = 2;        // days each tending takes off a wound's healing
 const HERB_KEEP = 0.6;       // share of the bundles still good after a year
 const HEAL_OLD = 62;         // at this age the healer hands the basket on
+// ---------- rats ----------
+const RAT_COME = 0.008;  // daily chance rats find a big heap of grain (year 2 on)
+const RAT_HEAP = 500;        // grain heaped in the open that draws them
+const RAT_RICH = 4000;       // or stores this large, even under a roof
+const RAT_FIRST = 6;         // how many come
+const RAT_BREED = 0.05;      // daily growth spring to autumn while grain lies in the open
+const RAT_BREED_DRY = 0.015; // daily growth when every grain is under a roof
+const RAT_WINTER = -0.02;    // winter with nothing in the open: they starve and freeze back
+const RAT_FROST = -0.04;     // on cold and snow days
+const RAT_BASE = 30;         // how many the island can feed with no granary
+const RAT_PER_GRANARY = 15;  // more for every granary to nest under
+const RAT_MAX = 150;
+const RAT_FOOD = 80;         // and never more than one per this much grain in store
+const RAT_EAT = 0.05;        // grain each rat eats (and fouls) per day
+const RAT_FEVER = 0.6;       // a swarming colony makes a fever up to 60% more likely to take hold
+const RAT_SWARM = 40;        // past this the village notices how many there are
 // ---------- footpaths ----------
 // Every step on open grass wears it a little; the grass grows back a little each day. Where people
 // walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
@@ -267,7 +283,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null,
   };
   // name the island
   let nm = '';
@@ -453,7 +469,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0 });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -462,6 +478,10 @@ function daily(w, c, fx) {
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
     for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
+    if (w.rats) {
+      if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
+      w.rats.y = 0;
+    }
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
     for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
@@ -509,6 +529,7 @@ function daily(w, c, fx) {
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
   } else w.stats.cold = false;
 
+  if (w.rats !== undefined) rats(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   lifeAndDeath(w, c);
@@ -1289,7 +1310,8 @@ function fever(w, c, fx) {
   const homes = new Set();
   for (const p of w.people) if (!p.dead && p.home != null) homes.add(p.home);
   const crowd = pop / Math.max(1, homes.size) / 4;
-  if (rnd(w) >= FEVER_SEED * crowd * (1 + pop / 50) * FEVER_SEASON[c.season]) return;
+  const vermin = w.rats ? 1 + RAT_FEVER * Math.min(1, w.rats.n / (RAT_SWARM * 1.5)) : 1;
+  if (rnd(w) >= FEVER_SEED * crowd * (1 + pop / 50) * FEVER_SEASON[c.season] * vermin) return;
   const open = w.people.filter((p) => !p.dead && !p.imm);
   if (!open.length) return;
   const p = open[ri(w, open.length)], a = ageY(w, p);
@@ -1297,6 +1319,57 @@ function fever(w, c, fx) {
   feverBegins(w, p, a < 14
     ? `${p.name} will not eat, burns hot to the touch and cries through the night.`
     : `${p.name} wakes burning hot, shivering, and cannot stand.`);
+}
+
+// ---------- rats ----------
+// Once the stores grow fat, rats find them (w.rats: n colony, y eaten this year, all eaten ever,
+// top largest colony, k times they have come, sw swarm noticed). They breed fast while grain lies in
+// heaps in the open, slower when it is all under a roof, and die back in a winter with nothing left
+// out. The island can only feed so many: a few for every granary they nest under, and never more
+// than the stores will carry. Every rat eats and fouls a little grain each day, and where they
+// swarm a fever takes hold more easily. Nobody on the island has an answer to them yet.
+function rats(w, c) {
+  const open = w.food - storeCap(w);
+  const R = w.rats;
+  if (!R || R.n <= 0) {
+    if (c.year < 2 || !w.techs.includes('granary') || (open < RAT_HEAP && w.food < RAT_RICH) || rnd(w) >= RAT_COME) return;
+    if (!R) {
+      w.rats = { n: RAT_FIRST, y: 0, all: 0, top: RAT_FIRST, k: 1, sw: 0 };
+      const who = elder(w);
+      milestone(w, `Something has been at the grain: husks strewn over the granary floor, droppings in the chaff, a little trail worn into the grass. At dusk ${who ? who.name : 'someone'} sees a grey shape run along the granary beam and drop into the heap. Rats have come to ${w.name}, and nobody knows how they came ashore.`);
+    } else {
+      R.n = RAT_FIRST; R.k++; R.sw = 0;
+      log(w, 'The rats are back. Fresh droppings in the granary, and the heap is tunnelled through.', 'bad');
+    }
+    return;
+  }
+  let g;
+  if (c.season < 3) g = open > 0 ? RAT_BREED : RAT_BREED_DRY;
+  else g = open > 0 ? RAT_BREED_DRY : RAT_WINTER;
+  if (c.season === 3 && (w.wx.k === 'cold' || w.wx.k === 'snow')) g = Math.min(g, RAT_FROST);
+  const d = R.n * g, whole = Math.floor(d);
+  R.n += whole + (rnd(w) < d - whole ? 1 : 0);
+  let gran = 0;
+  for (const b of w.buildings) if (b.kind === 'granary' && b.progress >= 1) gran++;
+  const cap = Math.min(RAT_MAX, RAT_BASE + RAT_PER_GRANARY * gran, Math.floor(w.food / RAT_FOOD));
+  if (R.n > cap) R.n -= Math.ceil((R.n - cap) * 0.25); // the hungry ones fight, starve or wander off
+  if (R.n <= 0) {
+    R.n = 0;
+    log(w, `The last of the rats ${c.season === 3 ? 'die in the frost' : 'starve in the empty stores'}. For now the granary is quiet.`, 'good');
+    return;
+  }
+  if (R.n > R.top) R.top = R.n;
+  const eat = Math.min(w.food, Math.round(R.n * RAT_EAT * 100) / 100);
+  w.food = Math.round((w.food - eat) * 100) / 100;
+  R.y = Math.round((R.y + eat) * 100) / 100;
+  R.all = Math.round((R.all + eat) * 100) / 100;
+  if (R.n >= RAT_SWARM && !R.sw) {
+    R.sw = 1;
+    const k = w.people.find((p) => !p.dead && ageY(w, p) < 14 && p.home != null);
+    if (!R.told) { R.told = 1; milestone(w, `The rats have multiplied past counting. At night the granary floor seethes, they run along the rafters and squeal in the thatch${k ? `, and ${k.name} wakes screaming with one on the blanket` : ''}. Whatever grain they do not eat, they foul.`); }
+    else log(w, 'The rats swarm in the stores again. The thatch squeaks all night.', 'bad');
+  }
+  if (R.n < RAT_SWARM / 4) R.sw = 0;
 }
 
 // ---------- herb lore ----------
@@ -2067,6 +2140,10 @@ const MIGRATIONS = {
     }
     w.nLearned = w.techs.length;
   },
+  // v15 -> v16: rats. None yet; they come on their own once the heaps grow large.
+  15: (w) => {
+    if (w.rats === undefined) w.rats = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -2101,6 +2178,7 @@ export function summary(w) {
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
     herbs: w.heal ? w.heal.s : 0, healer: (w.heal && w.heal.id != null && w.heal.nm) || null, tended: (w.heal && w.heal.n) || 0,
+    rats: w.rats ? w.rats.n : 0, ratsAte: w.rats ? Math.round(w.rats.y) : 0, ratsCame: !!w.rats,
   };
 }
 

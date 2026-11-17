@@ -158,3 +158,16 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Herbs for the cold: a warming brew cuts "died of the cold" for the frail in bitter snaps.
   - Coppicing was measured and skipped for now: on seed 4242 tall trees within 20 tiles fall 1000 -> 322 by Y100
     and timber stays ~2000, so the woods only run out after ~Y120. Worth doing before the live world reaches Y100.
+- Rats are done, as a problem only (SIM_VERSION 15 -> 16; w.rats {n colony, y eaten this year, all, top, k arrivals,
+  sw swarm flag, told}; rats() in sim.js, RAT_* constants; yearly `rats` eaten; drawRats() in render.js). They come
+  from year 2 once 500+ grain lies in the open (or 4000+ in store), breed 5%/day while grain is heaped outside, 1.5%
+  when it is all under a roof, die back in a winter with nothing left out. Cap min(150, 30 + 15/granary, food/80);
+  each eats 0.05 grain a day; a swarm makes fevers up to 60% likelier to start. On test seeds they never die out:
+  ~40-75 rats, ~1-2k grain a year, pop at Y90 close to the no-rat baseline. Answers it invites (none exist yet):
+  - Staddle stones: granary posts on mushroom-shaped stones the rats cannot climb (needs stone; cuts RAT_PER_GRANARY
+    and the dry-store breeding to ~0). The natural first answer.
+  - Clay jars / pottery: sealed jars in every house (HOME_STORE up, rats can't reach it). Also the pottery idea above.
+  - A rat-catcher role or children set to trapping (a daily cull), or terriers (first dog) that also help on fog days.
+  - Cats off a visiting boat: once boats exist, a trader brings a cat; kittens spread through the houses.
+  - Clearing the open heap: rats are what makes grain left outside hurt; building granaries fast enough starves them.
+  - Rats in the healer's herbs, or a plague year: if they swarm past ~100, a deadlier fever could come with them.

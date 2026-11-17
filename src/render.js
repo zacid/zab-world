@@ -549,6 +549,7 @@ function frame() {
   }
   if (track && fpos) moveCam(fpos);
   else if (returning) moveCam(null);
+  drawRats(hf, now);
   const beasts = drawBeasts(frac, now);
   ambience(c, hf, now, 'above');
   // the day's sky colours the land
@@ -732,6 +733,41 @@ function drawBeasts(frac, now) {
   return out;
 }
 
+// rats: render-only. A few dart about the granaries (or the houses) by day; at dusk and through
+// the night the colony comes out in force, one sprite for every six or so, scurrying in short
+// runs along the walls, freezing, then running again. Spilled grain lies under a swarmed granary.
+const RAT = ['.bbh', 't...'];
+const RCOL = { b: '#6f6862', h: '#57514c', t: '#a08a84' };
+function drawRats(hf, now) {
+  const n = w.rats ? w.rats.n : 0;
+  if (!n) return;
+  let nests = w.buildings.filter((b) => b.kind === 'granary' && b.progress >= 1);
+  if (!nests.length) nests = w.buildings.filter((b) => b.progress >= 1);
+  if (!nests.length) return;
+  const wx = wxNow();
+  const night = hf >= 19 || hf < 6;
+  const shown = Math.min(18, Math.ceil(n / (night ? 6 : 25)) - (wx === 'storm' || wx === 'snow' ? 1 : 0));
+  if (n >= 40) for (const b of nests) if (b.kind === 'granary') { // spilled grain and husks under the floor
+    for (let k = 0; k < 5; k++) px(sc, b.x * TILE + 1 + Math.floor(S.hash(b.id, k, 31) * 6), b.y * TILE + 7, k % 2 ? '#c9a94e' : '#8f7a46');
+  }
+  for (let i = 0; i < shown; i++) {
+    const b = nests[i % nests.length];
+    // each rat runs a little loop around its nest: a dash, a pause, a dash
+    const per = 2600 + Math.floor(S.hash(i, 1, 37) * 2400);
+    const ph = ((now + S.hash(i, 2, 37) * per) % per) / per;
+    const run = ph < 0.45 ? ph / 0.45 : ph < 0.55 ? 1 : 1 - (ph - 0.55) / 0.45;
+    const a0 = S.hash(i, 3, 37) * 6.28, a1 = a0 + (S.hash(i, 4, 37) < 0.5 ? 1.6 : -1.6);
+    const r = 5 + S.hash(i, 5, 37) * 5;
+    const ang = a0 + (a1 - a0) * run;
+    const X = Math.round(b.x * TILE + 4 + Math.cos(ang) * r), Y = Math.round(b.y * TILE + 5 + Math.sin(ang) * r * 0.6);
+    const face = (a1 > a0) === (ph < 0.5) ? (Math.sin(ang) > 0 ? -1 : 1) : (Math.sin(ang) > 0 ? 1 : -1);
+    for (let row = 0; row < RAT.length; row++) for (let k = 0; k < 4; k++) {
+      const ch = RAT[row][k];
+      if (ch !== '.') px(sc, face > 0 ? X + k : X + 3 - k, Y + row, RCOL[ch]);
+    }
+  }
+}
+
 function glow(c, x, y, r, col) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -754,6 +790,7 @@ function updatePanels() {
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
+    ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
@@ -821,7 +858,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
