@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 16;
+export const SIM_VERSION = 17;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -49,6 +49,7 @@ export const TECHS = {
   paths:    { name: 'Footpaths', added: '2026-11-15T01:30Z', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
   burial:   { name: 'Burying ground', added: '2026-11-15T01:59Z', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
   herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
+  goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
 // ---------- weather ----------
@@ -154,6 +155,22 @@ const RAT_FOOD = 80;         // and never more than one per this much grain in s
 const RAT_EAT = 0.05;        // grain each rat eats (and fouls) per day
 const RAT_FEVER = 0.6;       // a swarming colony makes a fever up to 60% more likely to take hold
 const RAT_SWARM = 40;        // past this the village notices how many there are
+
+export const PEN_W = 2;      // tiles inside the goat pen's wattle
+export const PEN_H = 2;
+const GOAT_COME = 0.05;      // daily chance in spring and summer (year 2 on) that the drifting raft finds the beach
+const GOAT_FIRST = 3;
+const GOAT_SPEED = 1.5;      // tiles per hour, grazing along
+const GOAT_REACH = 7;        // how far from the pen the herd is taken to graze
+const GOAT_OUT = 7, GOAT_HOME = 16; // let out after breakfast, brought in well before the wolves wake
+const GOAT_PER = 12;         // open grass tiles near the pen it takes to feed one goat through the year
+const GOAT_MAX = 14;
+const GOAT_MILK = 0.8;       // milk (counted as food) per grown goat per day, spring and summer
+const GOAT_FODDER = 1.5;     // grain each goat eats per winter day, when the stores can spare it
+const GOAT_MEAT = 20;
+const GOAT_OLD = 10;         // years before a goat is killed for the pot
+const GOAT_BROWSE = 4;       // saplings this small are eaten back to grass around the pen
+const GOAT_NIBBLE = 0.04;    // growth an unminded goat eats from a young field each hour it stands in it
 // ---------- footpaths ----------
 // Every step on open grass wears it a little; the grass grows back a little each day. Where people
 // walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
@@ -283,7 +300,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null,
   };
   // name the island
   let nm = '';
@@ -427,6 +444,7 @@ export function step(w, fx) {
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
+  if (w.goats) goatHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
@@ -469,7 +487,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0 });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -532,6 +550,7 @@ function daily(w, c, fx) {
   if (w.rats !== undefined) rats(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
+  if (w.goats !== undefined) goatDay(w, c);
   lifeAndDeath(w, c);
   pairing(w);
   housing(w);
@@ -837,10 +856,19 @@ function wolf(w, b, active) {
   const F = w.fauna, home = F.den;
   if (!active) {
     b.prey = null;
+    if (b.goat != null) b.goat = null;
     if (b.out && moveBeast(b, (home ? home.x : b.x) + 0.5, (home ? home.y : b.y) + 0.5, WOLF_SPEED)) b.out = 0;
     return;
   }
   if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; edge(w, b); }
+  if (b.goat != null) { // running down a goat that strayed out from the herd
+    const g = w.goats && w.goats.herd.find((o) => o.id === b.goat);
+    if (!g || !goatOpen(w, g)) { b.goat = null; edge(w, b); }
+    else {
+      if (moveBeast(b, g.x, g.y, WOLF_SPEED) || d2(b.x, b.y, g.x, g.y) < 1.5) takeGoat(w, b, g);
+      return;
+    }
+  }
   if (b.prey != null) {
     const p = w.people.find((o) => o.id === b.prey);
     if (!p || p.dead || p.asleep || !wild(w, p)) { b.prey = null; edge(w, b); }
@@ -854,6 +882,8 @@ function wolf(w, b, active) {
   if (rnd(w) < F.bold) {
     const p = lone(w, b);
     if (p) { b.prey = p.id; return; }
+    const g = w.goats && strayGoat(w, b);
+    if (g) { b.goat = g.id; return; }
   }
   if (--b.h <= 0) edge(w, b);
 }
@@ -1443,6 +1473,241 @@ function healerGather(w, p, c) {
   return null;
 }
 
+// ---------- goats ----------
+// A raft drifts ashore with three goats on it. They get a wattle pen beside the village and a herder,
+// a child if one is old enough. By day the herd grazes the open grass near the pen and eats the
+// saplings back; at four it is brought in, before the wolves stir. Milk in spring and summer, spare
+// grain in winter, the surplus and the old to the pot in autumn. Goats nobody minds wander into the
+// young grain, and in fog a wolf may take one that has strayed.
+function findPenSite(w) {
+  let best = null, bs = 1e9;
+  const { x: fx, y: fy } = w.fire;
+  for (let y = 2; y < MAP - PEN_H - 2; y++) for (let x = 2; x < MAP - PEN_W - 2; x++) {
+    const cx = x + PEN_W / 2, cy = y + PEN_H / 2;
+    const dd = d2(cx, cy, fx + 0.5, fy + 0.5);
+    if (dd < 25 || dd > 144) continue;
+    let ok = true, trees = 0;
+    for (let yy = y - 1; yy <= y + PEN_H && ok; yy++) for (let xx = x - 1; xx <= x + PEN_W; xx++) {
+      const t = tile(w, xx, yy), inside = yy >= y && yy < y + PEN_H && xx >= x && xx < x + PEN_W;
+      if (t === T.BUILD || (inside && t !== T.GRASS && t !== T.FOREST)) { ok = false; break; }
+      if (inside && t === T.FOREST) trees++;
+    }
+    if (!ok) continue;
+    let grass = 0;
+    for (let yy = y - 5; yy <= y + 6; yy++) for (let xx = x - 5; xx <= x + 6; xx++) if (tile(w, xx, yy) === T.GRASS) grass++;
+    const sc = Math.abs(Math.sqrt(dd) - 7) - grass * 0.08 + trees * 0.7 + hash(x, y, w.seed + 17);
+    if (sc >= bs || !lineOfLand(w, fx + 0.5, fy + 0.5, cx, cy)) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+const penMid = (G) => ({ x: G.pen.x + PEN_W / 2, y: G.pen.y + PEN_H / 2 });
+function addGoat(w, x, y, ageY) {
+  const g = { id: w.nextId++, x, y, px: x, py: y, b: w.t - Math.floor(ageY * TICKS_PER_YEAR), tx: null, ty: null, h: 0, out: 1 };
+  w.goats.herd.push(g); w.goats.n++;
+  return g;
+}
+function goatsCome(w, c) {
+  if (c.season > 1 || c.year < 2 || !w.techs.includes('fencing') || w.people.length < 8 || rnd(w) >= GOAT_COME) return;
+  const s = findPenSite(w);
+  if (!s) return;
+  const mid = { x: s.x + PEN_W / 2, y: s.y + PEN_H / 2 };
+  let land = null, bd = 1e9;
+  for (const i of w.shore || []) {
+    const x = i % MAP, y = (i - x) / MAP, dd = d2(x + 0.5, y + 0.5, mid.x, mid.y);
+    if (dd < bd && lineOfLand(w, x + 0.5, y + 0.5, mid.x, mid.y)) { bd = dd; land = { x, y }; }
+  }
+  if (!land) land = { x: w.fire.x, y: w.fire.y + 2 };
+  for (let y = s.y; y < s.y + PEN_H; y++) for (let x = s.x; x < s.x + PEN_W; x++) {
+    const i = idx(x, y);
+    w.timber += w.wood[i]; w.wood[i] = 0;
+    setTile(w, i, T.BUILD);
+  }
+  w.goats = { pen: { x: s.x, y: s.y }, herd: [], hid: null, at: null, ah: 0, n: 0, lost: 0, eaten: 0, milk: 0, ym: 0, yf: 0, yl: 0, ate: 0, nib: 0 };
+  for (let k = 0; k < GOAT_FIRST; k++) addGoat(w, land.x + 0.3 + k * 0.3, land.y + 0.5, 2 + ri(w, 3));
+  w.techs.push('goats');
+  const who = elder(w);
+  pickHerder(w, true);
+  const kid = aliveId(w, w.goats.hid);
+  milestone(w, `A raft of lashed logs drifts onto the beach with nobody aboard but three goats, thin and bleating. ${who ? who.name : 'Someone'} wades out and leads them ashore, and by nightfall a wattle pen stands beside the village.` +
+    (kid && kid === who ? ` ${who.name} takes a crook and goes out with them each morning.` : kid ? ` ${kid.name} is given a crook and sent out with them each morning.` : '') + ` ${w.name} keeps goats.`);
+}
+// a child of 7 to 13 minds the goats; with no child old enough, the eldest grown islander does
+function pickHerder(w, quiet) {
+  const G = w.goats, cur = aliveId(w, G.hid);
+  const healer = w.heal && w.heal.id;
+  let kid = null, old = null;
+  for (const p of w.people) {
+    if (p.dead || p.sick || p.id === healer) continue;
+    const a = ageY(w, p);
+    if (a >= 7 && a < 14) { if (!kid || p.born > kid.born || (p.born === kid.born && p.id < kid.id)) kid = p; } // the youngest old enough, so the crook stays a while
+    else if (a >= 14 && a < 70 && (!old || p.born < old.born || (p.born === old.born && p.id < old.id))) old = p;
+  }
+  if (cur && ageY(w, cur) < 14) return; // a child keeps the crook until grown
+  if (cur && !kid && ageY(w, cur) < 70) return;
+  const next = kid || old;
+  if (!next || (cur && next.id === cur.id)) { if (!next) G.hid = null; return; }
+  G.hid = next.id;
+  if (quiet) return;
+  const ca = cur ? ageY(w, cur) : 0;
+  if (cur && next === kid && ca < 15) log(w, `${cur.name} is grown now and hands the goat crook to ${next.name}.`, 'info');
+  else if (cur && next === kid && ca < 70) log(w, `${next.name} is old enough now to mind the goats, and ${cur.name} goes back to the fields.`, 'info');
+  else log(w, `${next.name} takes up the crook and goes out with the goats.`, 'info');
+}
+function goatCap(w) {
+  const m = penMid(w.goats);
+  let grass = 0;
+  for (let y = Math.floor(m.y) - 8; y <= Math.floor(m.y) + 8; y++) for (let x = Math.floor(m.x) - 8; x <= Math.floor(m.x) + 8; x++) if (tile(w, x, y) === T.GRASS) grass++;
+  return Math.max(3, Math.min(GOAT_MAX, Math.round(grass / GOAT_PER)));
+}
+function killGoats(w, list) {
+  const G = w.goats;
+  G.herd = G.herd.filter((g) => !list.includes(g));
+  G.eaten += list.length;
+  w.food += GOAT_MEAT * list.length;
+  w.hides = (w.hides || 0) + list.length;
+}
+function goatDay(w, c) {
+  if (w.goats === null) { goatsCome(w, c); return; }
+  const G = w.goats;
+  if (c.doy === 0) { G.ym = 0; G.yf = 0; G.yl = 0; }
+  pickHerder(w);
+  const n = G.herd.length, m = penMid(G);
+  // they strip the saplings creeping out onto their grazing
+  for (let k = 0; k < n; k++) {
+    const x = Math.floor(m.x) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH, y = Math.floor(m.y) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH;
+    if (!inMap(x, y)) continue;
+    const i = idx(x, y);
+    if (w.tiles[i] === T.FOREST && w.wood[i] <= GOAT_BROWSE) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
+  }
+  let grown = 0;
+  for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR) grown++;
+  if (c.season < 2 && grown) {
+    const milk = Math.round(grown * GOAT_MILK * 10) / 10;
+    w.food = Math.round((w.food + milk) * 100) / 100; G.ym = Math.round((G.ym + milk) * 10) / 10; G.milk = Math.round((G.milk + milk) * 10) / 10;
+  }
+  if (c.season === 3 && n) { // winter: grain from the stores, if there is grain to spare
+    const need = n * GOAT_FODDER;
+    if (w.food >= w.people.length * 60 + need) { w.food = Math.round((w.food - need) * 100) / 100; G.yf += need; }
+    else if (rnd(w) < 0.08) {
+      killGoats(w, [G.herd.reduce((a, g) => (g.b < a.b ? g : a))]);
+      log(w, 'The stores are too thin to feed the goats. One is killed for the pot.', 'bad');
+    }
+  }
+  if (G.ate) { // told once in a while, not every day they do it
+    G.nib++;
+    const text = 'With nobody minding them, the goats get in among the young grain.';
+    if (G.nib === 1) { milestone(w, `${text} By the time they are driven out, the shoots are bitten to the ground.`); G.nd = c.day; }
+    else if (c.day - (G.nd || 0) >= 20) { log(w, text, 'bad'); G.nd = c.day; }
+    G.ate = 0;
+  }
+  if (c.doy === 45 && grown >= 2) { // kidding
+    let k = 0;
+    for (let i = 0; i < grown && n + k < GOAT_MAX + 4; i++) if (rnd(w) < 0.7) k++;
+    for (let i = 0; i < k; i++) addGoat(w, G.pen.x + 0.5 + i * 0.3, G.pen.y + 1, 0);
+    if (k) log(w, k === 1 ? 'A kid is born in the goat pen, all legs.' : `${plural(k, 'kid', 'kids')} are born in the goat pen and are soon butting heads.`, 'good');
+  }
+  if (c.doy === 280 && n) { // autumn: the old, and whatever the grass cannot carry through the year, go to the pot
+    const cap = goatCap(w);
+    const byAge = [...G.herd].sort((a, b) => a.b - b.b || a.id - b.id);
+    const kill = byAge.filter((g) => w.t - g.b >= GOAT_OLD * TICKS_PER_YEAR);
+    for (const g of byAge) if (byAge.length - kill.length > cap && !kill.includes(g)) kill.push(g);
+    if (kill.length) {
+      killGoats(w, kill);
+      log(w, `${plural(kill.length, 'goat is', 'goats are')} killed before winter. Meat for the smoke, ${kill.length === 1 ? 'a hide' : 'hides'} for the doorways.`, 'info');
+    }
+  }
+}
+// someone close enough to shout, wave a stick and bring the herd together
+function goatGuard(w, g) {
+  const grown = w.t - 7 * TICKS_PER_YEAR;
+  for (const p of w.people) if (!p.dead && !p.asleep && p.born <= grown && d2(p.x, p.y, g.x, g.y) < 9) return p;
+  return null;
+}
+// out on the open grass, far enough from the hearth and the houses that a wolf will come for it
+const goatOpen = (w, g) => g.out && d2(g.x, g.y, w.fire.x + 0.5, w.fire.y + 0.5) >= WOLF_SAFE && !nearBuild(w, Math.floor(g.x), Math.floor(g.y), 2);
+function strayGoat(w, b) {
+  let best = null, bd = 64;
+  for (const g of w.goats.herd) {
+    const dd = d2(g.x, g.y, b.x, b.y);
+    if (dd < bd && goatOpen(w, g) && !goatGuard(w, g)) { bd = dd; best = g; }
+  }
+  return best;
+}
+function takeGoat(w, b, g) {
+  const G = w.goats;
+  b.goat = null;
+  const guard = goatGuard(w, g);
+  if (guard) {
+    b.rest = w.t + 24;
+    log(w, `A wolf rushes the goats. ${guard.name} yells and swings ${ageY(w, guard) < 14 ? 'the crook' : 'a stick'}, and it slinks back into the trees.`, 'info');
+    return;
+  }
+  G.herd = G.herd.filter((o) => o !== g);
+  G.lost++; G.yl++;
+  b.rest = w.t + 48;
+  const text = w.wx && w.wx.k === 'fog'
+    ? 'A wolf comes out of the fog and carries off a goat. Its bleating stops somewhere in the grey.'
+    : 'A wolf darts out of the trees and drags off a goat that wandered from the herd.';
+  if (G.lost === 1) milestone(w, `${text} Now the herd has to be watched as closely as the children.`);
+  else log(w, text, 'bad');
+}
+function goatHour(w, c) {
+  const G = w.goats, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
+  const fest = w.fest && w.fest.on === c.day && h >= FEST_FROM;
+  const out = G.herd.length > 0 && h >= GOAT_OUT && h < GOAT_HOME && wx !== 'storm' && wx !== 'snow' && !(c.season === 3 && wx === 'cold') && !fest;
+  const herder = G.hid != null ? aliveId(w, G.hid) : null;
+  const minded = !!(herder && !herder.sick && !herder.hurt && (h === GOAT_OUT || (herder.task && herder.task.k === 'herd')));
+  const m = penMid(G);
+  if (!out) G.at = null;
+  else if (!G.at || --G.ah <= 0) { // the herd drifts to a fresh patch of grass every few hours
+    G.at = { x: Math.floor(m.x), y: G.pen.y + PEN_H };
+    for (let k = 0; k < 8; k++) {
+      const x = Math.floor(m.x) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH, y = Math.floor(m.y) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH;
+      if (tile(w, x, y) === T.GRASS && lineOfLand(w, m.x, m.y, x + 0.5, y + 0.5)) { G.at = { x, y }; break; }
+    }
+    G.ah = 3 + ri(w, 3);
+  }
+  for (let k = 0; k < G.herd.length; k++) {
+    const g = G.herd[k];
+    g.px = g.x; g.py = g.y;
+    if (!out) { // back into the pen, each to its corner of the straw
+      g.tx = null;
+      const sx = G.pen.x + 0.35 + (k % 4) * 0.42, sy = G.pen.y + 0.45 + (Math.floor(k / 4) % 4) * 0.4;
+      if (moveToward(g, sx, sy, SPEED)) g.out = 0;
+      continue;
+    }
+    g.out = 1;
+    if (minded && g.tx != null && tile(w, g.tx, g.ty) === T.FIELD) g.tx = null; // the herder turns it back
+    if (g.tx == null) {
+      let tx = G.at.x, ty = G.at.y;
+      for (let tries = 0; tries < 4; tries++) {
+        const x = minded ? G.at.x + ri(w, 5) - 2 : Math.floor(m.x) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH;
+        const y = minded ? G.at.y + ri(w, 5) - 2 : Math.floor(m.y) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH;
+        const t = tile(w, x, y);
+        if ((t === T.GRASS || (!minded && t === T.FIELD)) && lineOfLand(w, g.x, g.y, x + 0.5, y + 0.5)) { tx = x; ty = y; break; }
+      }
+      g.tx = tx; g.ty = ty; g.h = 1 + ri(w, 3);
+    }
+    const far = d2(g.x, g.y, g.tx + 0.5, g.ty + 0.5) > 9;
+    if (!moveToward(g, g.tx + 0.2 + (g.id % 3) * 0.3, g.ty + 0.2 + (g.id % 2) * 0.5, far ? SPEED : GOAT_SPEED)) continue;
+    if (!minded) { // nobody to stop them: a mouthful of the young grain
+      const fx = Math.floor(g.x), fy = Math.floor(g.y);
+      if (tile(w, fx, fy) === T.FIELD) {
+        const f = w.fields.find((o) => o.x === fx && o.y === fy);
+        if (f && !f.fence && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - GOAT_NIBBLE) * 10000) / 10000); G.ate++; }
+        else if (f && !f.fence && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.02) * 100) / 100); G.ate++; }
+      }
+    }
+    if (--g.h <= 0) g.tx = null;
+  }
+}
+function herdTask(w, p) {
+  const G = w.goats;
+  if (!G || G.hid !== p.id || !G.at || !G.herd.length || p.hurt || p.haul) return null;
+  return { k: 'herd', x: G.at.x, y: G.at.y, h: 99 };
+}
+
 // ---------- the burying ground ----------
 // At the first death the village walls off a quiet patch of ground nearby. Every grave has a place in
 // rows inside the wall; the morning after a death the family stands at the graveside. When the rows
@@ -1932,8 +2197,18 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn')) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
+  if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
+    const ht = herdTask(w, p);
+    if (ht) {
+      if (p.task && p.task.k !== 'herd') release(w, p);
+      p.task = ht;
+      walk(w, p, ht.x + 0.5, ht.y + 1);
+      return;
+    }
+    if (p.task && p.task.k === 'herd') p.task = null;
+  }
   if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
@@ -2144,6 +2419,10 @@ const MIGRATIONS = {
   15: (w) => {
     if (w.rats === undefined) w.rats = null;
   },
+  // v16 -> v17: goats. None yet; a raft brings the first three ashore some spring or summer day.
+  16: (w) => {
+    if (w.goats === undefined) w.goats = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -2179,6 +2458,8 @@ export function summary(w) {
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
     herbs: w.heal ? w.heal.s : 0, healer: (w.heal && w.heal.id != null && w.heal.nm) || null, tended: (w.heal && w.heal.n) || 0,
     rats: w.rats ? w.rats.n : 0, ratsAte: w.rats ? Math.round(w.rats.y) : 0, ratsCame: !!w.rats,
+    goats: w.goats ? w.goats.herd.length : 0, goatsCame: !!w.goats, goatsLost: w.goats ? w.goats.lost : 0,
+    goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
 

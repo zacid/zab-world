@@ -93,5 +93,10 @@
   "at": "2026-11-17T20:13:57.483Z",
   "title": "Add rats that breed in the grain heaps and stores",
   "body": "- SIM_VERSION 16 (w.rats): from year 2, rats find grain heaped in the open (500+) or a large store (4000+)\n- They breed fast while grain lies outside, slowly when all is under a roof, and die back in a winter with nothing left out\n- Colony capped at 30 + 15 per granary (max 150, never above food/80); each rat eats 0.05 grain a day, and a swarm makes fevers up to 60% likelier\n- Visible: rats run around the granaries, many at night, with spilled grain under a swarmed store; a Rats row in the panel; rats in History\n- Watch: Hais has ~3000 grain in the open, so rats should arrive within weeks; nobody has an answer to them yet"
+ },
+ {
+  "at": "2026-11-17T20:45:00.662Z",
+  "title": "Add goats: a raft brings a herd, a pen and a goatherd",
+  "body": "- SIM_VERSION 17 (w.goats): some spring or summer day a raft drifts ashore with three goats; a 2x2 wattle pen goes up 5-12 tiles from the hearth and the new Goats tech is logged in the chronicle\n- A child of 7-13 (the eldest adult if none) takes the crook and walks the herd to fresh grass every few hours, 07:00-16:00; the herd stays in on storm, snow and winter cold days\n- Goats eat back saplings near the pen, give milk in spring and summer (0.8 a day each), eat 1.5 spare grain each per winter day, kid in spring, and in autumn the old and any the grass can't carry are killed for meat and hides (herd 3-14)\n- Unminded goats get into unfenced young grain; in fog a wolf may take a goat that strays from the herder (goatsLost in yearly history)\n- Visible: pen with straw and a lean-to, white, brown and black goats that graze head-down, skipping kids, a herder's crook; hover tooltip, Goats panel row, goatherd tag on the life card"
  }
 ]

@@ -55,6 +55,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   goes stale. What's left at 300+: the per-person cost of act() itself, garbage from task objects and
   'f'+id / 't'+i key strings, and idle adults calling pickTask every 2 h (~110k calls/yr). Giving idle
   workers longer rests, or numeric reservation keys, would be the next step (behaviour changes slightly).
+- Goats are done (w.goats: pen, herd[], hid herder, at grazing spot, lost/eaten/milk, ym/yf/yl yearly). Answers
+  they invite: cheese (milk kept for winter instead of drunk at once), a guard dog with the herder, wool or goat-hair
+  cloth, keeping the herd in on fog days once a goat is lost (weather lore), a second pen when the herd is capped,
+  goats browsing coppice near the village. Wolves could also try the pen on hungry winter nights.
+- The first herder is often an adult founder for a few years until a child turns 7; that adult does no other work.
 - Late game the woods within 20 tiles of the hearth are cut out: on seed 4242 timber falls from ~3000
   to 0 in Y97-100 with 98 houses burning 0.3 a day each. Charcoal, coppicing near the village, or
   shared longhouses (fewer hearths) would answer it; so would letting woodcutters walk farther.

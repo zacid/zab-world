@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
@@ -95,6 +95,7 @@ function doing(p) {
   }
   if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
+  if (p.task && p.task.k === 'herd') return 'minding the goats';
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
@@ -133,6 +134,7 @@ function drawWho() {
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
     `<b>${esc(p.name)}</b> <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
     (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
+    (w.goats && w.goats.hid === p.id ? ' <span class="goat">goatherd</span>' : '') +
     `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''}</div>` +
     kin.map(([l, v]) => `<div class="kin"><span class="m">${l}</span> ${v}</div>`).join('') +
     ev.map((e) => `<div class="ev"><span class="when">${e.s}</span>${esc(e.text)}</div>`).join('');
@@ -246,6 +248,7 @@ function drawTerrain() {
     }
   }
   drawYard(pal);
+  drawPen(pal);
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -343,6 +346,34 @@ function drawYard(pal) {
       px(tc, cx - 1, cy - 1, pal.snow ? '#eef3f7' : pal.grass[2], 2, 2);
       px(tc, cx - 1, cy - 2, age > 20 * S.TICKS_PER_YEAR ? '#7d7a72' : '#b8b8b0', 2, 1);
     }
+  }
+}
+// the goat pen: trodden earth and straw inside a wattle fence, a gap toward the village, and a
+// lean-to of bark against the back wall where the herd beds down
+function drawPen(pal) {
+  const G = w.goats;
+  if (!G) return;
+  const X0 = G.pen.x * TILE, Y0 = G.pen.y * TILE, W = S.PEN_W * TILE, H = S.PEN_H * TILE;
+  px(tc, X0, Y0, pal.snow ? '#a59d90' : '#6f5c40', W, H);
+  for (let k = 0; k < 18; k++) { const h = S.hash(G.pen.x * 3 + k, G.pen.y, 71); px(tc, X0 + 1 + ((h * 14) | 0), Y0 + 1 + ((h * 131) | 0) % 14, pal.snow ? '#d9dde2' : k % 3 ? '#c9b06a' : '#a8904e', 2, 1); }
+  const dx = X0 + W / 2 - (w.fire.x * TILE + 4), dy = Y0 + H / 2 - (w.fire.y * TILE + 4);
+  const gate = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'w' : 'e') : dy > 0 ? 'n' : 's';
+  const back = { n: 's', s: 'n', e: 'w', w: 'e' }[gate];
+  const rod = pal.snow ? '#a89a86' : '#9a7a4e', stake = '#5e4026', roof = pal.snow ? '#e4e8ec' : '#7a5232';
+  // lean-to along the back wall
+  if (back === 'n') px(tc, X0 + 2, Y0 + 1, roof, W - 4, 3);
+  if (back === 's') px(tc, X0 + 2, Y0 + H - 4, roof, W - 4, 3);
+  if (back === 'w') px(tc, X0 + 1, Y0 + 2, roof, 3, H - 4);
+  if (back === 'e') px(tc, X0 + W - 4, Y0 + 2, roof, 3, H - 4);
+  for (let k = 0; k < W; k++) {
+    const gap = k >= W / 2 - 2 && k < W / 2 + 2;
+    if (!(gate === 'n' && gap)) px(tc, X0 + k, Y0, k % 4 === 0 ? stake : rod);
+    if (!(gate === 's' && gap)) px(tc, X0 + k, Y0 + H - 1, k % 4 === 0 ? stake : rod);
+  }
+  for (let k = 0; k < H; k++) {
+    const gap = k >= H / 2 - 2 && k < H / 2 + 2;
+    if (!(gate === 'w' && gap)) px(tc, X0, Y0 + k, k % 4 === 0 ? stake : rod);
+    if (!(gate === 'e' && gap)) px(tc, X0 + W - 1, Y0 + k, k % 4 === 0 ? stake : rod);
   }
 }
 function graveAt(mx, my) {
@@ -533,6 +564,10 @@ function frame() {
       }
       if (p.task && p.task.k === 'herb' && !moving && Math.floor(now / 350 + p.id) % 2) px(sc, X + 1, Y + 3, '#8fcf7e', 2, 1); // bent to pick
     }
+    if (w.goats && w.goats.hid === p.id && p.task && p.task.k === 'herd') { // the herder's crook, hooked at the top
+      const top = age < 14 ? Y - 1 : Y - 2;
+      px(sc, X + 3, top, '#9a7a4e', 1, Y + 4 - top); px(sc, X + 4, top, '#9a7a4e'); px(sc, X + 4, top + 1, '#9a7a4e');
+    }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     shown.push({ p, x, y });
   }
@@ -551,6 +586,7 @@ function frame() {
   else if (returning) moveCam(null);
   drawRats(hf, now);
   const beasts = drawBeasts(frac, now);
+  const goats = drawGoats(frac, now);
   ambience(c, hf, now, 'above');
   // the day's sky colours the land
   const wx = wxNow();
@@ -611,8 +647,17 @@ function frame() {
     for (const o of shown) { const d = Math.hypot(o.x - mx, o.y - 0.2 - my); if (d < bd) { bd = d; best = o; } }
     let beast = null;
     for (const o of beasts) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; beast = o.b; best = null; } }
+    let goat = null;
+    for (const o of goats) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; goat = o; beast = null; best = null; } }
     const tip = $('tip');
-    if (beast) {
+    if (goat) {
+      const g = goat.g, still = g.x === g.px && g.y === g.py;
+      const cx = Math.floor(g.x), cy = Math.floor(g.y), onField = w.tiles[cy * S.MAP + cx] === S.T.FIELD;
+      const what = !g.out ? (darkness(hf) > 0.4 ? 'asleep in the pen' : 'shut in the pen') : onField ? 'in the young grain' : still ? 'grazing' : 'trotting after the herd';
+      const yrs = Math.floor((w.t - g.b) / S.TICKS_PER_YEAR);
+      tip.innerHTML = `<b>${goat.kid ? 'Kid' : 'Goat'}</b><br><span class="m">${what}${goat.kid ? '' : ` · ${yrs} yrs`}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (beast) {
       const still = beast.x === beast.px && beast.y === beast.py;
       const what = beast.k === 'wolf'
         ? (beast.prey != null ? 'stalking someone' : 'prowling the treeline')
@@ -733,6 +778,41 @@ function drawBeasts(frac, now) {
   return out;
 }
 
+// goats: 5x4, horns up; mirrored when heading left. Head down to graze, legs tucked when bedded in
+// the pen. Kids are 3x3 and white. Coats vary: white, brown and white, or near black.
+const GOAT = ['...h.', 't.wwH', '.www.', '.l.l.'];
+const GOAT_STEP = ['...h.', 't.wwH', '.www.', 'l...l'];
+const GOAT_GRAZE = ['.....', 't....', '.wwwh', '.l.lH'];
+const GOAT_BED = ['.....', '...h.', 't.wwH', 'wwww.'];
+const KID = ['..H', 'ww.', 'l.l'];
+const KID_BED = ['...', '..H', 'ww.'];
+const GCOATS = [{ w: '#ece6d6', H: '#d8d0bc' }, { w: '#8a6a4a', H: '#ece6d6' }, { w: '#3c3632', H: '#5a524c' }];
+function drawGoats(frac, now) {
+  const out = [];
+  if (!w.goats) return out;
+  for (const g of w.goats.herd) {
+    const x = g.px + (g.x - g.px) * frac, y = g.py + (g.y - g.py) * frac;
+    const dx = g.x - g.px, moving = dx !== 0 || g.y !== g.py;
+    let face = facing.get(g.id) || ((g.id & 1) ? 1 : -1);
+    if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
+    facing.set(g.id, face);
+    const kid = w.t - g.b < S.TICKS_PER_YEAR;
+    const step = Math.floor(now / 170 + g.id) % 2;
+    const rows = kid ? (!g.out && !moving ? KID_BED : KID)
+      : !g.out && !moving ? GOAT_BED : moving ? (step ? GOAT_STEP : GOAT) : Math.floor(now / 1100 + g.id * 1.3) % 3 ? GOAT_GRAZE : GOAT;
+    const coat = kid ? GCOATS[0] : GCOATS[g.id % 3];
+    const map = { w: coat.w, H: coat.H, h: '#6e665c', t: coat.w, l: '#2e2a26' };
+    const hop = kid && moving && step ? 1 : 0; // kids skip
+    const n = rows[0].length, X = Math.round(x * TILE) - (n >> 1), Y = Math.round(y * TILE) - rows.length + 1 - hop;
+    for (let r = 0; r < rows.length; r++) for (let k = 0; k < n; k++) {
+      const ch = rows[r][k];
+      if (ch !== '.') px(sc, face > 0 ? X + k : X + n - 1 - k, Y + r, map[ch]);
+    }
+    out.push({ g, x, y, kid });
+  }
+  return out;
+}
+
 // rats: render-only. A few dart about the granaries (or the houses) by day; at dusk and through
 // the night the colony comes out in force, one sprite for every six or so, scurrying in short
 // runs along the walls, freezing, then running again. Spilled grain lies under a swarmed granary.
@@ -791,6 +871,7 @@ function updatePanels() {
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
+    ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
@@ -858,7 +939,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
