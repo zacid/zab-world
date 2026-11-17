@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 19;
+export const SIM_VERSION = 20;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -49,6 +49,7 @@ export const TECHS = {
   paths:    { name: 'Footpaths', added: '2026-11-15T01:30Z', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
   burial:   { name: 'Burying ground', added: '2026-11-15T01:59Z', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
   herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
+  farisle:  { name: 'The far isle', added: '2026-11-17T22:26Z', desc: 'Another isle lies beyond the sea haze, and its people can see a big midsummer fire. Some years a dugout full of strangers paddles over for the dance. They trade hides for grain, and now and then one of them stays to marry an islander who had nobody at home; once the island is crowded, a restless islander may sail away with them.', req: ['midsummer', 'fishing'] },
   foghorn:  { name: 'Fog horn', added: '2026-11-17T21:42Z', desc: 'A great whelk shell from the beach with its tip knocked off. On fog days the oldest islander who can stand keeps by the hearth and blows it every little while. Within earshot nobody is alone: a wolf will not single out someone who can call back to the horn. Someone lost in the grey can follow the sound home.', req: ['fire', 'fishing'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
@@ -169,6 +170,19 @@ const RAT_EAT = 0.05;        // grain each rat eats (and fouls) per day
 const RAT_FEVER = 0.6;       // a swarming colony makes a fever up to 60% more likely to take hold
 const RAT_SWARM = 40;        // past this the village notices how many there are
 
+// ---------- the far isle ----------
+const ISLE_YEAR = 3;         // from this year a towering midsummer fire can be seen from the far isle
+const ISLE_SEEN = 0.5;       // chance they row over to the first big fire they see
+const ISLE_COME = 0.4;       // and to each one after
+const ISLE_OUT = 10;         // tiles offshore the boat comes in from
+const ISLE_SAIL = 8;         // hour on midsummer day the boat comes into sight
+const GUEST_SPEED = 4;       // tiles per hour, the guests striding up from the beach
+const BOAT_SPEED = 3;        // tiles per hour, paddling
+const ISLE_WED = 0.5;        // chance a single islander with nobody to marry at home is pledged to a guest
+const ISLE_LEAVE = 0.25;     // chance a single islander with nobody to marry sails away with them (a crowded island only)
+const ISLE_CROWD = 30;       // people on the island before anyone would think of leaving
+const ISLE_TRADE = 300;      // grain the guests take home, if the stores can spare it
+const ISLE_FEVER = 0.08;     // chance the guests leave a fever behind
 export const PEN_W = 2;      // tiles inside the goat pen's wattle
 export const PEN_H = 2;
 const GOAT_COME = 0.05;      // daily chance in spring and summer (year 2 on) that the drifting raft finds the beach
@@ -313,7 +327,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null,
   };
   // name the island
   let nm = '';
@@ -460,6 +474,7 @@ export function step(w, fx) {
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
   if (w.lost) lostHour(w, c);
+  if (w.isle && w.isle.boat) isleHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
@@ -663,33 +678,33 @@ function storm(w) {
 
 // a spell ends: tell the chronicle if it was one people will remember
 function endSpell(w, s) {
-  const n = s.n, len = spellLen(n);
+  const n = s.n, len = spellLen(n), v = (vb) => (len.startsWith('A ') ? vb + 's' : vb); // "A week of rain ends"
   let text = null, k = 'bad', big = false;
   if (s.k === 'storm' && (n >= 3 || s.f || s.r || s.g >= 3)) {
     const hurt = [];
     if (s.f) hurt.push(`${plural(s.f, 'field', 'fields')} flattened`);
     if (s.r) hurt.push(`${plural(s.r, 'roof', 'roofs')} torn away`);
     if (s.g) hurt.push(`${plural(s.g, 'fence', 'fences')} blown down`);
-    text = n === 1 ? `A storm tears across ${w.name}` : `${len} of storms batter ${w.name}`;
+    text = n === 1 ? `A storm tears across ${w.name}` : `${len} of storms ${v('batter')} ${w.name}`;
     text += hurt.length ? `: ${hurt.join(', ')}.` : ', but the village holds.';
     big = n >= 7 || s.r >= 3 || s.f >= Math.max(10, w.fields.length >> 3);
   } else if (s.k === 'heat' && n >= 7) {
-    text = `${len} of blazing heat break at last. The grain stood still in the sun.`;
+    text = `${len} of blazing heat ${v('break')} at last. The grain stood still in the sun.`;
     big = n >= 18 || s.d >= 2;
   } else if (s.k === 'cold' && n >= 6) {
-    text = `${len} of bitter cold lift.` + (s.d ? ` ${plural(s.d, 'soul was', 'souls were')} lost to it.` : ' Every hearth was kept burning.');
+    text = `${len} of bitter cold ${v('lift')}.` + (s.d ? ` ${plural(s.d, 'soul was', 'souls were')} lost to it.` : ' Every hearth was kept burning.');
     big = n >= 15 || s.d >= 2;
   } else if (s.k === 'snow' && n >= 5) {
-    text = `${len} of snow end. Drifts lie deep against the houses.`; k = 'info';
+    text = `${len} of snow ${v('end')}. Drifts lie deep against the houses.`; k = 'info';
   } else if (s.k === 'fog' && (n >= 4 || s.b)) {
     const fell = s.b === 1 ? 'a wolf fell on one of the village' : `wolves fell on ${s.b} islanders`;
-    text = (n === 1 ? 'The fog lifts.' : `${len} of fog lift.`) + (!s.b ? ' The sea and the woods come back.'
+    text = (n === 1 ? 'The fog lifts.' : `${len} of fog ${v('lift')}.`) + (!s.b ? ' The sea and the woods come back.'
       : s.x >= s.b ? ` Out of the grey, wolves took ${s.x === 1 ? 'one of the village' : s.x + ' islanders'}.`
       : ` Out of the grey, ${fell}${s.x ? `, and ${s.x === 1 ? 'one' : s.x} did not come home` : ''}.`);
     k = s.b ? 'bad' : 'info';
     big = n >= 12 || s.x >= 1;
   } else if (s.k === 'rain' && n >= 7) {
-    text = `${len} of rain end. The fields have drunk deep.`; k = 'good';
+    text = `${len} of rain ${v('end')}. The fields have drunk deep.`; k = 'good';
   }
   if (!text) return;
   if (big) milestone(w, text); else log(w, text, k);
@@ -1140,6 +1155,7 @@ function festSpot(w) {
 }
 function midsummer(w, c, fx) {
   const F = w.fest, h = c.hour, pop = w.people.length;
+  if (h === ISLE_SAIL) boatComes(w, c); // on the far isle they know the day, and the smoke of the fire-building
   if (h === FEST_FROM) {
     F.k = 0; F.pairs = [];
     F.wood = Math.min(FEST_WOOD, Math.floor(w.timber / 4));
@@ -1157,6 +1173,7 @@ function midsummer(w, c, fx) {
       f.partner = m.id; m.partner = f.id; f.wants = true;
       F.pairs.push(`${f.name} and ${m.name}`);
     }
+    if (w.isle && w.isle.boat) isleWed(w);
   } else if (h === 22) {
     F.n = (F.n || 0) + 1;
     const feast = F.feast >= pop ? ' and feast on the best of the stores' : F.feast > 0 ? ' and share what the stores can spare' : ' on empty stomachs';
@@ -1165,11 +1182,148 @@ function midsummer(w, c, fx) {
     const P = F.pairs;
     if (P.length === 1) text += ` ${P[0]} are pledged in the firelight.`;
     else if (P.length > 1) text += ` ${P.length} couples are pledged in the firelight: ${P.slice(0, 3).join(', ')}${P.length > 3 ? ' and more' : ''}.`;
+    if (w.isle && w.isle.boat) text += isleFeast(w);
     if (F.n === 1) milestone(w, `${text} The first midsummer fire on ${w.name} burns until nearly midnight.`);
     else if (F.n % 25 === 0) milestone(w, `${text} It is the ${F.n}th midsummer kept on ${w.name}.`);
     else log(w, text, P.length ? 'love' : 'good');
     delete F.pairs; delete F.feast; delete F.wood; delete F.wait;
   }
+}
+
+// ---------- the far isle ----------
+// Beyond the sea haze lies another isle, and a towering midsummer fire can be seen from it. Some years
+// a dugout paddles over: the guests dance, feast, sleep by the fire, trade hides for grain and leave at
+// first light. An islander with nobody to marry at home may be pledged to one of them, who stays.
+// Once the island is crowded, a restless single islander may sail away with them instead.
+function landing(w) {
+  // the beach nearest the hearth, the water off it, and a spot well out to sea straight beyond
+  let bi = -1, bd = 1e9;
+  for (const i of w.shore || []) { const dd = d2(i % MAP, (i / MAP) | 0, w.fire.x, w.fire.y); if (dd < bd) { bd = dd; bi = i; } }
+  if (bi < 0) return null;
+  const bx = bi % MAP, by = (bi / MAP) | 0;
+  const off = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([a, b]) => tile(w, bx + a, by + b) === T.WATER);
+  if (!off) return null;
+  let sx = bx + off[0], sy = by + off[1];
+  for (let k = 0; k < ISLE_OUT && inMap(sx + off[0], sy + off[1]) && tile(w, sx + off[0], sy + off[1]) === T.WATER; k++) { sx += off[0]; sy += off[1]; }
+  return { bx, by, lx: bx + off[0], ly: by + off[1], sx, sy };
+}
+function boatComes(w, c) {
+  if (c.year < ISLE_YEAR || Math.min(FEST_WOOD, Math.floor(w.timber / 4)) < 6 || (w.isle && w.isle.boat)) return; // only a towering fire is seen
+  if (rnd(w) >= (w.isle ? ISLE_COME : ISLE_SEEN)) return;
+  const L = landing(w);
+  if (!L) return;
+  w.isle ||= { n: 0, wed: 0, gone: 0, hides: 0, grain: 0, boat: null };
+  const gs = [], n = 2 + ri(w, 3);
+  for (let i = 0; i < n; i++) {
+    gs.push({ nm: makeName(w), sex: rnd(w) < 0.5 ? 'f' : 'm', a: 18 + ri(w, 20), x: L.sx + 0.5, y: L.sy + 0.5, px: L.sx + 0.5, py: L.sy + 0.5, k: 'boat' });
+  }
+  w.isle.boat = { ...L, x: L.sx + 0.5, y: L.sy + 0.5, px: L.sx + 0.5, py: L.sy + 0.5, st: 'in', d: c.day, gs };
+}
+// nobody on the island they could marry
+function alone(w, p) {
+  if (p.sex === 'f') return !mate(w, p);
+  const a = ageY(w, p);
+  return !w.people.some((f) => !f.dead && f.sex === 'f' && f.partner == null && ageY(w, f) >= 17 &&
+    Math.abs(ageY(w, f) - a) < 14 && !sibling(f, p) && f.mother !== p.id && p.mother !== f.id);
+}
+// late in the dance: one guest may be pledged to an islander who had nobody, and stays
+function isleWed(w) {
+  const B = w.isle.boat;
+  if (B.st !== 'ashore' || B.wed) return;
+  for (const g of B.gs) {
+    if (g.k !== 'fest') continue;
+    const p = w.people.find((o) => !o.dead && o.sex !== g.sex && o.partner == null && ageY(w, o) >= 17 && ageY(w, o) <= 45 &&
+      Math.abs(ageY(w, o) - g.a) < 14 && alone(w, o));
+    if (!p || rnd(w) >= ISLE_WED) continue;
+    const q = addPerson(w, g.sex, g.a, null, null, null);
+    q.name = g.nm; q.x = q.px = g.x; q.y = q.py = g.y;
+    q.partner = p.id; p.partner = q.id;
+    (p.sex === 'f' ? p : q).wants = true;
+    B.gs.splice(B.gs.indexOf(g), 1);
+    B.wed = `${g.nm} of the far isle is pledged to ${p.name} and will stay on ${w.name}`;
+    w.isle.wed++;
+    return;
+  }
+}
+// the feast: the guests trade, and the evening's tale gains a line
+function isleFeast(w) {
+  const B = w.isle.boat, I = w.isle, pop = w.people.length;
+  if (B.st !== 'ashore') return ' Out on the dark water a boat is still paddling toward the fire.';
+  const n = B.gs.length + (B.wed ? 1 : 0);
+  let text = ` ${n === 2 ? 'Two' : n === 3 ? 'Three' : n === 4 ? 'Four' : n} guests from the far isle dance with them.`;
+  const take = Math.max(0, Math.min(ISLE_TRADE, Math.floor(w.food - pop * 400)));
+  const give = take >= 50 ? 1 + ri(w, 3) : 0;
+  if (give) {
+    w.food = Math.round((w.food - take) * 100) / 100; w.hides = (w.hides || 0) + give;
+    I.grain += take; I.hides += give;
+    text += ` They trade ${plural(give, 'hide', 'hides')} for ${take} grain.`;
+  }
+  if (B.wed) text += ` ${B.wed}.`;
+  return text;
+}
+function boatLands(w, B) {
+  const I = w.isle;
+  I.n++;
+  B.gs.forEach((g, k) => { // up the beach to wait by the hearth until the fire is lit
+    g.x = B.bx + 0.5; g.y = B.by + 0.5;
+    g.tx = w.fire.x + 0.5 + (k % 3) - 1; g.ty = w.fire.y + 2.5 + (k >> 1) * 0.5;
+    g.k = 'walk';
+  });
+  if (w.techs.includes('farisle')) return;
+  w.techs.push('farisle');
+  const who = elder(w), n = B.gs.length;
+  milestone(w, `On midsummer day ${who ? who.name : 'a child'} sees a dugout come in over the sea with ${n} strangers at the paddles. ` +
+    `They come from an isle beyond the haze, where the midsummer fires of ${w.name} have been seen. Their words are strange, but they have come for the dance. ${w.name} is not alone in the sea.`);
+}
+// the boat that leaves at first light: perhaps with an islander aboard, perhaps leaving a fever behind
+function boatLeaves(w, B) {
+  B.st = 'out';
+  for (const g of B.gs) { g.x = B.x; g.y = B.y; g.k = 'boat'; }
+  const I = w.isle, pop = w.people.length;
+  if (pop >= ISLE_CROWD) {
+    const p = w.people.find((o) => !o.dead && o.partner == null && !o.sick && !o.hurt && ageY(w, o) >= 17 && ageY(w, o) <= 30 && alone(w, o) &&
+      !(w.heal && w.heal.id === o.id) && !(w.horn && w.horn.hid === o.id) && !(w.goats && w.goats.hid === o.id) && !(w.lost && w.lost.cur && w.lost.cur.id === o.id) &&
+      !w.people.some((k) => !k.dead && (k.mother === o.id || k.father === o.id) && ageY(w, k) < 14));
+    if (p && rnd(w) < ISLE_LEAVE) {
+      release(w, p); p.dead = true; I.gone++;
+      B.gs.push({ nm: p.name, sex: p.sex, a: Math.floor(ageY(w, p)), x: B.x, y: B.y, px: p.x, py: p.y, k: 'boat', isl: 1 });
+      if (I.gone === 1) milestone(w, `At first light the guests push off for the far isle, and ${p.name} goes with them. Nobody on ${w.name} was left for ${p.sex === 'f' ? 'her' : 'him'} to marry. The first islander to leave ${w.name} waves from the boat until it is gone into the haze.`);
+      else log(w, `${p.name} sails away with the guests to the far isle.`, 'info');
+    }
+  }
+  if (w.fever && rnd(w) < ISLE_FEVER) {
+    const sick = w.people.filter((o) => !o.dead && !o.sick && !(o.imm > w.t));
+    if (sick.length) {
+      const p = sick[ri(w, sick.length)];
+      fall(w, p, null);
+      if (w.fever.n === 1) feverBegins(w, p, `The boat from the far isle is hardly out of sight when ${p.name} begins to shiver.`);
+    }
+  }
+}
+function isleHour(w, c) {
+  const B = w.isle.boat, h = c.hour;
+  B.px = B.x; B.py = B.y;
+  for (const g of B.gs) { g.px = g.x; g.py = g.y; }
+  if (B.st === 'in') {
+    if (moveToward(B, B.lx + 0.5, B.ly + 0.5, BOAT_SPEED)) { B.st = 'ashore'; boatLands(w, B); }
+    else for (const g of B.gs) { g.x = B.x; g.y = B.y; }
+  } else if (B.st === 'ashore') {
+    const fest = w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO;
+    if (c.day > B.d && h >= 6) { // first light: back down to the boat
+      let all = true;
+      for (const g of B.gs) { g.k = 'walk'; if (!moveToward(g, B.bx + 0.5, B.by + 0.5, GUEST_SPEED)) all = false; }
+      if (all) boatLeaves(w, B);
+      return;
+    }
+    for (const g of B.gs) {
+      if (fest && g.r == null) { const s = festSpot(w); g.tx = s.x + 0.5; g.ty = s.y + 0.5; g.r = s.r; } // into the ring, behind the islanders
+      else if (!fest && g.r != null) { // the dance is over: they lie down by the embers
+        g.tx = Math.round(((g.tx + w.fire.x + 0.5) / 2) * 1000) / 1000; g.ty = Math.round(((g.ty + w.fire.y + 0.5) / 2 + 0.6) * 1000) / 1000; delete g.r;
+      }
+      g.k = moveToward(g, g.tx, g.ty, GUEST_SPEED) ?(fest ? 'fest' : c.day === B.d && h < FEST_FROM ? 'wait' : 'sleep') : 'walk';
+    }
+  } else if (moveToward(B, B.sx + 0.5, B.sy + 0.5, BOAT_SPEED)) w.isle.boat = null;
+  else for (const g of B.gs) { g.x = B.x; g.y = B.y; }
 }
 
 // ---------- fences ----------
@@ -2608,6 +2762,10 @@ const MIGRATIONS = {
       w.fauna.fa = seen.size;
     }
   },
+  // v19 -> v20: the far isle. Nobody has come yet; a towering midsummer fire may bring the first boat.
+  19: (w) => {
+    if (w.isle === undefined) w.isle = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -2646,6 +2804,8 @@ export function summary(w) {
     goats: w.goats ? w.goats.herd.length : 0, goatsCame: !!w.goats, goatsLost: w.goats ? w.goats.lost : 0,
     horn: (hornOn(w) && (aliveId(w, w.horn.hid) || {}).name) || null, hornFound: w.horn ? w.horn.f : 0,
     lost: (w.lost && w.lost.cur && (aliveId(w, w.lost.cur.id) || {}).name) || null, lostEver: w.lost ? w.lost.n : 0,
+    isleVisits: w.isle ? w.isle.n : 0, isleWed: w.isle ? w.isle.wed : 0, isleGone: w.isle ? w.isle.gone : 0,
+    guests: w.isle && w.isle.boat ? w.isle.boat.gs.filter((g) => !g.isl).length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

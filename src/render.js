@@ -598,6 +598,7 @@ function frame() {
   if (track && fpos) moveCam(fpos);
   else if (returning) moveCam(null);
   drawRats(hf, now);
+  const guests = drawIsle(frac, now, fest);
   const beasts = drawBeasts(frac, now);
   const goats = drawGoats(frac, now);
   ambience(c, hf, now, 'above');
@@ -666,8 +667,17 @@ function frame() {
     for (const o of beasts) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; beast = o.b; best = null; } }
     let goat = null;
     for (const o of goats) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; goat = o; beast = null; best = null; } }
+    let guest = null;
+    for (const o of guests) { const d = Math.hypot(o.x - mx, o.y - 0.2 - my); if (d < bd) { bd = d; guest = o; goat = null; beast = null; best = null; } }
     const tip = $('tip');
-    if (goat) {
+    if (guest) {
+      const g = guest.g;
+      const what = g.isl ? 'leaving for the far isle' : g.k === 'boat' ? 'at the paddle' : g.k === 'fest' ? 'dancing at the midsummer fire'
+        : g.k === 'sleep' ? 'asleep by the embers' : g.k === 'wait' ? 'waiting by the hearth for the fire' : 'walking';
+      tip.innerHTML = guest.boat ? `<b>Dugout</b><br><span class="m">from the far isle · ${guest.n ? `${guest.n} aboard` : 'pulled up on the beach'}</span>`
+        : `<b>${esc(g.nm)}</b><br>${g.a} yrs · ${what}${g.isl ? '' : '<br><span class="m">guest from the far isle</span>'}`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (goat) {
       const g = goat.g, still = g.x === g.px && g.y === g.py;
       const cx = Math.floor(g.x), cy = Math.floor(g.y), onField = w.tiles[cy * S.MAP + cx] === S.T.FIELD;
       const what = !g.out ? (darkness(hf) > 0.4 ? 'asleep in the pen' : 'shut in the pen') : onField ? 'in the young grain' : still ? 'grazing' : 'trotting after the herd';
@@ -695,8 +705,54 @@ function frame() {
   }
   requestAnimationFrame(frame);
 }
+// ---------- the far isle ----------
+// a dugout, 9x3, and its guests in sea-blue; paddles dip on alternate sides while it moves
+const DUGOUT = ['.bbbbbbb.', 'bBBBBBBBb', '.bbbbbbb.'];
+const DCOLS = { b: '#5a3a22', B: '#8a5a32' };
+const GUEST = '#6fa3c8';
+function drawIsle(frac, now, fest) {
+  const out = [], B = w.isle && w.isle.boat;
+  if (!B) return out;
+  const bx = B.px + (B.x - B.px) * frac, by = B.py + (B.y - B.py) * frac, going = B.x !== B.px || B.y !== B.py;
+  const X = Math.round(bx * TILE) - 4, Y = Math.round(by * TILE) - 1;
+  if (going) px(sc, X - 2, Y + 1, 'rgba(200,220,240,0.35)', 1, 1); // a little wake
+  sprite(sc, DUGOUT, X, Y, DCOLS);
+  const aboard = B.gs.filter((g) => g.k === 'boat');
+  aboard.forEach((g, i) => { // heads and shoulders in a row, paddles dipping
+    const gx = X + 1 + i * 2;
+    px(sc, gx, Y - 2, '#f1c9a5'); px(sc, gx, Y - 1, g.isl ? '#d9d9d9' : GUEST);
+    if (going && (Math.floor(now / 300) + i) % 2) px(sc, gx + 1, Y + 1 + ((i & 1) ? -2 : 2), '#b49a6a', 1, 2);
+  });
+  out.push({ g: {}, boat: true, n: aboard.length, x: bx, y: by });
+  const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
+  for (const g of B.gs) {
+    if (g.k === 'boat') continue;
+    let x = g.px + (g.x - g.px) * frac, y = g.py + (g.y - g.py) * frac;
+    const moving = g.x !== g.px || g.y !== g.py, h = S.hash(g.nm.length, g.a, 7) * 10;
+    if (g.k === 'sleep' && !moving) { // rolled in a cloak by the embers
+      const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE);
+      px(sc, GX - 1, GY, '#f1c9a5'); px(sc, GX, GY, GUEST, 4, 1); px(sc, GX + 1, GY - 1, '#4f7fa0', 2, 1);
+      out.push({ g, x, y });
+      continue;
+    }
+    let hop = 0;
+    if (fest && g.k === 'fest' && !moving) { // the ring turns, and the guests turn with it
+      const dx = x - fcx, dy = y - fcy, r = Math.hypot(dx, dy) || 1;
+      const a = Math.atan2(dy, dx) + ((g.r || 0) % 2 ? -1 : 1) * (now / (2400 * r));
+      x = fcx + Math.cos(a) * r; y = fcy + Math.sin(a) * r;
+      hop = Math.floor(now / 240 + h) % 2;
+    }
+    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3 - hop;
+    const step = moving || hop ? Math.floor(now / 180 + h) % 2 : 0;
+    px(sc, GX + 1, GY, '#f1c9a5'); px(sc, GX, GY + 1, GUEST, 3, 2); px(sc, GX + 1, GY + 1, '#4f7fa0', 1, 1); // a shell bead on the breast
+    px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
+    px(sc, GX + 1, GY - 1, '#e9dcc0'); // and a white feather in the hair
+    out.push({ g, x, y });
+  }
+  return out;
+}
 // ---------- midsummer ----------
-const CROWN = ['#f28ab0', '#f7d34a', '#ffffff', '#b98af0', '#f28ab0'];
+const CROWN =['#f28ab0', '#f7d34a', '#ffffff', '#b98af0', '#f28ab0'];
 function festNow(c) { return !!(w.fest && w.fest.on === c.day && c.hour >= 16 && c.hour < 23); }
 // the midsummer bonfire: a stack of logs, tall flickering flames and sparks drifting up into the dark
 function bonfire(X, Y, now) {
@@ -906,6 +962,7 @@ function updatePanels() {
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}</span>`]] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
+    ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');

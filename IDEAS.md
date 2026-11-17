@@ -194,3 +194,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The keeper is the oldest islander: an elder role with its own name on the card ("keeper of the horn"), handed on at death.
   - Wolves learn the horn means people: a bold wolf could come right up to the sound on a hungry winter fog day.
   - A History count of horn days per year.
+- The far isle is done (SIM_VERSION 20; tech 'farisle', w.isle {n, wed, gone, hides, grain, boat {bx,by beach, lx,ly landing, sx,sy offshore,
+  st in|ashore|out, d day, gs [{nm, sex, a, x, y, k boat|walk|wait|fest|sleep, r ring, isl}]}}; ISLE_* / BOAT_SPEED / GUEST_SPEED in sim.js;
+  boatComes/isleWed/isleFeast/boatLands/boatLeaves/isleHour; drawIsle() in render.js). Guests are not in w.people; a guest who weds is
+  made a real person. Test seeds: first visit Y4-6, a wedding every few visits, first islander leaves ~Y13-38. Answers it invites:
+  - Seafaring: the islanders learn to build their own dugout from the guests (a beached boat to copy), then fish deeper water or row over.
+  - Trade goods beyond hides: flint, seed of a new crop, a cat for the rats, a dog for the fog, salt for curing fish.
+  - Visits outside midsummer: a boat blown in by a storm, or a guest who comes back the next year to see their kin.
+  - Rivalry: a thin year on the far isle could send a raiding boat for the granaries instead of dancers.
+  - The landing beach is the shore tile nearest the hearth; a landing stage or a beacon there would give it a place on the map.

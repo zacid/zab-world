@@ -108,5 +108,10 @@
   "at": "2026-11-17T22:00:58.014Z",
   "title": "Add a fog horn blown at the hearth on fog days",
   "body": "- SIM_VERSION 19 (w.horn, fauna.fa): the first fog morning after a wolf attack out of the fog (or a lost child) teaches the Fog horn tech\n- On fog days 06:00-21:00, and all night during a search, the oldest able adult stands at the hearth and blows a whelk shell\n- Within 13 tiles of the hearth nobody counts as alone in fog, so wolves pick only those working farther out; someone lost may follow the sound home\n- Visible: keeper raises the shell, thin white sound rings roll out over the fog, Horn row in the panel, \"blowing the fog horn\" on the life card\n- Watch: Hais already lost Saaris to fog wolves, so it learns the horn on its next fog morning; fog attacks deep in the woods still happen"
+ },
+ {
+  "at": "2026-11-17T22:43:32.413Z",
+  "title": "Add a far isle whose boat comes to the midsummer fire",
+  "body": "- SIM_VERSION 20 (w.isle {n visits, wed, gone, hides, grain, boat}): from year 3, on midsummer day with a towering fire, a dugout with 2-4 guests may paddle in (50% the first time, 40% after); the first landing teaches the Far isle tech\n- Guests wait by the hearth, dance in the outer ring, trade 1-3 hides for up to 300 spare grain, sleep by the embers and leave at first light\n- A single islander with nobody to marry at home may be pledged to a guest, who stays (fixes Hais, where two single women have no match); once 30+ live there a lonely young islander may sail away with them, and 8% of visits leave a fever\n- Visible: dugout with paddles and wake, sea-blue guests with a white feather, Far isle panel row, hover tips; also fix \"A week of rain end\" style lines\n- Watch: Hais has timber for a towering fire, so a boat may come this midsummer (Y4 summer day 46)"
  }
 ]
