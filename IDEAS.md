@@ -185,3 +185,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A dog (see terriers/guard dogs) that finds the lost by scent in an hour or two.
   - The finder's name could be remembered on the follow card ("found little Emser in the fog of year 4").
   - Whole-village searches pull every adult off work; late game (200+ people) a search party of ~10 would be enough.
+- Fog horn is done (SIM_VERSION 19; tech 'foghorn', w.horn {hid keeper, f lost ones who walked home to it, d fog days blown},
+  fauna.fa fog attacks ever, lost.cur.hh heard the horn; HORN_* in sim.js; hornOn() exported; task kind 'horn'; hornRings() in render.js).
+  Test seeds learn it in Y1-2. Fog wolf deaths stay ~1-6 per century (woodcutters and hunters work past the 13-tile earshot);
+  only 1-2 lost ones per century reach the hearth by the horn because searchers usually meet them first. Answers it invites:
+  - Woodcutters go out in pairs on fog days, or stay inside earshot (the remaining fog deaths are all far out).
+  - A horn on the beach for boats coming home in fog (once there are boats).
+  - The keeper is the oldest islander: an elder role with its own name on the card ("keeper of the horn"), handed on at death.
+  - Wolves learn the horn means people: a bold wolf could come right up to the sound on a hungry winter fog day.
+  - A History count of horn days per year.

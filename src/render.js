@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e' };
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
@@ -97,6 +97,7 @@ function doing(p) {
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   if (p.task && p.task.k === 'herd') return 'minding the goats';
   if (p.task && p.task.k === 'lost') return 'lost in the fog';
+  if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
   if (p.task && p.task.k === 'search') { const o = w.lost && w.lost.cur && w.people.find((q) => q.id === w.lost.cur.id); return o ? `searching for ${o.name}` : 'searching the fog'; }
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
@@ -514,6 +515,7 @@ function frame() {
   else { px(sc, fx0 + 3, fy0 + 3, '#f0742b', 2, 3); px(sc, fx0 + 3 + (fl === 1 ? 1 : 0), fy0 + 2 - (fl === 2 ? 1 : 0), '#ffc23d', 1, 2); px(sc, fx0 + 4 - (fl === 0 ? 1 : 0), fy0 + 4, '#ffe48a', 1, 1); }
   // people
   const shown = [];
+  let horner = null;
   const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
   for (const p of w.people) {
     if (p.asleep) continue;
@@ -575,6 +577,10 @@ function frame() {
       const fl = Math.floor(now / 160 + p.id) % 3;
       px(sc, X + 3, Y - 1, '#8a5a32', 1, 3); px(sc, X + 3, Y - 2, fl ? '#ffb43c' : '#ffe48a'); if (fl === 2) px(sc, X + 3, Y - 3, '#f0742b');
     }
+    if (p.task && p.task.k === 'horn' && age >= 14) { // the whelk shell: raised to the lips when blown, else at the hip
+      if (!moving && hornBlast(now) >= 0) { px(sc, X + 2, Y, '#e9dcc0', 2, 1); px(sc, X + 4, Y - 1, '#d8c39a', 1, 2); horner = { x, y }; }
+      else { px(sc, X + 3, Y + 2, '#e9dcc0', 1, 1); px(sc, X + 3, Y + 1, '#d8c39a', 1, 1); }
+    }
     if (p.task && p.task.k === 'lost' && !moving && Math.floor(now / 900 + p.id) % 2) px(sc, X - 1, Y + 3, '#f4f4f4', 5, 1); // sat down, arms round the knees
     shown.push({ p, x, y });
   }
@@ -599,6 +605,7 @@ function frame() {
   const wx = wxNow();
   const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)', fog: 'rgba(190,198,204,0.30)' }[wx];
   if (tint) { sc.fillStyle = tint; sc.fillRect(0, 0, PX, PX); }
+  if (horner) hornRings(horner, now);
   // night
   if (dark > 0) {
     sc.fillStyle = `rgba(6,10,28,${dark.toFixed(3)})`; sc.fillRect(0, 0, PX, PX);
@@ -858,6 +865,22 @@ function drawRats(hf, now) {
   }
 }
 
+// the fog horn is blown for a long breath every few seconds: ms into the blast, or -1 between blasts
+const HORN_EVERY = 5200, HORN_LONG = 1800;
+const hornBlast = (now) => { const t = now % HORN_EVERY; return t < HORN_LONG ? t : -1; };
+// thin rings of sound roll out from the hearth over the fog and fade at the edge of earshot (13 tiles)
+function hornRings(at, now) {
+  const t = now % HORN_EVERY, reach = 13 * TILE, cx = at.x * TILE + 3.5, cy = at.y * TILE - 3.5;
+  sc.lineWidth = 1;
+  for (let k = 0; k < 3; k++) {
+    const age = t - k * 420;
+    if (age < 0) continue;
+    const f = age / (HORN_EVERY - 600);
+    if (f >= 1) continue;
+    sc.strokeStyle = `rgba(255,255,255,${(0.42 * (1 - f) * (1 - f)).toFixed(3)})`;
+    sc.beginPath(); sc.arc(cx, cy, 2 + f * reach, 0, Math.PI * 2); sc.stroke();
+  }
+}
 function glow(c, x, y, r, col) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -882,6 +905,7 @@ function updatePanels() {
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}</span>`]] : []),
+    ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');

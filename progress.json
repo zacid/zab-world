@@ -103,5 +103,10 @@
   "at": "2026-11-17T21:32:27.991Z",
   "title": "Add lost-in-the-fog searches with torches at night",
   "body": "- SIM_VERSION 18 (w.lost): on a fog day a child of 3-10 or an islander over 72 can wander off 8-15 tiles from the hearth\n- After 2 hours they are missed; every able adult goes searching in a ring that closes in, carrying torches through the night\n- Lost children can be targeted by wolves, and a winter night out can kill; when the fog lifts they see the hearth smoke and walk home\n- Visible: torches and their glow on searchers, a lost child sitting hunched, \"X lost in the fog\" in the People row, searches in History\n- Watch: Hais gets ~20 fog days a year, so expect the first search within a few years; test seeds see ~25 per century"
+ },
+ {
+  "at": "2026-11-17T22:00:58.014Z",
+  "title": "Add a fog horn blown at the hearth on fog days",
+  "body": "- SIM_VERSION 19 (w.horn, fauna.fa): the first fog morning after a wolf attack out of the fog (or a lost child) teaches the Fog horn tech\n- On fog days 06:00-21:00, and all night during a search, the oldest able adult stands at the hearth and blows a whelk shell\n- Within 13 tiles of the hearth nobody counts as alone in fog, so wolves pick only those working farther out; someone lost may follow the sound home\n- Visible: keeper raises the shell, thin white sound rings roll out over the fog, Horn row in the panel, \"blowing the fog horn\" on the life card\n- Watch: Hais already lost Saaris to fog wolves, so it learns the horn on its next fog morning; fog attacks deep in the woods still happen"
  }
 ]
