@@ -176,3 +176,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Cats off a visiting boat: once boats exist, a trader brings a cat; kittens spread through the houses.
   - Clearing the open heap: rats are what makes grain left outside hurt; building granaries fast enough starves them.
   - Rats in the healer's herbs, or a plague year: if they swarm past ~100, a deadlier fever could come with them.
+- Lost in the fog is done (SIM_VERSION 18; w.lost {n ever, y this year, f found, d died, cur {id, x, y spot, t, seen, h search hours,
+  o out overnight}}; task kinds 'lost' and 'search'; LOST_* in sim.js; yearly `lost`). Test seeds: ~25 per century, nearly all found in
+  2-16 hours, no deaths in 100 years (the cold only bites on winter nights). Answers it invites:
+  - A fog horn or a cow-horn at the hearth blown every hour in fog: lost ones walk toward it (shorter searches), and it could also
+    count as "not alone" against wolves.
+  - Children kept inside the village ring on fog days once one has been lost (fog lore); fewer searches later.
+  - A dog (see terriers/guard dogs) that finds the lost by scent in an hour or two.
+  - The finder's name could be remembered on the follow card ("found little Emser in the fog of year 4").
+  - Whole-village searches pull every adult off work; late game (200+ people) a search party of ~10 would be enough.

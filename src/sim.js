@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 17;
+export const SIM_VERSION = 18;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -75,6 +75,14 @@ const WX_GROW = { clear: 1, rain: 1.25, storm: 1, heat: 0.4, cold: 0.5, snow: 0,
 // wolves, hidden in the grey, come out of the trees by day
 const FOG_SPEED = 2;         // tiles per hour off a path in fog (a path is still PATH_SPEED)
 const FOG_BOLD = 0.5;        // share of its dusk boldness a wolf has by day in fog
+// lost in the fog: a small child or a very old islander wanders off into the grey and the village goes out searching
+const LOST_ODDS = 0.002;   // chance per fog hour (09:00-15:00) that someone strays
+const LOST_NOTICE = 2;       // hours before anyone misses them
+const LOST_WALK = 1;         // tiles per hour, wandering off blind
+const LOST_HEAR = 6.25;      // a searcher this close (squared) hears them answer in the fog
+const LOST_SEE = 25;         // and this close once the fog has lifted
+const LOST_COLD = 0.06;     // chance per winter night hour out in the open that the cold takes them
+const LOST_MAX = 40;         // hours before they stumble home on their own
 const STORM_FLATTEN = 0.03;  // chance per storm day that a tall or ripe field is flattened
 const STORM_ROOF = 0.15;    // chance per storm day that one building loses its roof
 
@@ -300,7 +308,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null },
   };
   // name the island
   let nm = '';
@@ -445,6 +453,7 @@ export function step(w, fx) {
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
+  if (w.lost) lostHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
@@ -487,7 +496,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl } : {}), ...(w.lost ? { lost: w.lost.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -500,6 +509,7 @@ function daily(w, c, fx) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
       w.rats.y = 0;
     }
+    if (w.lost) w.lost.y = 0;
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
     for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
@@ -896,7 +906,7 @@ function lone(w, b) {
   for (const p of w.people) {
     if (p.dead || p.asleep) continue;
     const dd = d2(p.x, p.y, b.x, b.y);
-    if (dd >= bd || ageY(w, p) < 14 || !wild(w, p)) continue;
+    if (dd >= bd || (ageY(w, p) < 14 && !isLost(w, p)) || !wild(w, p)) continue;
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
     bd = dd; best = p;
   }
@@ -1708,6 +1718,91 @@ function herdTask(w, p) {
   return { k: 'herd', x: G.at.x, y: G.at.y, h: 99 };
 }
 
+// ---------- lost in the fog ----------
+// On a fog day a small child (or a very old islander) can drift away from the others and lose the village
+// in the grey. When they are missed, every grown islander who can walk goes out calling, in a circle that
+// closes in on where the voice last answered; at night they carry torches. Out alone, the lost one is fair
+// game for a wolf, and a winter night in the open can kill. When the fog lifts they see the hearth smoke.
+const isLost = (w, p) => !!(w.lost && w.lost.cur && w.lost.cur.id === p.id);
+function lostWander(w, p, L) {
+  p.asleep = false;
+  if (!p.task || p.task.k !== 'lost') { release(w, p); p.task = { k: 'lost', x: L.x, y: L.y, h: 99 }; }
+  moveToward(p, L.x + 0.5, L.y + 0.5, LOST_WALK);
+}
+function searchSpot(w, p, L) {
+  const R = Math.max(2, 10 - (L.h >> 1)); // the ring of searchers draws in as the hours pass
+  for (let k = 0; k < 6; k++) {
+    const x = L.x + ri(w, R * 2 + 1) - R, y = L.y + ri(w, R * 2 + 1) - R;
+    if (tile(w, x, y) !== T.WATER && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) return { k: 'search', x, y, h: 99 };
+  }
+  return { k: 'search', x: L.x, y: L.y, h: 99 };
+}
+function search(w, p, L) {
+  p.asleep = false;
+  if (!p.task || p.task.k !== 'search') { release(w, p); p.task = searchSpot(w, p, L); }
+  if (walk(w, p, p.task.x + 0.5, p.task.y + 0.5)) p.task = searchSpot(w, p, L);
+}
+function strays(w) {
+  const list = w.people.filter((p) => {
+    if (p.dead || p.asleep || p.sick || p.hurt || (p.task && p.task.k === 'fest')) return false;
+    const a = ageY(w, p);
+    return (a >= 3 && a < 11) || a >= 72;
+  });
+  if (!list.length) return;
+  const p = list[ri(w, list.length)];
+  for (let k = 0; k < 12; k++) {
+    const x = w.fire.x + ri(w, 31) - 15, y = w.fire.y + ri(w, 31) - 15, dd = d2(x, y, w.fire.x, w.fire.y), t = tile(w, x, y);
+    if (dd < 64 || dd > 225 || (t !== T.GRASS && t !== T.FOREST) || !lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) continue;
+    release(w, p);
+    const S = w.lost;
+    S.cur = { id: p.id, x, y, t: w.t, seen: 0, h: 0, o: 0 };
+    S.n++; S.y++;
+    return;
+  }
+}
+function lostHour(w, c) {
+  const S = w.lost, L = S.cur, h = c.hour, fog = !!(w.wx && w.wx.k === 'fog');
+  if (!L) { if (fog && h >= 9 && h <= 15 && rnd(w) < LOST_ODDS) strays(w); return; }
+  const p = aliveId(w, L.id);
+  if (!p) { S.cur = null; for (const o of w.people) if (o.task && o.task.k === 'search') release(w, o); return; } // the wolves found them first; the chronicle has it
+  const first = S.n === 1, hn = w.t - L.t, hrs = plural(hn, 'hour', 'hours');
+  const night = h >= 20 || h < 6, obj = p.sex === 'f' ? 'her' : 'him', old = ageY(w, p) >= 14;
+  const who = old ? `Old ${p.name}` : `${p.name}, ${Math.floor(ageY(w, p))},`;
+  if (night && L.seen) L.o = 1;
+  const end = (text, big, k = 'good') => {
+    S.cur = null; release(w, p);
+    for (const o of w.people) if (o.task && o.task.k === 'search') release(w, o);
+    if (big) milestone(w, text); else log(w, text, k);
+  };
+  if (p.hurt) return end(`${p.name} stumbles home out of the grey, bleeding, ${hrs} after ${pron(p)} wandered off.`, false, 'bad');
+  if (!L.seen && hn >= LOST_NOTICE) {
+    L.seen = 1;
+    const text = `${who} has wandered off into the fog and does not answer. All of ${w.name} goes out into the grey, calling ${poss(p)} name.`;
+    if (first) milestone(w, text); else log(w, text, 'bad');
+  }
+  if (L.seen) L.h++;
+  const reach = fog ? LOST_HEAR : LOST_SEE;
+  const finder = w.people.find((o) => o !== p && !o.dead && !o.asleep && ageY(w, o) >= 14 && d2(o.x, o.y, p.x, p.y) < reach);
+  const t = tile(w, Math.floor(p.x), Math.floor(p.y));
+  const where = t === T.FOREST ? 'curled up under a tree at the edge of the woods' : old ? 'sitting on a stone, quite lost' : 'huddled in the wet grass';
+  if (finder) {
+    S.f++;
+    if (!L.seen) return end(`${finder.name} comes across ${p.name} ${where}, far from the village, and walks ${obj} home before anyone has missed ${obj}.`, false);
+    return end(`${finder.name} finds ${p.name} ${where}${night ? ' by torchlight' : ''}, ${hrs} after ${pron(p)} wandered off, and brings ${obj} home.` +
+      (L.o ? ` Nobody on ${w.name} slept that night.` : ''), first || L.o);
+  }
+  if (c.season === 3 && night && rnd(w) < LOST_COLD) {
+    S.d++;
+    die(w, p, 'died of cold, lost in the fog');
+    end(`The searchers find ${p.name} ${where}, cold and still. The fog came down too thick, and the night was too long.`, true);
+    return;
+  }
+  if ((!fog && !night) || hn >= LOST_MAX) {
+    S.f++;
+    end(`${fog ? 'Through a thin place in the fog' : 'The fog lifts, and'} ${p.name} sees the smoke of the hearth and walks home alone, ${hrs} after ${pron(p)} wandered off.`, first || L.o);
+  }
+}
+
 // ---------- the burying ground ----------
 // At the first death the village walls off a quiet patch of ground nearby. Every grave has a place in
 // rows inside the wall; the morning after a death the family stands at the graveside. When the rows
@@ -2154,6 +2249,11 @@ function moveToward(p, tx, ty, sp = SPEED) {
 
 function act(w, p, c, fx) {
   const a = ageY(w, p), h = c.hour;
+  if (w.lost && w.lost.cur) { // someone is out in the fog: they wander, and everyone able goes looking
+    const L = w.lost.cur;
+    if (p.id === L.id) { lostWander(w, p, L); return; }
+    if (L.seen && a >= 14 && a < 65 && !p.sick && !p.hurt) { search(w, p, L); return; }
+  }
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
   const night = h >= 21 || h < (afraid ? 7 : 6);
@@ -2197,7 +2297,7 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -2423,6 +2523,10 @@ const MIGRATIONS = {
   16: (w) => {
     if (w.goats === undefined) w.goats = null;
   },
+  // v17 -> v18: lost in the fog. Nobody has strayed yet; the first fog day that takes someone is told in the chronicle.
+  17: (w) => {
+    if (!w.lost) w.lost = { n: 0, y: 0, f: 0, d: 0, cur: null };
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -2459,6 +2563,7 @@ export function summary(w) {
     herbs: w.heal ? w.heal.s : 0, healer: (w.heal && w.heal.id != null && w.heal.nm) || null, tended: (w.heal && w.heal.n) || 0,
     rats: w.rats ? w.rats.n : 0, ratsAte: w.rats ? Math.round(w.rats.y) : 0, ratsCame: !!w.rats,
     goats: w.goats ? w.goats.herd.length : 0, goatsCame: !!w.goats, goatsLost: w.goats ? w.goats.lost : 0,
+    lost: (w.lost && w.lost.cur && (aliveId(w, w.lost.cur.id) || {}).name) || null, lostEver: w.lost ? w.lost.n : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

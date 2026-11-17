@@ -96,6 +96,8 @@ function doing(p) {
   if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   if (p.task && p.task.k === 'herd') return 'minding the goats';
+  if (p.task && p.task.k === 'lost') return 'lost in the fog';
+  if (p.task && p.task.k === 'search') { const o = w.lost && w.lost.cur && w.people.find((q) => q.id === w.lost.cur.id); return o ? `searching for ${o.name}` : 'searching the fog'; }
   return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
@@ -569,6 +571,11 @@ function frame() {
       px(sc, X + 3, top, '#9a7a4e', 1, Y + 4 - top); px(sc, X + 4, top, '#9a7a4e'); px(sc, X + 4, top + 1, '#9a7a4e');
     }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
+    if (p.task && p.task.k === 'search') { // a pitch torch held high, flickering
+      const fl = Math.floor(now / 160 + p.id) % 3;
+      px(sc, X + 3, Y - 1, '#8a5a32', 1, 3); px(sc, X + 3, Y - 2, fl ? '#ffb43c' : '#ffe48a'); if (fl === 2) px(sc, X + 3, Y - 3, '#f0742b');
+    }
+    if (p.task && p.task.k === 'lost' && !moving && Math.floor(now / 900 + p.id) % 2) px(sc, X - 1, Y + 3, '#f4f4f4', 5, 1); // sat down, arms round the knees
     shown.push({ p, x, y });
   }
   lastShown = shown;
@@ -601,6 +608,9 @@ function frame() {
       if (!lit) continue;
       px(sc, b.x * TILE + 2, b.y * TILE + 5, '#ffcf6a'); px(sc, b.x * TILE + 5, b.y * TILE + 5, '#ffcf6a');
       glow(sc, b.x * TILE + 4, b.y * TILE + 5, 7, `rgba(255,190,90,${(dark * 0.35).toFixed(3)})`);
+    }
+    for (const o of shown) if (o.p.task && o.p.task.k === 'search') { // the searchers' torches bob through the dark
+      glow(sc, o.x * TILE + 2.5, o.y * TILE - 4.5, 6 + (Math.floor(now / 160 + o.p.id) % 3) * 0.6, `rgba(255,170,70,${(dark * 0.55).toFixed(3)})`);
     }
     glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : 0.55)).toFixed(3)})`);
     if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
@@ -861,7 +871,7 @@ function updatePanels() {
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
   $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '');
   $('res').innerHTML = [
-    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '')],
+    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
@@ -939,7 +949,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.lost, 'search in the fog', 'searches in the fog')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

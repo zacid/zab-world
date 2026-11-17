@@ -98,5 +98,10 @@
   "at": "2026-11-17T20:45:00.662Z",
   "title": "Add goats: a raft brings a herd, a pen and a goatherd",
   "body": "- SIM_VERSION 17 (w.goats): some spring or summer day a raft drifts ashore with three goats; a 2x2 wattle pen goes up 5-12 tiles from the hearth and the new Goats tech is logged in the chronicle\n- A child of 7-13 (the eldest adult if none) takes the crook and walks the herd to fresh grass every few hours, 07:00-16:00; the herd stays in on storm, snow and winter cold days\n- Goats eat back saplings near the pen, give milk in spring and summer (0.8 a day each), eat 1.5 spare grain each per winter day, kid in spring, and in autumn the old and any the grass can't carry are killed for meat and hides (herd 3-14)\n- Unminded goats get into unfenced young grain; in fog a wolf may take a goat that strays from the herder (goatsLost in yearly history)\n- Visible: pen with straw and a lean-to, white, brown and black goats that graze head-down, skipping kids, a herder's crook; hover tooltip, Goats panel row, goatherd tag on the life card"
+ },
+ {
+  "at": "2026-11-17T21:32:27.991Z",
+  "title": "Add lost-in-the-fog searches with torches at night",
+  "body": "- SIM_VERSION 18 (w.lost): on a fog day a child of 3-10 or an islander over 72 can wander off 8-15 tiles from the hearth\n- After 2 hours they are missed; every able adult goes searching in a ring that closes in, carrying torches through the night\n- Lost children can be targeted by wolves, and a winter night out can kill; when the fog lifts they see the hearth smoke and walk home\n- Visible: torches and their glow on searchers, a lost child sitting hunched, \"X lost in the fog\" in the People row, searches in History\n- Watch: Hais gets ~20 fog days a year, so expect the first search within a few years; test seeds see ~25 per century"
  }
 ]
