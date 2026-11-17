@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 20;
+export const SIM_VERSION = 21;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -198,6 +198,14 @@ const GOAT_MEAT = 20;
 const GOAT_OLD = 10;         // years before a goat is killed for the pot
 const GOAT_BROWSE = 4;       // saplings this small are eaten back to grass around the pen
 const GOAT_NIBBLE = 0.04;    // growth an unminded goat eats from a young field each hour it stands in it
+const PEN_ODDS = 0.025;      // chance per winter night that a hungry wolf comes to the goat pen
+const PEN_COLD = 2;          // x this on a frost or snow night
+const PEN_DEER = 0.5;        // x this while the pack still has more than three deer to chase
+const PEN_HOLD = 0.35;       // chance the wattle holds until the wolf gives up
+const PEN_WAKE = 0.5;        // chance someone sleeping close by wakes to the goats and runs out with a brand
+const PEN_NEAR = 36;         // a house this close to the pen (squared) is close enough to hear
+const PEN_BITE = 0.15;       // chance the one who runs out is bitten
+const PEN_MEND = 2;          // timber to weave the torn wattle back
 // ---------- footpaths ----------
 // Every step on open grass wears it a little; the grass grows back a little each day. Where people
 // walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
@@ -517,7 +525,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl } : {}), ...(w.lost ? { lost: w.lost.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -880,6 +888,7 @@ function prowl(w, c) {
     learnHunting(w);
     if (F.raids >= FENCE_LEARN) learnFencing(w);
   }
+  if (h === 20 && w.goats) penNight(w, c, wx);
   if (h === 6) { F.raid = 0; F.turned = 0; F.broke = 0; }
 }
 
@@ -888,10 +897,19 @@ function wolf(w, b, active) {
   if (!active) {
     b.prey = null;
     if (b.goat != null) b.goat = null;
+    if (b.pen) b.pen = 0;
     if (b.out && moveBeast(b, (home ? home.x : b.x) + 0.5, (home ? home.y : b.y) + 0.5, WOLF_SPEED)) b.out = 0;
     return;
   }
   if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; edge(w, b); }
+  if (b.pen) { // a hungry winter night: straight for the goat pen, hearth or no hearth
+    if (!w.goats) b.pen = 0;
+    else {
+      const t = penBack(w);
+      if (moveBeast(b, t.x, t.y, WOLF_SPEED)) penRaid(w, b);
+      return;
+    }
+  }
   if (b.goat != null) { // running down a goat that strayed out from the herd
     const g = w.goats && w.goats.herd.find((o) => o.id === b.goat);
     if (!g || !goatOpen(w, g)) { b.goat = null; edge(w, b); }
@@ -1694,7 +1712,7 @@ function goatsCome(w, c) {
     w.timber += w.wood[i]; w.wood[i] = 0;
     setTile(w, i, T.BUILD);
   }
-  w.goats = { pen: { x: s.x, y: s.y }, herd: [], hid: null, at: null, ah: 0, n: 0, lost: 0, eaten: 0, milk: 0, ym: 0, yf: 0, yl: 0, ate: 0, nib: 0 };
+  w.goats = { pen: { x: s.x, y: s.y }, herd: [], hid: null, at: null, ah: 0, n: 0, lost: 0, eaten: 0, milk: 0, ym: 0, yf: 0, yl: 0, ate: 0, nib: 0, pr: 0, pk: 0, yp: 0, gap: 0 };
   for (let k = 0; k < GOAT_FIRST; k++) addGoat(w, land.x + 0.3 + k * 0.3, land.y + 0.5, 2 + ri(w, 3));
   w.techs.push('goats');
   const who = elder(w);
@@ -1741,7 +1759,8 @@ function killGoats(w, list) {
 function goatDay(w, c) {
   if (w.goats === null) { goatsCome(w, c); return; }
   const G = w.goats;
-  if (c.doy === 0) { G.ym = 0; G.yf = 0; G.yl = 0; }
+  if (c.doy === 0) { G.ym = 0; G.yf = 0; G.yl = 0; G.yp = 0; }
+  if (G.gap && w.timber >= PEN_MEND) { w.timber -= PEN_MEND; G.gap = 0; } // the torn wattle is woven back
   pickHerder(w);
   const n = G.herd.length, m = penMid(G);
   // they strip the saplings creeping out onto their grazing
@@ -1822,6 +1841,76 @@ function takeGoat(w, b, g) {
     : 'A wolf darts out of the trees and drags off a goat that wandered from the herd.';
   if (G.lost === 1) milestone(w, `${text} Now the herd has to be watched as closely as the children.`);
   else log(w, text, 'bad');
+}
+// ---------- wolves at the pen ----------
+// In winter the woods go empty. On a hungry night one wolf of the pack stops waiting at the treeline and
+// goes straight for the goat pen, hearth or no hearth, and works at the back wall where the village can't
+// see. The wattle may hold; someone sleeping close by may wake to the goats screaming and run out with a
+// brand; or in the morning there is a hole in the wattle and one goat fewer.
+function penNight(w, c, wx) {
+  const G = w.goats, F = w.fauna;
+  if (c.season !== 3 || G.herd.length < 3 || !F.den || wx === 'storm') return;
+  const pack = w.beasts.filter((b) => b.k === 'wolf');
+  if (pack.length < 2) return;
+  let deer = 0;
+  for (const b of w.beasts) if (b.k === 'deer') deer++;
+  const odds = PEN_ODDS * (wx === 'cold' || wx === 'snow' ? PEN_COLD : 1) * (deer > 3 ? PEN_DEER : 1);
+  if (rnd(w) >= odds) return;
+  const b = pack.find((o) => (o.rest || 0) <= w.t && o.prey == null && o.goat == null);
+  if (b) b.pen = 1;
+}
+// just outside the back wall of the pen, the side away from the hearth
+function penBack(w) {
+  const G = w.goats, m = penMid(G);
+  const dx = m.x - (w.fire.x + 0.5), dy = m.y - (w.fire.y + 0.5);
+  if (Math.abs(dx) > Math.abs(dy)) return { x: dx > 0 ? G.pen.x + PEN_W + 0.4 : G.pen.x - 0.4, y: m.y };
+  return { x: m.x, y: dy > 0 ? G.pen.y + PEN_H + 0.4 : G.pen.y - 0.4 };
+}
+// someone grown and able who sleeps in a house within earshot of the pen
+function penWaker(w) {
+  const m = penMid(w.goats);
+  let best = null, bd = PEN_NEAR;
+  for (const p of w.people) {
+    if (p.dead || p.sick || p.hurt || p.home == null || isLost(w, p)) continue;
+    const a = ageY(w, p);
+    if (a < 14 || a >= 65) continue;
+    const h = w.buildings.find((b) => b.id === p.home);
+    if (!h) continue;
+    const dd = d2(h.x + 0.5, h.y + 0.5, m.x, m.y);
+    if (dd < bd || (dd === bd && best && p.id < best.id)) { bd = dd; best = p; }
+  }
+  return best;
+}
+function penRaid(w, b) {
+  const G = w.goats, F = w.fauna;
+  b.pen = 0; b.rest = w.t + 72; edge(w, b);
+  if (!G.herd.length) return;
+  G.pr = (G.pr || 0) + 1; G.yp = (G.yp || 0) + 1;
+  const first = G.pr === 1, snow = w.wx && w.wx.k === 'snow';
+  const tail = first ? ' The winter woods are empty, and the wolves have found the goat pen.' : '';
+  if (rnd(w) < PEN_HOLD) {
+    const text = 'A wolf comes out of the dark to the goat pen and digs and scrabbles at the wattle half the night. It never gets in, but in the morning the goats will not come out of the lean-to.';
+    if (first) milestone(w, text + tail); else log(w, text, 'info');
+    return;
+  }
+  G.gap = 1;
+  const p = penWaker(w);
+  if (p && rnd(w) < PEN_WAKE) {
+    let text = `In the dead of night the goats scream. ${p.name} runs out with a burning brand from the hearth, and the wolf, already halfway through the wattle, turns and runs.`;
+    if (rnd(w) < PEN_BITE) {
+      p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+      F.att++;
+      text += ` It snaps at ${p.name} on the way past; the bite is deep.`;
+    }
+    if (first) milestone(w, text + tail); else log(w, text, 'bad');
+    return;
+  }
+  const g = G.herd.reduce((a, o) => (o.b > a.b || (o.b === a.b && o.id > a.id) ? o : a)); // the smallest is the easiest to drag
+  const kid = w.t - g.b < TICKS_PER_YEAR;
+  G.herd = G.herd.filter((o) => o !== g);
+  G.lost++; G.yl++; G.pk = (G.pk || 0) + 1;
+  const text = `A wolf tears through the back of the goat pen in the night and drags off ${kid ? 'a kid' : 'a goat'}. Nobody wakes until it is over; in the morning there is a hole in the wattle and a red trail ${snow ? 'across the snow' : 'into the trees'}.`;
+  if (first) milestone(w, text + tail); else log(w, text, 'bad');
 }
 function goatHour(w, c) {
   const G = w.goats, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
@@ -2766,6 +2855,10 @@ const MIGRATIONS = {
   19: (w) => {
     if (w.isle === undefined) w.isle = null;
   },
+  // v20 -> v21: wolves at the goat pen. No winter raid yet; the pen gets counters and a wattle that can be torn.
+  20: (w) => {
+    if (w.goats) for (const k of ['pr', 'pk', 'yp', 'gap']) if (w.goats[k] === undefined) w.goats[k] = 0;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -2801,7 +2894,7 @@ export function summary(w) {
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
     herbs: w.heal ? w.heal.s : 0, healer: (w.heal && w.heal.id != null && w.heal.nm) || null, tended: (w.heal && w.heal.n) || 0,
     rats: w.rats ? w.rats.n : 0, ratsAte: w.rats ? Math.round(w.rats.y) : 0, ratsCame: !!w.rats,
-    goats: w.goats ? w.goats.herd.length : 0, goatsCame: !!w.goats, goatsLost: w.goats ? w.goats.lost : 0,
+    goats: w.goats ? w.goats.herd.length : 0, goatsCame: !!w.goats, goatsLost: w.goats ? w.goats.lost : 0, penRaids: w.goats ? w.goats.pr || 0 : 0, penTaken: w.goats ? w.goats.pk || 0 : 0, penYear: w.goats ? w.goats.yp || 0 : 0,
     horn: (hornOn(w) && (aliveId(w, w.horn.hid) || {}).name) || null, hornFound: w.horn ? w.horn.f : 0,
     lost: (w.lost && w.lost.cur && (aliveId(w, w.lost.cur.id) || {}).name) || null, lostEver: w.lost ? w.lost.n : 0,
     isleVisits: w.isle ? w.isle.n : 0, isleWed: w.isle ? w.isle.wed : 0, isleGone: w.isle ? w.isle.gone : 0,

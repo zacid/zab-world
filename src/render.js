@@ -368,15 +368,22 @@ function drawPen(pal) {
   if (back === 's') px(tc, X0 + 2, Y0 + H - 4, roof, W - 4, 3);
   if (back === 'w') px(tc, X0 + 1, Y0 + 2, roof, 3, H - 4);
   if (back === 'e') px(tc, X0 + W - 4, Y0 + 2, roof, 3, H - 4);
+  // a wolf tore through the back wall: a ragged hole until someone weaves it back
+  const torn = (side, k, n) => G.gap && back === side && k >= n / 2 - 3 && k < n / 2 + 2;
   for (let k = 0; k < W; k++) {
     const gap = k >= W / 2 - 2 && k < W / 2 + 2;
-    if (!(gate === 'n' && gap)) px(tc, X0 + k, Y0, k % 4 === 0 ? stake : rod);
-    if (!(gate === 's' && gap)) px(tc, X0 + k, Y0 + H - 1, k % 4 === 0 ? stake : rod);
+    if (!(gate === 'n' && gap) && !torn('n', k, W)) px(tc, X0 + k, Y0, k % 4 === 0 ? stake : rod);
+    if (!(gate === 's' && gap) && !torn('s', k, W)) px(tc, X0 + k, Y0 + H - 1, k % 4 === 0 ? stake : rod);
   }
   for (let k = 0; k < H; k++) {
     const gap = k >= H / 2 - 2 && k < H / 2 + 2;
-    if (!(gate === 'w' && gap)) px(tc, X0, Y0 + k, k % 4 === 0 ? stake : rod);
-    if (!(gate === 'e' && gap)) px(tc, X0 + W - 1, Y0 + k, k % 4 === 0 ? stake : rod);
+    if (!(gate === 'w' && gap) && !torn('w', k, H)) px(tc, X0, Y0 + k, k % 4 === 0 ? stake : rod);
+    if (!(gate === 'e' && gap) && !torn('e', k, H)) px(tc, X0 + W - 1, Y0 + k, k % 4 === 0 ? stake : rod);
+  }
+  if (G.gap) { // snapped rods splayed out from the hole
+    const bx = back === 'w' ? X0 - 1 : back === 'e' ? X0 + W : X0 + W / 2 - 1;
+    const by = back === 'n' ? Y0 - 1 : back === 's' ? Y0 + H : Y0 + H / 2 - 1;
+    px(tc, bx, by, rod); px(tc, bx + (back === 'n' || back === 's' ? 2 : 0), by + (back === 'w' || back === 'e' ? 2 : 0), rod);
   }
 }
 function graveAt(mx, my) {
@@ -960,7 +967,7 @@ function updatePanels() {
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
-    ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}</span>`]] : []),
+    ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
@@ -1030,7 +1037,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.lost, 'search in the fog', 'searches in the fog')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

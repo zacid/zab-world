@@ -203,3 +203,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Visits outside midsummer: a boat blown in by a storm, or a guest who comes back the next year to see their kin.
   - Rivalry: a thin year on the far isle could send a raiding boat for the granaries instead of dancers.
   - The landing beach is the shore tile nearest the hearth; a landing stage or a beacon there would give it a place on the map.
+- Wolves at the pen are done, as a problem only (SIM_VERSION 21; goats.pr raids ever, pk taken, yp this year, gap torn wattle; penNight/penBack/
+  penWaker/penRaid in sim.js, PEN_* constants; yearly `pens`; b.pen on the raiding wolf). Test seeds: ~3 pen nights and ~1 goat taken per winter.
+  Nobody has an answer yet. Answers it invites:
+  - A thorn-brush or blackthorn hedge around the pen (PEN_HOLD up to ~0.9), learned after the first goat taken from the pen.
+  - A dog: a tamed wolf cub or a dog off the far isle's boat sleeps by the pen and barks (PEN_WAKE to ~1); also useful in fog and for the lost.
+  - A watch fire or the herder sleeping in the lean-to on frost nights (costs a worker and wood; risk of a bite).
+  - Bring the herd inside the houses in the worst cold (goats in the byre end of a longhouse).
+  - Hunters track the raider back to the den after a pen night (a winter wolf hunt).
