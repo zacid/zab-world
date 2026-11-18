@@ -630,7 +630,7 @@ function frame() {
   if (track && fpos) moveCam(fpos);
   else if (returning) moveCam(null);
   drawRats(hf, now);
-  const guests = drawIsle(frac, now, fest);
+  const guests = drawIsle(frac, now, fest).concat(drawRaid(frac, now));
   const beasts = drawBeasts(frac, now);
   const goats = drawGoats(frac, now);
   const dogs = drawDogs(frac, now);
@@ -653,6 +653,7 @@ function frame() {
     for (const o of shown) if (o.p.task && o.p.task.k === 'search') { // the searchers' torches bob through the dark
       glow(sc, o.x * TILE + 2.5, o.y * TILE - 4.5, 6 + (Math.floor(now / 160 + o.p.id) % 3) * 0.6, `rgba(255,170,70,${(dark * 0.55).toFixed(3)})`);
     }
+    for (const o of guests) if (o.chase) glow(sc, o.x * TILE + 2.5, o.y * TILE - 4.5, 7 + (Math.floor(now / 140 + o.g.id) % 3) * 0.7, `rgba(255,160,60,${(dark * 0.6).toFixed(3)})`);
     glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : tale ? 32 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : tale ? 0.65 : 0.55)).toFixed(3)})`);
     if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
@@ -710,6 +711,13 @@ function frame() {
       const yrs = Math.floor((w.t - d.b) / S.TICKS_PER_YEAR);
       const what = dog.pup ? (o ? `tumbling after ${esc(o.name)}` : 'tumbling about the hearth') : !o ? 'lying by the hearth' : d.lie ? `asleep across ${esc(o.name)}'s doorway` : `at ${esc(o.name)}'s heels`;
       tip.innerHTML = `<b>${esc(d.nm)}</b><br>${dog.pup ? 'pup' : `dog · ${yrs} yrs`} · ${what}`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (guest && guest.raid) {
+      const g = guest.g, C = w.raid.cur;
+      const what = guest.chase ? 'running after the raiders with a brand' : g.k === 'run' ? 'running for the boat' : g.k === 'back' ? 'creeping back to the boat with a sack of grain'
+        : g.k === 'wait' ? 'crouched at the granary door' : 'creeping up from the beach';
+      tip.innerHTML = guest.boat ? `<b>Dugout</b><br><span class="m">from the far isle · come by night${guest.n ? ` · ${guest.n} aboard` : ' · pulled up on the beach'}${C && C.take ? ` · ${C.take} grain` : ''}</span>`
+        : guest.chase ? `<b>${esc(g.nm)}</b><br>${what}` : `<b>Raider</b><br>${what}<br><span class="m">from the far isle</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (guest) {
       const g = guest.g;
@@ -790,6 +798,51 @@ function drawIsle(frac, now, fest) {
     px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
     px(sc, GX + 1, GY - 1, '#e9dcc0'); // and a white feather in the hair
     out.push({ g, x, y });
+  }
+  return out;
+}
+// ---------- raiders ----------
+// the same dugout, come by night: hooded figures in dark cloaks, grain sacks on their backs, and once the
+// village is roused, islanders running after them with brands
+const RAIDER = '#2b2a33', RAIDER_HI = '#45434f', SACK = '#b59a62';
+function drawRaid(frac, now) {
+  const out = [], C = w.raid && w.raid.cur;
+  if (!C || C.st === 'gone') return out;
+  const bx = C.px + (C.x - C.px) * frac, by = C.py + (C.y - C.py) * frac, going = C.x !== C.px || C.y !== C.py;
+  const X = Math.round(bx * TILE) - 4, Y = Math.round(by * TILE) - 1;
+  sprite(sc, DUGOUT, X, Y, DCOLS);
+  const aboard = C.rs.filter((r) => r.k === 'boat');
+  aboard.forEach((r, i) => {
+    const gx = X + 1 + i * 2;
+    px(sc, gx, Y - 2, RAIDER_HI); px(sc, gx, Y - 1, RAIDER);
+    if (r.s) px(sc, gx + 1, Y - 1, SACK);
+    if (going && (Math.floor(now / 260) + i) % 2) px(sc, gx + 1, Y + 1 + ((i & 1) ? -2 : 2), '#b49a6a', 1, 2);
+  });
+  out.push({ g: {}, boat: true, raid: true, n: aboard.length, x: bx, y: by });
+  C.rs.forEach((r, i) => {
+    if (r.k === 'boat') return;
+    const x = r.px + (r.x - r.px) * frac, y = r.py + (r.y - r.py) * frac, moving = r.x !== r.px || r.y !== r.py;
+    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3;
+    const step = moving ? Math.floor(now / (r.k === 'run' ? 110 : 200) + i) % 2 : 0;
+    if (r.k === 'wait' && !moving) { // crouched at the door, a hand at the bar
+      px(sc, GX + 1, GY + 1, RAIDER_HI); px(sc, GX, GY + 2, RAIDER, 3, 2);
+      if (Math.floor(now / 400 + i) % 3 === 0) px(sc, GX + 3, GY + 1, '#f1c9a5');
+    } else {
+      px(sc, GX + 1, GY, RAIDER_HI); px(sc, GX, GY + 1, RAIDER, 3, 2); // a hood pulled low over the face
+      px(sc, GX + step * 2, GY + 3, '#1c1b22', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#1c1b22', 1, 1);
+      if (r.s) { px(sc, GX - 1, GY, SACK, 2, 3); px(sc, GX - 1, GY, '#d6c08a'); } // a bulging sack over the shoulder
+    }
+    out.push({ g: r, raid: true, x, y });
+  });
+  for (const o of C.ch) { // islanders with brands from the hearth
+    const x = o.px + (o.x - o.px) * frac, y = o.py + (o.y - o.py) * frac, moving = o.x !== o.px || o.y !== o.py;
+    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3, step = moving ? Math.floor(now / 120 + o.id) % 2 : 0;
+    const fl = Math.floor(now / 140 + o.id) % 3;
+    px(sc, GX + 1, GY, '#f1c9a5'); px(sc, GX, GY + 1, '#d9d9d9', 3, 2);
+    px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
+    px(sc, GX + 3, GY - 1, '#8a5a32', 1, 3); px(sc, GX + 3, GY - 2, fl ? '#ffb43c' : '#ffe48a'); if (fl === 2) px(sc, GX + 3, GY - 3, '#f0742b');
+    if (!moving && Math.floor(now / 300 + o.id) % 2) px(sc, GX - 1, GY, '#f1c9a5'); // a fist shaken at the sea
+    out.push({ g: o, raid: true, chase: true, x, y });
   }
   return out;
 }
@@ -1024,7 +1077,7 @@ function updatePanels() {
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
@@ -1039,7 +1092,8 @@ function updatePanels() {
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
     ...(s.dogsCame ? [['dog', 'Dogs', s.dogs ? `${s.dogs} <span class="m">· ${w.dogs.d.filter((d) => w.t - d.b >= S.TICKS_PER_YEAR).map((d) => { const o = w.people.find((q) => q.id === d.own); return esc(d.nm) + (o ? ' with ' + esc(o.name) : ''); }).join(' · ') || 'all pups'}${s.dogsTurned ? ` · ${s.dogsTurned} ${s.dogsTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}${s.dogsFound ? ` · ${s.dogsFound} lost found` : ''}${s.dogsRats ? ` · ${s.dogsRats} rats` : ''}</span>` : '<span class="m">none left</span>']] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
-    ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>`]] : []),
+    ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
+    ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
@@ -1109,7 +1163,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

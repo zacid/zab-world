@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 24;
+export const SIM_VERSION = 25;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -193,6 +193,24 @@ const ISLE_LEAVE = 0.25;     // chance a single islander with nobody to marry sa
 const ISLE_CROWD = 30;       // people on the island before anyone would think of leaving
 const ISLE_TRADE = 300;      // grain the guests take home, if the stores can spare it
 const ISLE_FEVER = 0.08;     // chance the guests leave a fever behind
+// raiders: in a thin year on the far isle the dugout comes back by night after the harvest, for the granaries
+const RAID_LEAN = 0.25;      // chance each year, once they have seen the island, that the far isle goes hungry (less with kin on both shores)
+const RAID_NIGHT = 0.03;     // chance per autumn or early-winter night of a thin year that they come
+const RAID_FOG = 3;          // x this on a fog day: nobody will see the boat come in
+const RAID_RICH = 2000;      // grain in store before the crossing seems worth the risk
+const RAID_CARRY = 70;       // grain each raider carries off in a sack
+const RAID_SHARE = 0.15;     // and never more than this share of the stores
+const RAID_DAWN = 6;         // from this hour the first ones up see anybody still at the granary
+const RAID_SEEN = 16;        // within this (squared) of it
+const RAID_OUT = 3;      // tiles offshore the dugout creeps in from
+const RAID_SAIL = 20;        // hour it pushes in out of the dusk
+const RAID_SPEED = 5;        // tiles per hour, loping up from the beach in the dark
+const RAID_ROW = 3;          // tiles per hour, paddling
+const RAID_RUN = 6;          // and running for the boat
+const RAID_NEAR = 100;       // a house this close (squared) to the granary is close enough to hear the door
+const RAID_WAKE = 0.15;      // chance per hour they are at the granary door that someone close by wakes (x3 with a dog by the granary)
+const RAID_HURT = 0.25;      // chance the first one out is struck down in the scuffle
+const RAID_CHASE = 3;        // islanders who run after them with brands
 export const PEN_W = 2;      // tiles inside the goat pen's wattle
 export const PEN_H = 2;
 const GOAT_COME = 0.05;      // daily chance in spring and summer (year 2 on) that the drifting raft finds the beach
@@ -358,7 +376,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null,
   };
   // name the island
   let nm = '';
@@ -508,6 +526,7 @@ export function step(w, fx) {
   if (w.dogs) dogHour(w, c);
   if (w.lost) lostHour(w, c);
   if (w.isle && w.isle.boat) isleHour(w, c);
+  if (w.raid && (w.raid.cur || w.raid.on === c.day)) raidHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
@@ -550,7 +569,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -564,6 +583,7 @@ function daily(w, c, fx) {
       w.rats.y = 0;
     }
     if (w.lost) w.lost.y = 0;
+    raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
     for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
@@ -574,6 +594,7 @@ function daily(w, c, fx) {
   festDay(w, c);
   taleDay(w, c);
   const wx = w.wx.k;
+  if (w.raid) raidNight(w, c, wx);
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
@@ -1361,20 +1382,22 @@ function tellTale(w, t) {
 // a dugout paddles over: the guests dance, feast, sleep by the fire, trade hides for grain and leave at
 // first light. An islander with nobody to marry at home may be pledged to one of them, who stays.
 // Once the island is crowded, a restless single islander may sail away with them instead.
-function landing(w) {
-  // the beach nearest the hearth, the water off it, and a spot well out to sea straight beyond
+function landing(w) { return landAt(w, w.fire.x, w.fire.y, ISLE_OUT); }
+function landAt(w, x, y, out) {
+  // the beach nearest (x, y), the water off it, and a spot out to sea straight beyond
   let bi = -1, bd = 1e9;
-  for (const i of w.shore || []) { const dd = d2(i % MAP, (i / MAP) | 0, w.fire.x, w.fire.y); if (dd < bd) { bd = dd; bi = i; } }
+  for (const i of w.shore || []) { const dd = d2(i % MAP, (i / MAP) | 0, x, y); if (dd < bd) { bd = dd; bi = i; } }
   if (bi < 0) return null;
   const bx = bi % MAP, by = (bi / MAP) | 0;
   const off = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([a, b]) => tile(w, bx + a, by + b) === T.WATER);
   if (!off) return null;
   let sx = bx + off[0], sy = by + off[1];
-  for (let k = 0; k < ISLE_OUT && inMap(sx + off[0], sy + off[1]) && tile(w, sx + off[0], sy + off[1]) === T.WATER; k++) { sx += off[0]; sy += off[1]; }
+  for (let k = 0; k < out && inMap(sx + off[0], sy + off[1]) && tile(w, sx + off[0], sy + off[1]) === T.WATER; k++) { sx += off[0]; sy += off[1]; }
   return { bx, by, lx: bx + off[0], ly: by + off[1], sx, sy };
 }
 function boatComes(w, c) {
   if (c.year < ISLE_YEAR || Math.min(FEST_WOOD, Math.floor(w.timber / 4)) < 6 || (w.isle && w.isle.boat)) return; // only a towering fire is seen
+  if (w.isle && w.isle.feud >= c.year) return; // the summer after a raid, nobody from the far isle dares show their face
   if (rnd(w) >= (w.isle ? ISLE_COME : ISLE_SEEN)) return;
   const L = landing(w);
   if (!L) return;
@@ -1425,6 +1448,7 @@ function isleFeast(w) {
     text += ` They trade ${plural(give, 'hide', 'hides')} for ${take} grain.`;
   }
   if (B.wed) text += ` ${B.wed}.`;
+  if (I.feud) { text += ' Nobody speaks of the stolen grain.'; delete I.feud; }
   return text;
 }
 function boatLands(w, B) {
@@ -1490,6 +1514,145 @@ function isleHour(w, c) {
     }
   } else if (moveToward(B, B.sx + 0.5, B.sy + 0.5, BOAT_SPEED)) w.isle.boat = null;
   else for (const g of B.gs) { g.x = B.x; g.y = B.y; }
+}
+
+// ---------- raiders ----------
+// The far isle has danced at the midsummer fire and seen the granaries. In a thin year there, the dugout comes
+// back by night after the harvest, lands below the granary nearest the sea and creeps up to empty it.
+// w.raid: n raids, g grain carried off ever, yg this year, d driven off, lean year of hunger, y year of the
+// last raid, on the night chosen, cur the raid under way (the boat, rs raiders, ch islanders running after them).
+// After a raid w.isle.feud holds the next year: no boat comes to that midsummer fire.
+function raidYear(w, c) {
+  const I = w.isle;
+  if (w.raid) w.raid.yg = 0;
+  if (!I || !I.n) return;
+  w.raid ||= { n: 0, g: 0, yg: 0, d: 0, lean: 0, y: 0, on: null, cur: null };
+  if (rnd(w) < RAID_LEAN / (1 + Math.min(I.wed, 2))) w.raid.lean = c.year; // kin on both shores make them think twice
+}
+// the finished granary nearest the sea
+function raidTarget(w) {
+  let best = null, bd = 1e9;
+  for (const b of w.buildings) {
+    if (b.kind !== 'granary' || b.progress < 1) continue;
+    for (const i of w.shore || []) { const dd = d2(i % MAP, (i / MAP) | 0, b.x, b.y); if (dd < bd) { bd = dd; best = b; } }
+  }
+  return best;
+}
+function raidNight(w, c, wx) {
+  const R = w.raid;
+  if (R.lean !== c.year || R.cur || R.on != null || R.y === c.year) return;
+  if (c.season < 2 || c.doy >= DAYS_PER_SEASON * 3 + 45 || wx === 'storm' || wx === 'snow') return;
+  if (w.food < RAID_RICH || (w.isle && w.isle.boat) || !raidTarget(w)) return;
+  if (rnd(w) < RAID_NIGHT * (wx === 'fog' ? RAID_FOG : 1)) { R.on = c.day; R.y = c.year; }
+}
+function raidHour(w, c) {
+  const R = w.raid, h = c.hour;
+  if (!R.cur) {
+    if (h !== RAID_SAIL) return;
+    R.on = null;
+    const g = raidTarget(w), L = g && landAt(w, g.x, g.y, RAID_OUT);
+    if (!L) return;
+    const rs = [], n = 3 + ri(w, 3);
+    for (let i = 0; i < n; i++) rs.push({ nm: makeName(w), x: L.sx + 0.5, y: L.sy + 0.5, px: L.sx + 0.5, py: L.sy + 0.5, k: 'boat', s: 0 });
+    R.cur = { ...L, gx: g.x, gy: g.y, x: L.sx + 0.5, y: L.sy + 0.5, px: L.sx + 0.5, py: L.sy + 0.5, st: 'in', rs, ch: [], take: 0, drop: 0, woke: null, hurt: null, dog: null };
+    return;
+  }
+  const C = R.cur;
+  C.px = C.x; C.py = C.y;
+  for (const r of C.rs) { r.px = r.x; r.py = r.y; }
+  for (const o of C.ch) { o.px = o.x; o.py = o.y; }
+  if (C.st === 'in') {
+    if (moveToward(C, C.lx + 0.5, C.ly + 0.5, RAID_ROW)) {
+      C.st = 'ashore';
+      C.rs.forEach((r, k) => { // up the beach in a file, to crouch along the granary's front
+        r.x = C.bx + 0.5; r.y = C.by + 0.5; r.k = 'walk';
+        r.tx = C.gx + 0.15 + (k % 4) * 0.25; r.ty = C.gy + 1.15 + (k >> 2) * 0.35;
+      });
+    } else for (const r of C.rs) { r.x = C.x; r.y = C.y; }
+    return;
+  }
+  if (C.st === 'ashore') {
+    // creeping, they make no sound; at the door they do, and from first light anyone near the granary is seen
+    if (C.rs.some((r) => r.k === 'wait' || (h >= RAID_DAWN && d2(r.x, r.y, C.gx + 0.5, C.gy + 0.5) < RAID_SEEN))) raidAlarm(w, C, h);
+    if (C.st === 'ashore') {
+      if (C.rs.every((r) => r.k === 'wait')) { // the door is forced and the sacks filled
+        C.take = Math.max(0, Math.min(C.rs.length * RAID_CARRY, Math.floor(w.food * RAID_SHARE)));
+        w.food = Math.round((w.food - C.take) * 100) / 100;
+        for (const r of C.rs) { r.k = 'back'; r.s = 1; }
+        return;
+      }
+      for (const r of C.rs) {
+        if (r.k === 'walk' && moveToward(r, r.tx, r.ty, RAID_SPEED)) r.k = 'wait';
+        else if (r.k === 'back' && moveToward(r, C.bx + 0.5, C.by + 0.5, RAID_SPEED)) { r.k = 'boat'; r.x = C.x; r.y = C.y; }
+      }
+    }
+  }
+  if (C.st === 'flee') {
+    for (const r of C.rs) if (r.k !== 'boat' && moveToward(r, C.bx + 0.5, C.by + 0.5, RAID_RUN)) { r.k = 'boat'; r.x = C.x; r.y = C.y; }
+    C.ch.forEach((o, k) => moveToward(o, C.bx + 0.5 + (k - 1) * 0.6, C.by + 0.5 + (C.by > w.fire.y ? -1 : 1), GUEST_SPEED));
+  }
+  if ((C.st === 'ashore' || C.st === 'flee') && C.rs.every((r) => r.k === 'boat')) { raidOver(w, C); return; }
+  if (C.st === 'out') {
+    if (C.ch.length) C.ch.forEach((o, k) => moveToward(o, C.bx + 0.5 + (k - 1) * 0.6, C.by + 0.5 + (C.by > w.fire.y ? -1 : 1), GUEST_SPEED));
+    if (moveToward(C, C.sx + 0.5, C.sy + 0.5, BOAT_SPEED)) {
+      if (C.tell && h < 6) C.st = 'gone'; // nobody knows yet: it is found at first light
+      else { if (C.tell) raidTold(w, C); R.cur = null; }
+    } else for (const r of C.rs) { r.x = C.x; r.y = C.y; }
+  } else if (C.st === 'gone' && h >= 6 && h < RAID_SAIL) { raidTold(w, C); R.cur = null; }
+}
+// a door creaks, a dog barks, or someone up before dawn sees shapes at the granary
+function raidAlarm(w, C, h) {
+  const gx = C.gx + 0.5, gy = C.gy + 0.5, p = waker(w, gx, gy, RAID_NEAR);
+  if (!p) return;
+  const dog = dogNear(w, gx, gy, RAID_NEAR), fog = w.wx && w.wx.k === 'fog';
+  const dawn = h >= RAID_DAWN && h < RAID_SAIL;
+  const odds = dawn ? 1 : RAID_WAKE * (dog ? 3 : 1) * (fog ? 0.5 : 1);
+  if (rnd(w) >= odds) return;
+  C.st = 'flee'; C.woke = p.id;
+  if (dawn) C.dawn = 1;
+  else if (dog) { C.dog = dog.nm; w.dogs.p++; }
+  if (C.take) { // half the sacks are flung down in the dark
+    C.drop = Math.floor(C.take / 2); C.take -= C.drop;
+    w.food = Math.round((w.food + C.drop) * 100) / 100;
+    C.rs.forEach((r, k) => { if (k & 1) r.s = 0; });
+  }
+  if (rnd(w) < RAID_HURT) { p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY; C.hurt = p.id; }
+  const run = C.hurt == null ? [p] : [], skip = [p.id];
+  while (run.length < RAID_CHASE) {
+    const q = waker(w, gx, gy, 400, skip);
+    if (!q) break;
+    run.push(q); skip.push(q.id);
+  }
+  C.ch = run.map((q) => {
+    const b = w.buildings.find((o) => o.id === q.home);
+    return { id: q.id, nm: q.name, x: b.x + 0.5, y: b.y + 0.5, px: b.x + 0.5, py: b.y + 0.5 };
+  });
+  for (const r of C.rs) if (r.k !== 'boat') r.k = 'run';
+}
+function raidOver(w, C) {
+  const R = w.raid;
+  C.st = 'out';
+  R.n++; R.g += C.take; R.yg += C.take;
+  if (w.isle) w.isle.feud = clock(w.t).year + 1;
+  if (C.woke == null) C.tell = 1;
+  else { R.d++; raidTold(w, C); }
+}
+function raidTold(w, C) {
+  const R = w.raid, p = aliveId(w, C.woke), hurt = aliveId(w, C.hurt);
+  let text;
+  if (C.woke == null) {
+    const f = waker(w, C.gx + 0.5, C.gy + 0.5, 1e9) || elder(w);
+    text = `In the grey of the morning ${f ? f.name : 'someone'} finds the granary door hanging open and the floor swept half bare: ${C.take} grain are gone. Down on the beach there are footprints and the long groove of a keel, and only the far isle has a boat.`;
+  } else {
+    const who = p ? p.name : 'Someone';
+    text = C.dawn ? `At first light ${who} steps out to see strangers at the granary door. ${who} snatches a brand from the hearth and shouts the village awake.`
+      : `${C.dog ? `In the dead of night ${C.dog} starts up barking at the granary.` : 'In the dead of night the granary door creaks.'} ${who} runs out with a brand from the hearth and shouts the village awake.`;
+    if (hurt) text += ` A dark figure swings a paddle at ${hurt.name} and knocks ${hurt.sex === 'f' ? 'her' : 'him'} flat.`;
+    text += ` Shapes ${C.take || C.drop ? 'with sacks on their backs ' : ''}scatter for the beach${C.drop ? `, flinging down half of what they carry` : ''}, and a dugout slides off into the night.`;
+    text += C.take ? ` ${C.take} grain are gone.` : ' They get away with nothing.';
+  }
+  if (R.n === 1) milestone(w, `${text} The far isle has had a thin year, and its people have not forgotten the granaries they saw at midsummer. Next summer nobody on ${w.name} will look for their boat.`);
+  else log(w, text, 'bad');
 }
 
 // ---------- fences ----------
@@ -2026,14 +2189,17 @@ function penBack(w) {
 // someone grown and able who sleeps in a house within earshot of the pen
 function penWaker(w) {
   const m = penMid(w.goats);
-  let best = null, bd = PEN_NEAR;
+  return waker(w, m.x, m.y, PEN_NEAR);
+}
+function waker(w, mx, my, near, skip) {
+  let best = null, bd = near;
   for (const p of w.people) {
-    if (p.dead || p.sick || p.hurt || p.home == null || isLost(w, p)) continue;
+    if (p.dead || p.sick || p.hurt || p.home == null || isLost(w, p) || (skip && skip.includes(p.id))) continue;
     const a = ageY(w, p);
     if (a < 14 || a >= 65) continue;
     const h = w.buildings.find((b) => b.id === p.home);
     if (!h) continue;
-    const dd = d2(h.x + 0.5, h.y + 0.5, m.x, m.y);
+    const dd = d2(h.x + 0.5, h.y + 0.5, mx, my);
     if (dd < bd || (dd === bd && best && p.id < best.id)) { bd = dd; best = p; }
   }
   return best;
@@ -3283,6 +3449,10 @@ const MIGRATIONS = {
   23: (w) => {
     if (w.tale === undefined) w.tale = null;
   },
+  // v24 -> v25: raiders. Nothing yet; once the far isle has seen the granaries, a thin year there may bring them by night.
+  24: (w) => {
+    if (w.raid === undefined) w.raid = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3325,6 +3495,8 @@ export function summary(w) {
     guests: w.isle && w.isle.boat ? w.isle.boat.gs.filter((g) => !g.isl).length : 0,
     dogs: w.dogs ? w.dogs.d.length : 0, dogsCame: !!w.dogs, dogsTurned: w.dogs ? w.dogs.k : 0, dogsFound: w.dogs ? w.dogs.f : 0, dogsRats: w.dogs ? w.dogs.r : 0,
     tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
+    raids: w.raid ? w.raid.n : 0, raidGrain: w.raid ? w.raid.g : 0, raidsDriven: w.raid ? w.raid.d : 0, raidLean: !!(w.raid && w.raid.lean === c.year),
+    raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

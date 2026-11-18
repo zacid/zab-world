@@ -241,3 +241,16 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Tales that drift: a tale retold after 30+ years grows (the boar gets bigger, the number of wolves doubles) in the chronicle text.
   - Song and memory: once the tellers have told 20 tales, a song or a carved tally stick by the hearth keeps them (a visible object on the map).
   - Late-game the tale candidate list scans the whole chronicle every winter; cheap now (~once a year), but keep it that way.
+- Raiders are done, as a problem only (SIM_VERSION 25; w.raid {n, g grain carried off, yg this year, d driven off, lean year, y last raid year,
+  on night, cur {boat bx/by/lx/ly/sx/sy, gx/gy granary, st in|ashore|flee|out|gone, rs raiders [{nm, k boat|walk|wait|back|run, s sack}],
+  ch chasers [{id, nm}], take, drop, woke, hurt, dog, dawn, tell}}; w.isle.feud year with no midsummer boat; RAID_* in sim.js; raidYear/
+  raidTarget/raidNight/raidHour/raidAlarm/raidOver/raidTold; waker() shared with the pen; drawRaid() in render.js; yearly `stolen`).
+  Test seeds: 5-12 raids per century, about half driven off (a dog by the granary does most of it); each costs 0-350 grain, small next to
+  the 10-90k stores, so the real cost is the lost midsummer visit. Nobody has an answer yet. Answers it invites:
+  - A night watch: once raided twice, an adult sits up by the granary on autumn nights (RAID_WAKE to ~0.6; costs a worker's morning).
+  - A beacon or watch fire on the landing beach in autumn: the dugout is seen coming in and turns back before it lands.
+  - A barred or stone granary door, or moving the next granary inland; raidTarget picks the one nearest the sea.
+  - Peace: a gift of grain sent back with the midsummer boat in a lean year (the islanders learn the signs) stops the raid; kin ties
+    already cut RAID_LEAN, so a "peace-weaving" wedding could end raids for a generation.
+  - A raider caught in the scuffle (left behind with a twisted ankle) who is kept over the winter and either weds in or is rowed home.
+  - Revenge as a twist: once the islanders have boats, young hotheads row over to the far isle after a raid.
