@@ -211,3 +211,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A watch fire or the herder sleeping in the lean-to on frost nights (costs a worker and wood; risk of a bite).
   - Bring the herd inside the houses in the worst cold (goats in the byre end of a longhouse).
   - Hunters track the raider back to the den after a pen night (a winter wolf hunt).
+- Deeds and bynames are done (SIM_VERSION 22; p.dd {b,w,d,f,g,h,l,p,n, by}, w.by {deedKey: living holder id}, b.hands ids while a
+  building goes up; DEEDS marks, deed()/nameThem()/unname() in sim.js; byname() and deedsText() exported; grave g.by/g.dd).
+  Test seeds: ~23 bynames per century, mostly Reaper and Fisher late, Hunter/Wolf-slayer early; the Builder almost never fires because
+  founders who raise the roofs earn a hunting name first, and late-game houses are rare. Answers it invites:
+  - A skill effect: a named Hunter strikes more often, a Fisher lands more per cast, a Builder works faster (makes names matter in the sim).
+  - Apprentices: a child who follows a named islander picks up the trade, and the name can pass down a family ("Hamor the Fisher's daughter").
+  - Elders' stories: on long winter nights an elder retells a dead hero's deeds in the chronicle, years after the death.
+  - Rivalry: two islanders close to the same mark race for it; a footrace or spear throw at midsummer settles it.
+  - Bynames for bad deeds too: someone who loses a goat to the wolves or lets a fire go out gets a mocking name.
+- Speed: on this machine seed 4242 ran ~2.9 s/yr at Y90-95 (307 people) even with deeds switched off (scripts/_bench.mjs compares);
+  check whether earlier visits (goats, isle, pen, lost, horn) pushed the late-game cost up, and trim per-hour scans (aliveId, people.find).

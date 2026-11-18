@@ -119,6 +119,7 @@ function drawWho() {
     const g = (w.graves || []).find((o) => o.id === follow);
     el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div><b>${esc(gone)}</b><div class="m">is no longer among the living.</div>` +
       (g ? `<div class="do">${esc(graveText(g))}; lies in the burying ground since ${when(g.d)}.</div>` : '') +
+      (g && g.dd ? `<div class="kin"><span class="m">in life</span> ${esc(g.dd)}</div>` : '') +
       (last ? `<div class="ev"><span class="when">${last.s}</span>${esc(last.text)}</div>` : '');
     el.hidden = false; return;
   }
@@ -133,9 +134,10 @@ function drawWho() {
     const mates = w.people.filter((o) => o.home === p.home && o.id !== p.id && o.id !== p.partner && !kids.includes(o));
     if (mates.length) kin.push(['shares a roof with', mates.map((o) => link(o.id)).join(', ')]);
   } else kin.push(['home', '<span class="bad">none yet</span>']);
-  const ev = mentions(p.name, 3);
+  const ev = mentions(p.name, 3), by = S.byname(p), deeds = S.deedsText(p.dd);
+  if (deeds) kin.push(['so far', esc(deeds)]);
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
-    `<b>${esc(p.name)}</b> <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
+    `<b>${esc(p.name)}</b>${by ? ` <span class="by">${esc(by)}</span>` : ''} <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
     (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
     (w.goats && w.goats.hid === p.id ? ' <span class="goat">goatherd</span>' : '') +
     `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''}</div>` +
@@ -396,7 +398,7 @@ function graveAt(mx, my) {
   return best;
 }
 const when = (t) => { const c = S.clock(t); return `Y${c.year} ${S.SEASONS[c.season]}`; };
-const graveText = (g) => `${g.n} ${g.why}, aged ${Math.floor((g.d - g.b) / S.TICKS_PER_YEAR)}`;
+const graveText = (g) => `${g.n}${g.by ? ' ' + g.by : ''} ${g.why}, aged ${Math.floor((g.d - g.b) / S.TICKS_PER_YEAR)}`;
 
 // ---------- time ----------
 function nowTickF() { return (Date.now() - w.epoch) / S.TICK_MS; }
@@ -702,11 +704,12 @@ function frame() {
     } else if (best) {
       const p = best.p, a = Math.floor(S.ageY(w, p));
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
-      tip.innerHTML = `<b>${p.name}</b><br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
+      const by = S.byname(p);
+      tip.innerHTML = `<b>${p.name}</b>${by ? ` <span class="by">${by}</span>` : ''}<br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
-      tip.innerHTML = `<b>${esc(best.n)}</b><br>${esc(best.why)}, aged ${Math.floor((best.d - best.b) / S.TICKS_PER_YEAR)}<br><span class="m">laid to rest ${when(best.d)}${kin.length ? `<br>child of ${kin.map(esc).join(' &amp; ')}` : ''}</span>`;
+      tip.innerHTML = `<b>${esc(best.n)}</b>${best.by ? ` <span class="by">${esc(best.by)}</span>` : ''}<br>${esc(best.why)}, aged ${Math.floor((best.d - best.b) / S.TICKS_PER_YEAR)}<br><span class="m">laid to rest ${when(best.d)}${kin.length ? `<br>child of ${kin.map(esc).join(' &amp; ')}` : ''}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else tip.hidden = true;
   }
@@ -953,6 +956,7 @@ function glow(c, x, y, r, col) {
 // ---------- panels ----------
 function updatePanels() {
   const s = S.summary(w), c = S.clock(w.t);
+  const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
   $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '');
@@ -970,6 +974,7 @@ function updatePanels() {
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>`]] : []),
+    ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');

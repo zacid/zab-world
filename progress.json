@@ -118,5 +118,10 @@
   "at": "2026-11-17T23:21:30.684Z",
   "title": "Add hungry winter wolves that raid the goat pen",
   "body": "- SIM_VERSION 21 (goats.pr/pk/yp/gap): on a winter night (2.5%, x2 in frost or snow, halved while 4+ deer remain) one wolf walks straight to the back wall of the goat pen, hearth or no hearth\n- The wattle holds 35% of the time; otherwise someone asleep in a house within 6 tiles may run out with a brand (50%, 15% are bitten), or the youngest goat is dragged off\n- No raids while the herd is under 3 goats; a torn wattle is mended next day for 2 timber\n- Visible: a ragged hole and splayed rods in the pen's back wall, \"wolves at the pen\" and \"wattle torn\" in the Goats row, pen nights in History\n- Watch: Hais has its first winter with goats this year; test seeds see ~3 pen nights and ~1 goat taken a winter, herds hold at 6-14"
+ },
+ {
+  "at": "2026-11-18T00:17:09.199Z",
+  "title": "Add deeds and bynames: islanders earn names that stick",
+  "body": "- SIM_VERSION 22 (p.dd tally, w.by living holders, b.hands): each islander counts boars, wolves and deer taken, fish landed, grain reaped, roofs helped raise, lost ones found, wolves driven from the pen and sick tended; the migration counts in the hunts and finds still in the log\n- Passing a mark (3 wolves, 10 kills, 2 finds, 10 roofs, 3,000 fish, 30,000 grain) gives a byname such as \"the Wolf-slayer\" or \"the Fisher\", told in the chronicle; only one living holder per name, it passes on at death\n- A named islander's death is a chronicle entry that lists their life's deeds; graves keep the name and deeds\n- Visible: byname in gold on the life card, hover tip and grave tip, a \"so far\" deeds line on the card, a Named row in the panel\n- Watch: Vidor is 4 kills short of \"the Hunter\" and Duten 2 wolves short of \"the Wolf-slayer\"; test seeds see ~23 names per century"
  }
 ]

@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 21;
+export const SIM_VERSION = 22;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -1303,7 +1303,7 @@ function boatLeaves(w, B) {
       !(w.heal && w.heal.id === o.id) && !(w.horn && w.horn.hid === o.id) && !(w.goats && w.goats.hid === o.id) && !(w.lost && w.lost.cur && w.lost.cur.id === o.id) &&
       !w.people.some((k) => !k.dead && (k.mother === o.id || k.father === o.id) && ageY(w, k) < 14));
     if (p && rnd(w) < ISLE_LEAVE) {
-      release(w, p); p.dead = true; I.gone++;
+      release(w, p); p.dead = true; I.gone++; unname(w, p);
       B.gs.push({ nm: p.name, sex: p.sex, a: Math.floor(ageY(w, p)), x: B.x, y: B.y, px: p.x, py: p.y, k: 'boat', isl: 1 });
       if (I.gone === 1) milestone(w, `At first light the guests push off for the far isle, and ${p.name} goes with them. Nobody on ${w.name} was left for ${p.sex === 'f' ? 'her' : 'him'} to marry. The first islander to leave ${w.name} waves from the boat until it is gone into the haze.`);
       else log(w, `${p.name} sails away with the guests to the far isle.`, 'info');
@@ -1433,6 +1433,7 @@ function strike(w, p, t) {
       const text = `${who} ${mate ? 'creep' : 'creeps'} up through the long grass downwind and ${mate ? 'bring' : 'brings'} down a deer.`;
       if (F.sd === 1) milestone(w, `${text} The first venison on ${w.name}; the hide is pegged out to dry and the bones are kept for needles.`);
       else log(w, text, 'good');
+      deed(w, p, 'd'); deed(w, mate, 'd');
     } else if (r < odds + harm) {
       p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
       log(w, `A stag lashes out at ${p.name} with its hooves and crashes away. ${p.sex === 'f' ? 'She' : 'He'} limps home empty-handed.`, 'bad');
@@ -1451,6 +1452,8 @@ function strike(w, p, t) {
       : `${who} ${mate ? 'track' : 'tracks'} the pack to its den and ${mate ? 'kill' : 'kills'} a wolf. Its pelt will hang by the fire.`;
     if (n === 1) milestone(w, q === 'boar' ? `${text} The first boar taken on ${w.name}; there is roast pork at the fire tonight.` : `${text} The first wolf ever slain on ${w.name}.`);
     else log(w, text, 'good');
+    const dk = q === 'boar' ? 'b' : 'w';
+    deed(w, p, dk); deed(w, mate, dk);
   } else if (r < odds + harm) {
     const fatal = rnd(w) < (mate ? 0.1 : 0.3);
     const beast = q === 'boar' ? 'A boar' : 'A wolf';
@@ -1897,6 +1900,7 @@ function penRaid(w, b) {
   const p = penWaker(w);
   if (p && rnd(w) < PEN_WAKE) {
     let text = `In the dead of night the goats scream. ${p.name} runs out with a burning brand from the hearth, and the wolf, already halfway through the wattle, turns and runs.`;
+    deed(w, p, 'p');
     if (rnd(w) < PEN_BITE) {
       p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
       F.att++;
@@ -2043,6 +2047,7 @@ function lostHour(w, c) {
   const where = t === T.FOREST ? 'curled up under a tree at the edge of the woods' : old ? 'sitting on a stone, quite lost' : 'huddled in the wet grass';
   if (finder) {
     S.f++;
+    if (L.seen) deed(w, finder, 'l');
     if (!L.seen) return end(`${finder.name} comes across ${p.name} ${where}, far from the village, and walks ${obj} home before anyone has missed ${obj}.`, false);
     return end(`${finder.name} finds ${p.name} ${where}${night ? ' by torchlight' : ''}, ${hrs} after ${pron(p)} wandered off, and brings ${obj} home.` +
       (L.o ? ` Nobody on ${w.name} slept that night.` : ''), first || L.o);
@@ -2159,7 +2164,9 @@ function bury(w, p, why) {
   for (const g of w.graves) used[g.s] = true;
   let s = used.indexOf(false), old = null;
   if (s < 0) { old = w.graves.shift(); s = old.s; Y.sunk++; }
-  w.graves.push({ id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why, m: p.mother, f: p.father, s });
+  const g = { id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why, m: p.mother, f: p.father, s };
+  if (p.dd && p.dd.by) { g.by = byname(p); g.dd = deedsText(p.dd); }
+  w.graves.push(g);
   Y.n++;
   // the morning after, the family stands at the graveside
   const day = clock(w.t).day + 1;
@@ -2184,11 +2191,82 @@ function mournSpot(w, p, s) {
   return { k: 'mourn', x: Math.round((g.x - 0.5 + [0, -0.4, 0.4, -0.75, 0.75, 0][k]) * 1000) / 1000, y: Math.round((g.y - 0.5 + [0.45, 0.4, 0.4, 0.2, 0.2, 0.75][k]) * 1000) / 1000, h: 99 };
 }
 
+// ---------- deeds ----------
+// Every islander keeps a tally of what they have done (p.dd: b boars, w wolves, d deer taken, f fish landed,
+// g grain reaped, h roofs helped raise, l lost ones found, p wolves driven from the pen, n sick tended).
+// Pass a mark and the island gives them a byname that sticks for life (p.dd.by = the DEEDS key).
+const DEEDS = [
+  { k: 'w', mark: 3, by: 'the Wolf-slayer' },
+  { k: 'k', mark: 10, by: 'the Hunter' },     // b + d + w
+  { k: 'l', mark: 2, by: 'the Finder' },
+  { k: 'h', mark: 10, by: 'the Builder' },
+  { k: 'f', mark: 3000, by: 'the Fisher' },
+  { k: 'g', mark: 30000, by: 'the Reaper' },
+];
+const ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
+const thou = (n) => (n >= 1000 ? `${Math.floor(n / 1000)},${String(n % 1000).padStart(3, '0')}` : String(n));
+export function byname(p) {
+  const e = p && p.dd && p.dd.by && DEEDS.find((o) => o.k === p.dd.by);
+  return e ? e.by : '';
+}
+export function deedsText(d) {
+  if (!d) return '';
+  const out = [], kill = [];
+  const n = (v, one, many) => `${thou(v)} ${v === 1 ? one : many}`;
+  if (d.w) kill.push(n(d.w, 'wolf', 'wolves'));
+  if (d.b) kill.push(n(d.b, 'boar', 'boars'));
+  if (d.d) kill.push(n(d.d, 'deer', 'deer'));
+  if (kill.length) out.push('took ' + (kill.length > 1 ? kill.slice(0, -1).join(', ') + ' and ' + kill[kill.length - 1] : kill[0]));
+  if (d.f) out.push('landed ' + n(d.f, 'fish', 'fish'));
+  if (d.g) out.push(`reaped ${thou(d.g)} grain`);
+  if (d.h) out.push('helped raise ' + n(d.h, 'roof', 'roofs'));
+  if (d.l) out.push('found ' + n(d.l, 'lost one', 'lost ones') + ' in the fog');
+  if (d.p) out.push('drove ' + n(d.p, 'wolf', 'wolves') + ' from the goat pen');
+  if (d.n) out.push('tended the sick ' + n(d.n, 'time', 'times'));
+  return out.join('; ');
+}
+function deed(w, p, k, v = 1) {
+  if (!p || p.dead || !v) return;
+  const d = p.dd || (p.dd = {});
+  d[k] = (d[k] || 0) + v;
+  if (d.by) return;
+  const kk = k === 'b' || k === 'd' ? 'k' : k, held = w.by || (w.by = {});
+  for (const e of DEEDS) {
+    if (e.k !== kk && !(k === 'w' && e.k === 'k')) continue;
+    const have = e.k === 'k' ? (d.b || 0) + (d.d || 0) + (d.w || 0) : d[e.k] || 0;
+    if (have < e.mark || held[e.k] != null) continue; // one living Fisher at a time; the name passes on at death
+    d.by = e.k; held[e.k] = p.id;
+    nameThem(w, p, e, have);
+    return;
+  }
+}
+// the byname is free again once its holder is dead or gone over the sea
+function unname(w, p) {
+  if (w.by && p.dd && p.dd.by && w.by[p.dd.by] === p.id) delete w.by[p.dd.by];
+}
+function nameThem(w, p, e, n) {
+  const he = pron(p), him = p.sex === 'f' ? 'her' : 'him', His = poss(p)[0].toUpperCase() + poss(p).slice(1), full = `${p.name} ${e.by}`;
+  const text = {
+    w: `${p.name} pegs out a ${ORD[n] || `${n}th`} wolf pelt beside the others. Around the fire they have started calling ${him} ${full}, and the children hush when ${he} walks by.`,
+    k: `${p.name} carries home ${poss(p)} ${ORD[n] || `${n}th`} kill. The children play at being ${full} now, with sticks for spears.`,
+    l: `${p.name} has brought a second lost one home out of the fog. ${His} ears are sharper than the horn, they say. From now on it is ${full}.`,
+    h: `${p.name} has had a hand in raising ${n} roofs on ${w.name}. People call ${him} ${full}, and come to ${him} first when a beam will not sit.`,
+    f: `${p.name} has pulled ${thou(n)} fish out of the shallows. The others call ${him} ${full} and watch where ${he} casts.`,
+    g: `${p.name} has cut and carried ${thou(n)} measures of grain in ${poss(p)} life. At harvest the others fall in behind ${full}.`,
+  }[e.k];
+  milestone(w, text);
+}
+
 function die(w, p, why) {
   p.dead = true;
   release(w, p);
   w.stats.deaths++; w.stats.yd++;
-  log(w, `${p.name} ${why}, aged ${Math.floor(ageY(w, p))}.`, 'death');
+  const by = byname(p);
+  unname(w, p);
+  if (by) {
+    const tale = deedsText(p.dd);
+    milestone(w, `${p.name} ${by} ${why}, aged ${Math.floor(ageY(w, p))}. In ${poss(p)} life ${pron(p)} ${tale.replace(/; ([^;]*)$/, ' and $1').replace(/; /g, ', ')}. ${w.name} will tell of ${p.sex === 'f' ? 'her' : 'him'} at the fire.`);
+  } else log(w, `${p.name} ${why}, aged ${Math.floor(ageY(w, p))}.`, 'death');
   bury(w, p, why);
   for (const o of w.people) if (o.partner === p.id) o.partner = null;
 }
@@ -2646,6 +2724,7 @@ function finish(w, p, t, c, fx) {
     if (!f || f.stage !== 'ripe') return;
     const y = Math.round(FIELD_YIELD * w.harvest * (1 - (f.lost || 0)));
     w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; delete f.lost;
+    deed(w, p, 'g', y);
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
@@ -2653,8 +2732,13 @@ function finish(w, p, t, c, fx) {
   } else if (t.k === 'build') {
     const b = w.buildings.find((o) => 'b' + o.id === t.key);
     if (!b || b.progress >= 1) return;
+    if (!b.dmg) { const hs = b.hands || (b.hands = []); if (!hs.includes(p.id)) hs.push(p.id); }
     b.progress = Math.min(1, Math.round((b.progress + 4 / (b.kind === 'granary' ? GRANARY_WORK : HOUSE_WORK)) * 1000) / 1000);
     pop('+' + Math.round(b.progress * 100) + '%', 'build');
+    if (b.progress >= 1 && b.hands) {
+      for (const id of b.hands) deed(w, aliveId(w, id), 'h');
+      delete b.hands;
+    }
     if (b.progress >= 1 && b.dmg) {
       delete b.dmg;
       log(w, b.kind === 'granary' ? 'The granary roof is thatched again.' : 'A storm-torn roof is mended.', 'good');
@@ -2692,6 +2776,7 @@ function finish(w, p, t, c, fx) {
     const o = w.people.find((q) => q.id === t.o), H = w.heal;
     if (!o || o.dead || !(o.sick || o.hurt) || !H || H.s < 1) return;
     H.s--; H.n++; o.tend = c.day;
+    deed(w, p, 'n');
     if (o.sick && w.fever) w.fever.t = (w.fever.t || 0) + 1;
     if (o.hurt) o.hurt = Math.max(w.t + 1, o.hurt - HERB_WOUND * TICKS_PER_DAY);
     pop('tended', 'herb');
@@ -2714,6 +2799,7 @@ function finish(w, p, t, c, fx) {
   } else if (t.k === 'fish') {
     const got = Math.min(w.fish, 3 + ri(w, 4));
     w.fish -= got; w.food += got;
+    deed(w, p, 'f', got);
     if (got > 0) pop('+' + got, 'fish');
   }
 }
@@ -2858,6 +2944,30 @@ const MIGRATIONS = {
   // v20 -> v21: wolves at the goat pen. No winter raid yet; the pen gets counters and a wattle that can be torn.
   20: (w) => {
     if (w.goats) for (const k of ['pr', 'pk', 'yp', 'gap']) if (w.goats[k] === undefined) w.goats[k] = 0;
+  },
+  // v21 -> v22: deeds. Every islander starts a tally (p.dd); the hunts and finds the island still speaks of are counted in.
+  // Nobody gets a byname here: the first is given in-world, when someone passes a mark.
+  21: (w) => {
+    if (!w.by) w.by = {};
+    const byName = new Map(w.people.filter((p) => !p.dead).map((p) => [p.name, p]));
+    const seen = new Set();
+    const add = (nm, k) => {
+      const p = byName.get(nm);
+      if (p) { const d = p.dd || (p.dd = {}); d[k] = (d[k] || 0) + 1; }
+    };
+    for (const l of [...(w.chronicle || []), ...(w.log || [])]) {
+      const key = l.t + ' ' + l.text;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const m = /^(\S+)(?: and (\S+))? (spears? a boar|tracks? the pack to its den|creeps? up through the long grass)/.exec(l.text);
+      if (m) {
+        const k = m[3][0] === 's' ? 'b' : m[3][0] === 't' ? 'w' : 'd';
+        add(m[1], k); if (m[2]) add(m[2], k);
+        continue;
+      }
+      const f = /^(\S+) finds \S+ .*brings (?:him|her) home/.exec(l.text);
+      if (f) add(f[1], 'l');
+    }
   },
 };
 export function migrate(w) {
