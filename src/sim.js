@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 22;
+export const SIM_VERSION = 23;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -51,6 +51,7 @@ export const TECHS = {
   herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
   farisle:  { name: 'The far isle', added: '2026-11-17T22:26Z', desc: 'Another isle lies beyond the sea haze, and its people can see a big midsummer fire. Some years a dugout full of strangers paddles over for the dance. They trade hides for grain, and now and then one of them stays to marry an islander who had nobody at home; once the island is crowded, a restless islander may sail away with them.', req: ['midsummer', 'fishing'] },
   foghorn:  { name: 'Fog horn', added: '2026-11-17T21:42Z', desc: 'A great whelk shell from the beach with its tip knocked off. On fog days the oldest islander who can stand keeps by the hearth and blows it every little while. Within earshot nobody is alone: a wolf will not single out someone who can call back to the horn. Someone lost in the grey can follow the sound home.', req: ['fire', 'fishing'] },
+  dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -206,6 +207,19 @@ const PEN_WAKE = 0.5;        // chance someone sleeping close by wakes to the go
 const PEN_NEAR = 36;         // a house this close to the pen (squared) is close enough to hear
 const PEN_BITE = 0.15;       // chance the one who runs out is bitten
 const PEN_MEND = 2;          // timber to weave the torn wattle back
+const DOG_CUB = 0.01;        // daily chance in spring and summer (year 3 on) that a cub is found at the edge of the woods
+const DOG_GROWN = 1;         // years before a pup is any use
+const DOG_SPEED = 6;         // tiles per hour, trotting at heel
+const DOG_NEAR = 9;          // a grown dog this close (squared) is at your side
+const DOG_NOSE = 49;         // and this close to someone lost in the fog it has their scent
+const DOG_DIES = 0.15;       // chance a dog that flies at a wolf is killed doing it
+const DOG_WAKE = 0.9;        // chance someone wakes when a dog by the pen barks
+const DOG_RAT = 0.15;        // daily chance each grown dog catches a rat
+const DOG_EAT = 0.5;         // scraps each dog eats a day
+const DOG_PER = 7;           // islanders it takes to feed one dog
+const DOG_MAX = 8;
+const DOG_OLD = 10;          // years; the hardiest live a few more
+const DOG_NAMES = ['Bran', 'Gyp', 'Fen', 'Tor', 'Mab', 'Rua', 'Ash', 'Nip', 'Scar', 'Brock', 'Moss', 'Tansy', 'Holt', 'Wisp', 'Cull', 'Sorrel', 'Grim', 'Dun', 'Pip', 'Rook'];
 // ---------- footpaths ----------
 // Every step on open grass wears it a little; the grass grows back a little each day. Where people
 // walk often enough the ground is trodden bare: a path. Nobody lays them out, the feet do.
@@ -335,7 +349,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null,
   };
   // name the island
   let nm = '';
@@ -481,6 +495,7 @@ export function step(w, fx) {
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
+  if (w.dogs) dogHour(w, c);
   if (w.lost) lostHour(w, c);
   if (w.isle && w.isle.boat) isleHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
@@ -525,7 +540,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -590,6 +605,7 @@ function daily(w, c, fx) {
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
+  if (w.dogs !== undefined) dogDay(w, c);
   lifeAndDeath(w, c);
   pairing(w);
   housing(w);
@@ -967,8 +983,17 @@ function bite(w, b, p) {
   if (fog) { w.wx.b = (w.wx.b || 0) + 1; F.fa = (F.fa || 0) + 1; }
   const where = fog ? 'out of the fog' : 'at the edge of the trees';
   let text;
+  const dog = !helper && dogBy(w, p);
   if (helper) text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
-  else if (rnd(w) < WOLF_KILL) {
+  else if (dog) { // the dog flies at it: half wolf itself, and fighting for its own pack
+    const D = w.dogs, him = dog.sex === 'f' ? 'her' : 'him';
+    D.k++;
+    if (rnd(w) < DOG_DIES) {
+      D.d = D.d.filter((o) => o !== dog); D.dead++;
+      text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}. ${dog.nm} flies at it, and the two roll snarling over and over in the ${fog ? 'grey' : 'grass'} until the wolf breaks away and runs. ${dog.nm} does not get up. ${p.name} carries ${him} home.`;
+    } else text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}; ${p.name}'s dog ${dog.nm} flies at its throat, and the wolf breaks off and runs for the trees.`;
+    if (D.k === 1) { milestone(w, `${text} That night ${w.name} ${D.dead ? `buries ${dog.nm} by the door` : `gives ${dog.nm} the best bone in the pot`}. A wolf the village raised has turned on its own kind for them.`); return; }
+  } else if (rnd(w) < WOLF_KILL) {
     die(w, p, fog ? 'was dragged down by wolves in the fog' : 'was dragged down by wolves');
     text = fog ? `Wolves take ${p.name} in the fog. Nobody saw them come.` : `Wolves take ${p.name} at the edge of the trees.`;
     if (fog) w.wx.x = (w.wx.x || 0) + 1;
@@ -1823,7 +1848,7 @@ function strayGoat(w, b) {
   let best = null, bd = 64;
   for (const g of w.goats.herd) {
     const dd = d2(g.x, g.y, b.x, b.y);
-    if (dd < bd && goatOpen(w, g) && !goatGuard(w, g)) { bd = dd; best = g; }
+    if (dd < bd && goatOpen(w, g) && !goatGuard(w, g) && !dogNear(w, g.x, g.y)) { bd = dd; best = g; }
   }
   return best;
 }
@@ -1834,6 +1859,12 @@ function takeGoat(w, b, g) {
   if (guard) {
     b.rest = w.t + 24;
     log(w, `A wolf rushes the goats. ${guard.name} yells and swings ${ageY(w, guard) < 14 ? 'the crook' : 'a stick'}, and it slinks back into the trees.`, 'info');
+    return;
+  }
+  const dog = dogNear(w, g.x, g.y);
+  if (dog) {
+    b.rest = w.t + 24; w.dogs.k++;
+    log(w, `A wolf rushes a straying goat, but ${dog.nm} is there first, hackles up and barking, and it slinks back into the trees.`, 'info');
     return;
   }
   G.herd = G.herd.filter((o) => o !== g);
@@ -1897,9 +1928,10 @@ function penRaid(w, b) {
     return;
   }
   G.gap = 1;
-  const p = penWaker(w);
-  if (p && rnd(w) < PEN_WAKE) {
-    let text = `In the dead of night the goats scream. ${p.name} runs out with a burning brand from the hearth, and the wolf, already halfway through the wattle, turns and runs.`;
+  const p = penWaker(w), m = penMid(G), bark = dogNear(w, m.x, m.y, PEN_NEAR);
+  if (p && rnd(w) < (bark ? DOG_WAKE : PEN_WAKE)) {
+    if (bark) w.dogs.p++;
+    let text = `${bark ? `In the dead of night ${bark.nm} starts up barking at the goat pen and will not stop.` : 'In the dead of night the goats scream.'} ${p.name} runs out with a burning brand from the hearth, and the wolf, already halfway through the wattle, turns and runs.`;
     deed(w, p, 'p');
     if (rnd(w) < PEN_BITE) {
       p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
@@ -1970,6 +2002,141 @@ function herdTask(w, p) {
   const G = w.goats;
   if (!G || G.hid !== p.id || !G.at || !G.herd.length || p.hurt || p.haul) return null;
   return { k: 'herd', x: G.at.x, y: G.at.y, h: 99 };
+}
+
+// ---------- dogs ----------
+// One spring a child comes in from the edge of the woods with a wolf cub that crept out of the den alone.
+// It stays, grows up thinking the village is its pack, and the next cub found is let in beside it; after
+// that there is a litter most springs, as many as the scraps can feed (w.dogs {d [{id, nm, sex, b, own,
+// x, y, lie}], n ever, k wolves turned, f lost ones scented, p pen alarms, r rats, dead killed by wolves}).
+// Each grown dog keeps at the heels of one islander (the goatherd first) and sleeps across their doorway.
+const dogGrown = (w, d) => w.t - d.b >= DOG_GROWN * TICKS_PER_YEAR;
+function dogNear(w, x, y, r = DOG_NEAR) {
+  if (!w.dogs) return null;
+  let best = null, bd = r;
+  for (const d of w.dogs.d) {
+    if (!dogGrown(w, d)) continue;
+    const dd = d2(d.x, d.y, x, y);
+    if (dd < bd) { bd = dd; best = d; }
+  }
+  return best;
+}
+// the grown dog at someone's side, if they have one
+function dogBy(w, p) {
+  if (!w.dogs) return null;
+  for (const d of w.dogs.d) if (d.own === p.id && dogGrown(w, d) && d2(d.x, d.y, p.x, p.y) < DOG_NEAR) return d;
+  return null;
+}
+function dogName(w) {
+  const used = new Set(w.dogs.d.map((d) => d.nm));
+  for (let k = 0; k < 6; k++) { const nm = DOG_NAMES[ri(w, DOG_NAMES.length)]; if (!used.has(nm)) return nm; }
+  return DOG_NAMES.find((n) => !used.has(n)) || DOG_NAMES[ri(w, DOG_NAMES.length)];
+}
+function addDog(w, sex, ageY, own, x, y) {
+  const d = { id: w.nextId++, nm: dogName(w), sex, b: w.t - Math.floor(ageY * TICKS_PER_YEAR), own, x, y, px: x, py: y, lie: 0 };
+  w.dogs.d.push(d); w.dogs.n++;
+  return d;
+}
+function cubFound(w) {
+  let kids = w.people.filter((p) => !p.dead && !p.sick && !p.asleep && ageY(w, p) >= 6 && ageY(w, p) < 14);
+  if (!kids.length) kids = w.people.filter((p) => !p.dead && !p.sick && !p.asleep && ageY(w, p) >= 14 && ageY(w, p) < 60);
+  if (!kids.length) return;
+  const who = kids[ri(w, kids.length)];
+  const first = !w.dogs;
+  if (first) w.dogs = { d: [], n: 0, k: 0, f: 0, p: 0, r: 0, dead: 0 };
+  const D = w.dogs;
+  const sex = D.d.length ? (D.d.some((d) => d.sex === 'f') ? 'm' : 'f') : rnd(w) < 0.5 ? 'f' : 'm';
+  const d = addDog(w, sex, 0.15, who.id, who.x, who.y);
+  const it = sex === 'f' ? 'her' : 'him';
+  if (first) {
+    w.techs.push('dogs');
+    milestone(w, `${who.name} comes in from the edge of the woods with a wolf cub in ${poss(who)} arms, thin and shivering; it had crept out of the den alone. The grown-ups argue half the night about knocking it on the head. In the end it stays: ${who.name} calls ${it} ${d.nm}, feeds ${it} fish heads and lets ${it} sleep across the doorway. ${d.nm} grows up thinking the village is ${sex === 'f' ? 'her' : 'his'} pack. ${w.name} has a dog.`);
+  } else {
+    const old = D.d.find((o) => o !== d);
+    log(w, `${who.name} brings home another cub from the woods, ${sex === 'f' ? 'a she-cub' : 'a dog-cub'}.${old ? ` ${old.nm} sniffs ${it} all over and lets ${it} sleep against ${old.sex === 'f' ? 'her' : 'his'} side.` : ''} They call ${it} ${d.nm}.`, 'good');
+  }
+}
+// one grown dog to an islander; the eldest dogs keep theirs, the goatherd gets the first one free
+function dogOwners(w) {
+  const D = w.dogs, taken = new Set();
+  const order = [...D.d].sort((a, b) => a.b - b.b || a.id - b.id);
+  const keep = new Set();
+  for (const d of order) { // grown dogs keep the owner they have, eldest first
+    const o = dogGrown(w, d) && aliveId(w, d.own);
+    if (o && !taken.has(o.id)) { taken.add(o.id); keep.add(d); }
+  }
+  for (const d of order) {
+    if (keep.has(d)) continue;
+    const o = aliveId(w, d.own), grown = dogGrown(w, d);
+    if (o && !grown) continue;
+    if (!grown) { const m = order.find((q) => q.sex === 'f' && q !== d && aliveId(w, q.own)); d.own = m ? m.own : null; continue; }
+    const herder = w.goats && aliveId(w, w.goats.hid);
+    let next = herder && !taken.has(herder.id) && !herder.sick ? herder : null;
+    if (!next) {
+      let bs = -1;
+      for (const p of w.people) {
+        if (p.dead || taken.has(p.id)) continue;
+        const a = ageY(w, p);
+        if (a < 14 || a >= 60) continue;
+        const dd = p.dd || {}, sc = ((dd.w || 0) + (dd.b || 0) + (dd.d || 0)) * 10 + (dd.l || 0) * 5 + (dd.p || 0) * 5;
+        if (sc > bs || (sc === bs && p.id < next.id)) { bs = sc; next = p; }
+      }
+    }
+    d.own = next ? next.id : null;
+    if (!next) continue;
+    taken.add(next.id);
+    log(w, o ? `${d.nm} is grown now, and leaves ${o.name}'s heels to follow ${next.name} everywhere.` : `${d.nm} lies by the hearth for days, then takes to following ${next.name}.`, 'info');
+  }
+}
+function dogDay(w, c) {
+  const F = w.fauna;
+  let pack = 0;
+  for (const b of w.beasts || []) if (b.k === 'wolf') pack++;
+  const D0 = w.dogs, pair = !!(D0 && D0.d.some((d) => d.sex === 'f') && D0.d.some((d) => d.sex === 'm'));
+  if (!pair && c.year >= 3 && c.season < 2 && F && F.den && pack >= 3 && w.techs.includes('hunting') && rnd(w) < (D0 ? DOG_CUB / 2 : DOG_CUB)) cubFound(w);
+  const D = w.dogs;
+  if (!D) return;
+  if (D.d.length) w.food = Math.max(0, Math.round((w.food - D.d.length * DOG_EAT) * 100) / 100);
+  for (const d of D.d) {
+    if (w.t - d.b < (DOG_OLD + (d.id % 5)) * TICKS_PER_YEAR) continue;
+    const o = aliveId(w, d.own);
+    d.gone = 1;
+    log(w, `${o ? `${o.name}'s` : 'The'} old dog ${d.nm} lies down by the hearth one evening and does not get up.`, 'death');
+  }
+  if (D.d.some((d) => d.gone)) D.d = D.d.filter((d) => !d.gone);
+  dogOwners(w);
+  if (w.rats && w.rats.n > 0) for (const d of D.d) {
+    if (!dogGrown(w, d) || w.rats.n <= 0 || rnd(w) >= DOG_RAT) continue;
+    w.rats.n--; D.r++;
+    if (D.r === 1) log(w, `${d.nm} pounces in the granary chaff and comes out with a rat in ${d.sex === 'f' ? 'her' : 'his'} jaws, shaking it. After that ${d.nm} goes rat-hunting every evening.`, 'good');
+  }
+  if (c.doy === 40) { // a litter in the straw
+    const cap = Math.min(DOG_MAX, Math.max(2, Math.floor(w.people.length / DOG_PER)));
+    const room = cap - D.d.length;
+    const ma = D.d.find((d) => d.sex === 'f' && dogGrown(w, d) && w.t - d.b < 8 * TICKS_PER_YEAR);
+    if (room > 0 && ma && D.d.some((d) => d.sex === 'm' && dogGrown(w, d)) && rnd(w) < 0.7) {
+      const n = Math.min(room, 1 + ri(w, 3));
+      for (let k = 0; k < n; k++) addDog(w, rnd(w) < 0.5 ? 'f' : 'm', 0, ma.own, ma.x, ma.y);
+      const o = aliveId(w, ma.own);
+      log(w, `${ma.nm} whelps ${n === 1 ? 'a pup' : `${n} pups`} in the straw ${o ? `behind ${o.name}'s house` : 'by the hearth'}. The children fight over who gets to name ${n === 1 ? 'it' : 'them'}.`, 'birth');
+    }
+  }
+}
+// every hour: at heel while the owner is up and about, across the doorway while they sleep
+function dogHour(w, c) {
+  const C = cacheOf(w);
+  for (const d of w.dogs.d) {
+    d.px = d.x; d.py = d.y;
+    const o = aliveId(w, d.own), k = (d.id % 5) * 0.25 - 0.5;
+    let tx, ty;
+    if (!o) { tx = w.fire.x + 0.5 + k; ty = w.fire.y + 1.6; d.lie = 1; }
+    else if (o.asleep) {
+      if (C.hb !== w.buildings.length) { C.hb = w.buildings.length; C.byId = new Map(); for (const b of w.buildings) C.byId.set(b.id, b); }
+      const h = (o.home != null && C.byId.get(o.home)) || { x: w.fire.x, y: w.fire.y };
+      tx = h.x + 0.5 + k * 0.6; ty = h.y + 1.2; d.lie = 1;
+    } else { tx = o.x + ((d.id & 1) ? 0.7 : -0.7); ty = o.y + 0.3 + k * 0.4; d.lie = 0; }
+    moveToward(d, tx, ty, DOG_SPEED);
+  }
 }
 
 // ---------- lost in the fog ----------
@@ -2045,6 +2212,14 @@ function lostHour(w, c) {
   const finder = w.people.find((o) => o !== p && !o.dead && !o.asleep && ageY(w, o) >= 14 && d2(o.x, o.y, p.x, p.y) < reach);
   const t = tile(w, Math.floor(p.x), Math.floor(p.y));
   const where = t === T.FOREST ? 'curled up under a tree at the edge of the woods' : old ? 'sitting on a stone, quite lost' : 'huddled in the wet grass';
+  if (!finder && L.seen && w.dogs) for (const d of w.dogs.d) { // a dog out with the searchers picks up the scent
+    const o = dogGrown(w, d) && aliveId(w, d.own);
+    if (!o || o === p || !o.task || o.task.k !== 'search' || d2(d.x, d.y, p.x, p.y) >= DOG_NOSE) continue;
+    S.f++; w.dogs.f++;
+    deed(w, o, 'l');
+    const text = `${d.nm} puts ${d.sex === 'f' ? 'her' : 'his'} nose to the wet grass and drags ${o.name} off through the ${fog ? 'fog' : 'dark'}, straight to ${p.name} ${where}, ${hrs} after ${pron(p)} wandered off.`;
+    return end(w.dogs.f === 1 ? `${text} From then on, when anyone is missing, the dogs go out first.` : text, first || L.o || w.dogs.f === 1);
+  }
   if (finder) {
     S.f++;
     if (L.seen) deed(w, finder, 'l');
@@ -2969,6 +3144,10 @@ const MIGRATIONS = {
       if (f) add(f[1], 'l');
     }
   },
+  // v22 -> v23: dogs. None yet; a cub may be found at the edge of the woods from this spring on.
+  22: (w) => {
+    if (w.dogs === undefined) w.dogs = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3009,6 +3188,7 @@ export function summary(w) {
     lost: (w.lost && w.lost.cur && (aliveId(w, w.lost.cur.id) || {}).name) || null, lostEver: w.lost ? w.lost.n : 0,
     isleVisits: w.isle ? w.isle.n : 0, isleWed: w.isle ? w.isle.wed : 0, isleGone: w.isle ? w.isle.gone : 0,
     guests: w.isle && w.isle.boat ? w.isle.boat.gs.filter((g) => !g.isl).length : 0,
+    dogs: w.dogs ? w.dogs.d.length : 0, dogsCame: !!w.dogs, dogsTurned: w.dogs ? w.dogs.k : 0, dogsFound: w.dogs ? w.dogs.f : 0, dogsRats: w.dogs ? w.dogs.r : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

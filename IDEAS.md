@@ -222,3 +222,13 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Bynames for bad deeds too: someone who loses a goat to the wolves or lets a fire go out gets a mocking name.
 - Speed: on this machine seed 4242 ran ~2.9 s/yr at Y90-95 (307 people) even with deeds switched off (scripts/_bench.mjs compares);
   check whether earlier visits (goats, isle, pen, lost, horn) pushed the late-game cost up, and trim per-hour scans (aliveId, people.find).
+- Dogs are done (SIM_VERSION 23; tech 'dogs', w.dogs {d [{id, nm, sex, b, own, x, y, lie}], n, k wolves turned, f lost found, p pen alarms,
+  r rats, dead}; DOG_* in sim.js; cubFound/dogOwners/dogDay/dogHour/dogNear/dogBy; drawDogs() in render.js; yearly `dogs`).
+  Test seeds: first cub Y3-4, 1-8 dogs, wolves rarely meet a dog (wolf attacks are rare once hunters thin the pack); the pen alarm
+  and the rat catching do most of the work. The line can die out (litters need a bitch under 8) and a new cub refounds it. Answers it invites:
+  - lone() ignores dogs: a wolf could hesitate to stalk anyone with a dog at heel (fewer attacks) instead of the dog fighting it.
+  - Hunting dogs: a hunter with a dog strikes more often and finds deer faster (and the dog can be gored by a boar).
+  - Sheepdog work: the goatherd's dog lets the herd graze farther (GOAT_REACH up) and turns goats out of the young grain.
+  - A dog that loses its owner pines; a dog's grave beside its owner's; dogs howling with the wolves on winter nights.
+  - Pups given to the far isle guests as gifts (trade), or a far-isle dog of a new coat brought in to breed.
+  - Wolf blood: a dog that runs off to the pack one hungry winter, or a half-wolf litter that is wilder.

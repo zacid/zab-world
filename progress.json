@@ -123,5 +123,10 @@
   "at": "2026-11-18T00:17:09.199Z",
   "title": "Add deeds and bynames: islanders earn names that stick",
   "body": "- SIM_VERSION 22 (p.dd tally, w.by living holders, b.hands): each islander counts boars, wolves and deer taken, fish landed, grain reaped, roofs helped raise, lost ones found, wolves driven from the pen and sick tended; the migration counts in the hunts and finds still in the log\n- Passing a mark (3 wolves, 10 kills, 2 finds, 10 roofs, 3,000 fish, 30,000 grain) gives a byname such as \"the Wolf-slayer\" or \"the Fisher\", told in the chronicle; only one living holder per name, it passes on at death\n- A named islander's death is a chronicle entry that lists their life's deeds; graves keep the name and deeds\n- Visible: byname in gold on the life card, hover tip and grave tip, a \"so far\" deeds line on the card, a Named row in the panel\n- Watch: Vidor is 4 kills short of \"the Hunter\" and Duten 2 wolves short of \"the Wolf-slayer\"; test seeds see ~23 names per century"
+ },
+ {
+  "at": "2026-11-18T00:43:56.263Z",
+  "title": "Add dogs: a wolf cub raised by the hearth",
+  "body": "- SIM_VERSION 23 (w.dogs {d [{id, nm, sex, b, own, x, y, lie}], n, k, f, p, r, dead}): from year 3, on a spring or summer day while the pack has 3+ wolves, a child may bring home a lone cub (1%/day); a second cub of the other sex follows, then a litter most springs up to pop/7 dogs (max 8)\n- Each grown dog follows one islander (goatherd first, then the best hunter) and sleeps across their doorway; it flies at a wolf that springs on its owner (15% it dies doing it), barks the village awake at a pen raid (wake 90% instead of 50%), keeps wolves off nearby goats, scents lost ones in the fog within 7 tiles, catches a rat now and then, eats 0.5 grain a day, lives 10-14 years\n- Visible: pixel dogs and pups at heel (tail wags when still, lie flat at night), hover tip, Dogs row in the panel, dog on the life card, dogs in History\n- Watch: Hais is in year 4 spring with 3 wolves, so the first cub is likely this spring or summer; test seeds hold 1-8 dogs and can lose them all for a few years"
  }
 ]

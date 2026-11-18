@@ -136,6 +136,8 @@ function drawWho() {
   } else kin.push(['home', '<span class="bad">none yet</span>']);
   const ev = mentions(p.name, 3), by = S.byname(p), deeds = S.deedsText(p.dd);
   if (deeds) kin.push(['so far', esc(deeds)]);
+  const dog = w.dogs && w.dogs.d.find((d) => d.own === p.id && w.t - d.b >= S.TICKS_PER_YEAR);
+  if (dog) kin.push(['dog', esc(dog.nm)]);
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
     `<b>${esc(p.name)}</b>${by ? ` <span class="by">${esc(by)}</span>` : ''} <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
     (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
@@ -610,6 +612,7 @@ function frame() {
   const guests = drawIsle(frac, now, fest);
   const beasts = drawBeasts(frac, now);
   const goats = drawGoats(frac, now);
+  const dogs = drawDogs(frac, now);
   ambience(c, hf, now, 'above');
   // the day's sky colours the land
   const wx = wxNow();
@@ -676,10 +679,18 @@ function frame() {
     for (const o of beasts) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; beast = o.b; best = null; } }
     let goat = null;
     for (const o of goats) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; goat = o; beast = null; best = null; } }
+    let dog = null;
+    for (const o of dogs) { const d = Math.hypot(o.x - mx, o.y - my); if (d < bd) { bd = d; dog = o; goat = null; beast = null; best = null; } }
     let guest = null;
-    for (const o of guests) { const d = Math.hypot(o.x - mx, o.y - 0.2 - my); if (d < bd) { bd = d; guest = o; goat = null; beast = null; best = null; } }
+    for (const o of guests) { const d = Math.hypot(o.x - mx, o.y - 0.2 - my); if (d < bd) { bd = d; guest = o; dog = null; goat = null; beast = null; best = null; } }
     const tip = $('tip');
-    if (guest) {
+    if (dog) {
+      const d = dog.d, o = d.own != null && w.people.find((q) => q.id === d.own);
+      const yrs = Math.floor((w.t - d.b) / S.TICKS_PER_YEAR);
+      const what = dog.pup ? (o ? `tumbling after ${esc(o.name)}` : 'tumbling about the hearth') : !o ? 'lying by the hearth' : d.lie ? `asleep across ${esc(o.name)}'s doorway` : `at ${esc(o.name)}'s heels`;
+      tip.innerHTML = `<b>${esc(d.nm)}</b><br>${dog.pup ? 'pup' : `dog · ${yrs} yrs`} · ${what}`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (guest) {
       const g = guest.g;
       const what = g.isl ? 'leaving for the far isle' : g.k === 'boat' ? 'at the paddle' : g.k === 'fest' ? 'dancing at the midsummer fire'
         : g.k === 'sleep' ? 'asleep by the embers' : g.k === 'wait' ? 'waiting by the hearth for the fire' : 'walking';
@@ -896,6 +907,39 @@ function drawGoats(frac, now) {
   return out;
 }
 
+// dogs: 5x3, tail up, ears pricked; wagging when they stand still, flat out across the doorway at night.
+// Pups are 3x2 and tumble after the grown ones. Coats are wolf grey, tawny or near black.
+const DOG = ['t...e', '.bbbh', '.l.l.'];
+const DOG_STEP = ['t...e', '.bbbh', 'l...l'];
+const DOG_WAG = ['....e', 'tbbbh', '.l.l.'];
+const DOG_LIE = ['....e', 'tbbbh'];
+const PUP = ['..e', 'bbh'];
+const DCOATS = [{ b: '#8a8d93', h: '#a3a6ab' }, { b: '#9a7448', h: '#b58d5c' }, { b: '#4a443e', h: '#635b53' }];
+function drawDogs(frac, now) {
+  const out = [];
+  if (!w.dogs) return out;
+  for (const d of w.dogs.d) {
+    const x = d.px + (d.x - d.px) * frac, y = d.py + (d.y - d.py) * frac;
+    const dx = d.x - d.px, moving = dx !== 0 || d.y !== d.py;
+    let face = facing.get(d.id) || ((d.id & 1) ? -1 : 1);
+    if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
+    facing.set(d.id, face);
+    const pup = w.t - d.b < S.TICKS_PER_YEAR;
+    const step = Math.floor(now / 120 + d.id) % 2;
+    const rows = pup ? PUP : d.lie && !moving ? DOG_LIE : moving ? (step ? DOG_STEP : DOG) : Math.floor(now / 260 + d.id) % 2 ? DOG_WAG : DOG;
+    const coat = DCOATS[d.id % 3];
+    const map = { b: coat.b, h: coat.h, t: coat.b, e: '#2e2a26', l: '#2e2a26' };
+    const hop = pup && moving && step ? 1 : 0;
+    const n = rows[0].length, X = Math.round(x * TILE) - (n >> 1), Y = Math.round(y * TILE) - rows.length + 1 - hop;
+    for (let r = 0; r < rows.length; r++) for (let k = 0; k < n; k++) {
+      const ch = rows[r][k];
+      if (ch !== '.') px(sc, face > 0 ? X + k : X + n - 1 - k, Y + r, map[ch]);
+    }
+    out.push({ d, x, y, pup });
+  }
+  return out;
+}
+
 // rats: render-only. A few dart about the granaries (or the houses) by day; at dusk and through
 // the night the colony comes out in force, one sprite for every six or so, scurrying in short
 // runs along the walls, freezing, then running again. Spilled grain lies under a swarmed granary.
@@ -972,6 +1016,7 @@ function updatePanels() {
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
+    ...(s.dogsCame ? [['dog', 'Dogs', s.dogs ? `${s.dogs} <span class="m">· ${w.dogs.d.filter((d) => w.t - d.b >= S.TICKS_PER_YEAR).map((d) => { const o = w.people.find((q) => q.id === d.own); return esc(d.nm) + (o ? ' with ' + esc(o.name) : ''); }).join(' · ') || 'all pups'}${s.dogsTurned ? ` · ${s.dogsTurned} ${s.dogsTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}${s.dogsFound ? ` · ${s.dogsFound} lost found` : ''}${s.dogsRats ? ` · ${s.dogsRats} rats` : ''}</span>` : '<span class="m">none left</span>']] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
@@ -1042,7 +1087,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
