@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 23;
+export const SIM_VERSION = 24;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -51,6 +51,7 @@ export const TECHS = {
   herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
   farisle:  { name: 'The far isle', added: '2026-11-17T22:26Z', desc: 'Another isle lies beyond the sea haze, and its people can see a big midsummer fire. Some years a dugout full of strangers paddles over for the dance. They trade hides for grain, and now and then one of them stays to marry an islander who had nobody at home; once the island is crowded, a restless islander may sail away with them.', req: ['midsummer', 'fishing'] },
   foghorn:  { name: 'Fog horn', added: '2026-11-17T21:42Z', desc: 'A great whelk shell from the beach with its tip knocked off. On fog days the oldest islander who can stand keeps by the hearth and blows it every little while. Within earshot nobody is alone: a wolf will not single out someone who can call back to the horn. Someone lost in the grey can follow the sound home.', req: ['fire', 'fishing'] },
+  tales:    { name: 'Winter tales', added: '2026-11-18T01:02Z', desc: 'On the longest night of the year the whole island sits close round the hearth, children in front, and the eldest tells a tale from the island\'s own past: the landing, the dead in the burying ground and what they did, how the named got their names, what the fog can do. A new tale each winter. Once the fog has been told of, the children keep close to the houses when it comes in.', req: ['fire', 'burial'] },
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
@@ -137,6 +138,14 @@ const FEST_LEARN = 10;       // people on the island before anyone thinks to kee
 const FEST_WOOD = 12;        // timber heaped on the bonfire (at most a quarter of the pile)
 const FEST_FEAST = 2;        // extra food each person eats, if the stores can spare it
 const FEST_PAIR = 0.4;       // chance a single woman finds a partner in the firelight
+// ---------- the longest night ----------
+const TALE_DAY = 315;        // day of the year (winter day 46); a storm or snow puts it off a few days
+const TALE_LAST = 330;       // after this the nights are drawing out again and the year goes without
+const TALE_FROM = 18, TALE_TELL = 21, TALE_TO = 23; // the village sits close round the hearth; the tale is told late
+const TALE_YEAR = 2;         // the first winter is too raw for stories
+const TALE_WOOD = 4;         // timber kept on the fire all evening (at most a sixth of the pile)
+const TALE_HEED = 0.7;       // once the fog tale is told, chance a child stays by the houses when the fog comes in
+const TALE_KEEP = 80;        // tales remembered as told; older ones may be told again
 // ---------- fever ----------
 const FEVER_SEED = 0.0012;   // daily chance a fever takes hold, x crowding, x village size, x season
 const FEVER_SEASON = [0.5, 0.25, 1, 1.6]; // worst in autumn and winter, when everyone is shut in together
@@ -346,7 +355,7 @@ export function genesis(seed, epoch) {
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
     wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
-    beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 },
+    beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
     graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null,
@@ -492,6 +501,7 @@ export function step(w, fx) {
   hornHour(w, c);
   if (c.hour === 19) supper(w);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
+  if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
@@ -562,6 +572,7 @@ function daily(w, c, fx) {
   if (w.beasts) wilds(w, c);
   weather(w, c);
   festDay(w, c);
+  taleDay(w, c);
   const wx = w.wx.k;
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
@@ -1231,6 +1242,118 @@ function midsummer(w, c, fx) {
     else log(w, text, P.length ? 'love' : 'good');
     delete F.pairs; delete F.feast; delete F.wood; delete F.wait;
   }
+}
+
+// ---------- the longest night ----------
+// On the longest night of the year the whole village sits close round the hearth, children in front,
+// and the eldest tells a tale from the island's own past (w.tale: y last year kept, on day, n tales told,
+// id teller, told [keys], lore once the fog tale is told, k/j ring slots for grown-ups and children).
+// The fog tale is a lesson: once the children have heard it, most keep by the houses when the fog comes in.
+export const taleNow = (w, c) => !!(w.tale && w.tale.on === c.day && c.hour >= TALE_FROM && c.hour < TALE_TO);
+const TALE_A = [6, 4, 8, 2, 10, 0, 12, 22, 14, 20, 16], TALE_B = [5, 7, 3, 9, 1, 11, 23, 13, 21, 15];
+const TALE_ALL = [6, 5, 7, 4, 8, 3, 9, 2, 10, 1, 11, 0, 12, 23, 13, 22, 14, 21, 15, 20, 16]; // all round, but never in front of the teller
+const Cap = (s) => s[0].toUpperCase() + s.slice(1);
+const yearOf = (tick) => { const y = clock(tick).year; return ORD[y] ? `the ${ORD[y]} year` : `year ${y}`; };
+const andJoin = (s) => s.replace(/; ([^;]*)$/, ' and $1').replace(/; /g, ', ');
+function taleDay(w, c) {
+  if (c.year < TALE_YEAR || c.doy < TALE_DAY || c.doy > TALE_LAST || w.people.length < 2) return;
+  if (!w.tale) {
+    if (!w.yard) return; // nobody has died yet: there is nothing to remember
+    w.tale = { y: 0, on: -1, n: 0, k: 0, j: 0, id: null, told: [], lore: 0 };
+  }
+  const F = w.tale, wx = w.wx ? w.wx.k : 'clear';
+  if (F.y >= c.year || wx === 'storm' || (wx === 'snow' && c.doy < TALE_LAST)) return;
+  F.y = c.year; F.on = c.day;
+}
+function teller(w) {
+  const L = w.lost && w.lost.cur, ok = (p, a) => !p.dead && !p.sick && ageY(w, p) >= a && !(w.horn && w.horn.hid === p.id) && !(L && L.id === p.id);
+  let best = null;
+  for (const p of w.people) if (ok(p, 30) && (!best || p.born < best.born || (p.born === best.born && p.id < best.id))) best = p;
+  if (!best) for (const p of w.people) if (ok(p, 14) && (!best || p.born < best.born || (p.born === best.born && p.id < best.id))) best = p;
+  return best;
+}
+// children in a tight ring round the fire, the grown-ups in wider rings behind; the teller stands on the far side
+function taleSpot(w, p) {
+  const F = w.tale, fx = w.fire.x, fy = w.fire.y, r3 = (v) => Math.round(v * 1000) / 1000;
+  if (p.id === F.id) return { k: 'tale', x: fx, y: r3(fy - 1.5), h: 99 };
+  const kid = ageY(w, p) < 14;
+  let n = kid ? F.j++ : F.k++, ring = 0, list;
+  for (;;) {
+    list = ring < 2 ? (ring % 2 ? TALE_B : TALE_A) : TALE_ALL;
+    if (n < list.length) break;
+    n -= list.length; ring++;
+  }
+  const inner = kid ? 0 : Math.ceil((F.kids || 0) / 11);
+  const r = 1.4 + Math.min(ring + inner, 9) * 0.65 + (kid ? 0 : 0.15), [ux, uy] = RING[list[n]];
+  return { k: 'tale', x: r3(fx + ux * r), y: r3(fy + uy * r), h: 99 };
+}
+function longNight(w, c, fx) {
+  const F = w.tale, h = c.hour;
+  if (h === TALE_FROM) {
+    F.k = 0; F.j = 0;
+    const t = teller(w);
+    F.id = t ? t.id : null;
+    F.kids = w.people.filter((p) => !p.dead && !p.sick && ageY(w, p) < 14).length;
+    const wood = Math.min(TALE_WOOD, Math.floor(w.timber / 6));
+    w.timber = Math.round((w.timber - wood) * 100) / 100;
+    if (fx) fx.push({ x: w.fire.x + 0.5, y: w.fire.y - 1, text: 'the longest night', color: 'food' });
+  } else if (h === TALE_TELL) {
+    const t = aliveId(w, F.id);
+    if (t && !t.sick) tellTale(w, t);
+  } else if (h === TALE_TO) {
+    F.id = null; F.k = 0; F.j = 0;
+    delete F.kids;
+  }
+}
+// what the island remembers, most pressing first
+function taleChoices(w, t) {
+  const out = [], His = Cap(poss(t)), He = Cap(pron(t));
+  const fogDead = (w.graves || []).filter((g) => /fog/.test(g.why));
+  if ((w.lost && w.lost.n) || (w.fauna && w.fauna.fa) || fogDead.length) {
+    const fd = fogDead.length ? ` ${fogDead.length === 1 ? fogDead[0].n : fogDead.slice(0, -1).map((g) => g.n).join(', ') + ' and ' + fogDead[fogDead.length - 1].n} went out into it and did not come home.` : '';
+    out.push({ key: 'fog', lore: 1, text: `of the fog: how it comes in off the sea without a sound, how a child who strays past the last house cannot find the way back, and how the wolves walk in it by day.${fd} Nobody fidgets.` });
+  }
+  const m = /^(\d+) settlers/.exec((w.chronicle[0] && w.chronicle[0].text) || '');
+  const founder = t.born < 0 && t.born % TICKS_PER_YEAR === 0 && t.id < 40; // came ashore at the first hour
+  if (m) out.push({ key: 'land', text: `of the landing: how ${m[1]} people came over the sea in the first spring with seed grain, stone axes and a pot of embers, and lit the fire they are sitting round.${founder ? ` ${He} was one of them, ${Math.floor(-t.born / TICKS_PER_YEAR)} years old, and ${pron(t)} remembers the smell of the wet ashes.` : ''}` });
+  const graves = w.graves || [];
+  for (const g of graves) if (g.by && g.dd) out.push({ key: 'g' + g.id, text: `of ${g.n} ${g.by}, who ${andJoin(g.dd)}, and ${g.why} in ${yearOf(g.d)}. The children make ${t.sex === 'f' ? 'her' : 'him'} tell it twice.` });
+  const own = t.dd && deedsText(t.dd);
+  if (own) out.push({ key: 'me' + t.id, text: `of ${poss(t)} own young days: ${pron(t)} ${andJoin(own)}. ${His} hands show it as ${pron(t)} talks.` });
+  for (const p of w.people) if (p !== t && !p.dead && p.dd && p.dd.by) out.push({ key: 'by' + p.id, text: `how ${p.name} came to be called ${p.name} ${byname(p)}: ${pron(p)} ${andJoin(deedsText(p.dd))}. ${p.name} looks into the fire and says nothing.` });
+  for (const g of graves) {
+    if (g.by) continue;
+    const kin = t.mother === g.id ? `${poss(t)} mother, ` : t.father === g.id ? `${poss(t)} father, ` : g.m === t.id || g.f === t.id ? `${poss(t)} own child, ` : '';
+    const end = ['The fire cracks, and for a while nobody speaks.', 'The little ones ask where the mound is, and are told.', 'Somebody wipes their eyes on a sleeve.'][g.id % 3];
+    out.push({ key: 'g' + g.id, text: `of ${g.n}, ${kin}who ${g.why} in ${yearOf(g.d)}. ${end}` });
+  }
+  for (const e of w.chronicle) {
+    if (w.t - e.t < TICKS_PER_YEAR) break;
+    const s = /^Y(\d+) (\w+)/.exec(e.s), first = (/^.*?[.!?](?=\s|$)/.exec(e.text) || [e.text])[0];
+    if (!s || first.length < 40 || first.length > 220 || /^\d|is home to|aged \d|longest night|nights are long/.test(first)) continue;
+    const y = +s[1];
+    out.push({ key: 'c' + e.t, text: `again of the ${s[2].toLowerCase()} of ${ORD[y] ? `the ${ORD[y]} year` : `year ${y}`}: "${first}"` });
+  }
+  return out;
+}
+function tellTale(w, t) {
+  const F = w.tale, first = !w.techs.includes('tales'), who = `${t.name}${byname(t) ? ' ' + byname(t) : ''}`;
+  const all = taleChoices(w, t), fresh = all.filter((o) => !F.told.includes(o.key));
+  F.n++;
+  if (!fresh.length) {
+    log(w, `On the longest night ${w.name} sits close round the hearth, and ${who} tells the old tales again. The children know every word and say them along with ${t.sex === 'f' ? 'her' : 'him'}.`, 'good');
+    return;
+  }
+  const o = rnd(w) < 0.6 ? fresh[0] : fresh[ri(w, fresh.length)];
+  F.told.push(o.key);
+  if (F.told.length > TALE_KEEP) F.told.shift();
+  let text = first
+    ? `The nights are long and black, and ${who}, the eldest, says the old days must not be forgotten. On the longest night all of ${w.name} sits close round the hearth, the children in front, and ${t.name} tells ${o.text}`
+    : `On the longest night all of ${w.name} sits close round the hearth, the children in front, and ${who} tells ${o.text}`;
+  if (!/[.!?"]$/.test(text)) text += '.';
+  if (o.lore && !F.lore) { F.lore = 1; text += ` Since that night the children of ${w.name} keep close to the houses when the fog comes in.`; }
+  if (first) { w.techs.push('tales'); text += ' From now on a tale is told every year on the longest night.'; }
+  milestone(w, text);
 }
 
 // ---------- the far isle ----------
@@ -2170,8 +2293,9 @@ function search(w, p, L) {
 }
 function strays(w) {
   const list = w.people.filter((p) => {
-    if (p.dead || p.asleep || p.sick || p.hurt || (p.task && p.task.k === 'fest') || (w.horn && w.horn.hid === p.id)) return false;
+    if (p.dead || p.asleep || p.sick || p.hurt || (p.task && (p.task.k === 'fest' || p.task.k === 'tale')) || (w.horn && w.horn.hid === p.id)) return false;
     const a = ageY(w, p);
+    if (a < 11 && w.tale && w.tale.lore && hash(p.id, w.t, 83) < TALE_HEED) return false; // they remember the tale
     return (a >= 3 && a < 11) || a >= 72;
   });
   if (!list.length) return;
@@ -2834,6 +2958,13 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
+  if (taleNow(w, c) && !p.sick) { // the longest night: everyone round the hearth to hear the tale
+    if (p.task && p.task.k !== 'tale') release(w, p);
+    if (!p.task) p.task = taleSpot(w, p);
+    p.asleep = false;
+    walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
+    return;
+  }
   if (night || storm || p.sick) { // in a storm nobody works outdoors: they wait it out at home. The sick keep to their beds
     if (p.task && p.task.k !== 'home') release(w, p);
     const home = homeOf(w, p);
@@ -2865,7 +2996,7 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -3148,6 +3279,10 @@ const MIGRATIONS = {
   22: (w) => {
     if (w.dogs === undefined) w.dogs = null;
   },
+  // v23 -> v24: the longest night. No tale told yet; the first is told at the hearth this winter.
+  23: (w) => {
+    if (w.tale === undefined) w.tale = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3189,6 +3324,7 @@ export function summary(w) {
     isleVisits: w.isle ? w.isle.n : 0, isleWed: w.isle ? w.isle.wed : 0, isleGone: w.isle ? w.isle.gone : 0,
     guests: w.isle && w.isle.boat ? w.isle.boat.gs.filter((g) => !g.isl).length : 0,
     dogs: w.dogs ? w.dogs.d.length : 0, dogsCame: !!w.dogs, dogsTurned: w.dogs ? w.dogs.k : 0, dogsFound: w.dogs ? w.dogs.f : 0, dogsRats: w.dogs ? w.dogs.r : 0,
+    tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

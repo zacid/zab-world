@@ -232,3 +232,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A dog that loses its owner pines; a dog's grave beside its owner's; dogs howling with the wolves on winter nights.
   - Pups given to the far isle guests as gifts (trade), or a far-isle dog of a new coat brought in to breed.
   - Wolf blood: a dog that runs off to the pack one hungry winter, or a half-wolf litter that is wilder.
+- The longest night is done (SIM_VERSION 24; tech 'tales', w.tale {y, on, n, id, told [keys], lore, k/j ring slots, kids}; TALE_* in sim.js;
+  taleDay/teller/taleSpot/longNight/taleChoices/tellTale; taleNow() exported; task kind 'tale'). One chronicle tale per winter from Y2;
+  late game most tales are graves of named Reapers because they die every year or two. Only the fog tale changes the sim. Answers it invites:
+  - More lessons: a tale of a boar goring makes hunters take boars only in pairs of three; a tale of a cold death sends the frail to the
+    biggest woodpile on bitter nights; a tale of the far isle makes the young restless (more leave with the boat).
+  - Heroes inspire: a child who hears a named hunter's tale is likelier to take up the spear (a bias in pickTask for 14-20 year olds).
+  - Tales that drift: a tale retold after 30+ years grows (the boar gets bigger, the number of wolves doubles) in the chronicle text.
+  - Song and memory: once the tellers have told 20 tales, a song or a carved tally stick by the hearth keeps them (a visible object on the map).
+  - Late-game the tale candidate list scans the whole chronicle every winter; cheap now (~once a year), but keep it that way.
