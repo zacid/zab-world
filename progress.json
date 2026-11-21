@@ -158,5 +158,10 @@
   "at": "2026-11-21T05:15:28.388Z",
   "title": "Add snowmen: children play in the winter snow",
   "body": "- SIM_VERSION 29 (w.snow {k, n built ever, y this year, men [{id, x, y, s balls, m melting, nm, by}]}; tech 'snowmen'; task kind 'snow'; SNOW_* in sim.js; yearly `snowmen`): learned on the first winter snow day with two children aged 4-13\n- On winter days without storm or fog, 2 of every 3 children go out to the green within 6 tiles of the hearth. They roll up to 3 snowmen (three balls each) and spend the rest of the day in snowball fights. Children do no work, so food and labour are unchanged\n- Finished snowmen often get a name: someone living with a byname, a named grave, or the eldest. Each byname adds its own prop (spear, bracken pelt, torch, axe, straw crown). They melt ball by ball in spring, faster in rain and heat\n- Visible: pixel snowmen with twig arms that lean and leave meltwater in spring, children patting snow and lobbing snowballs, hover tips, snowmen in History\n- Watch: Hais learns it this coming winter (Y7) and builds 3 a winter, named after Vidor the Hunter and Duten the Wolf-slayer"
+ },
+ {
+  "at": "2026-11-21T06:09:16.714Z",
+  "title": "Add summer wildfires that the village beats back",
+  "body": "- SIM_VERSION 30 (w.blaze; BLAZE_*/ASH_* in sim.js; task kind 'blaze'; yearly `burnt`): from Y2, a long heatwave or a dry storm after heat can set a tall tree alight\n- Fire spreads tree to tree with a wind, through dry grass, standing grain and thatch; rain and night dew damp it. Every able adult goes out with green branches to the flames nearest the houses; beaten-out trees stand scorched, burnt ones turn to ash\n- Burnt woods lie black for a season, then open grass with fireweed, then saplings; the woods refill in about 3 years\n- Visible: flames and drifting smoke on burning tiles, a brown haze and night glow, beaters swinging branches, black ash, a Fire row, hover tips, History\n- Watch: the live island should see a small first fire in summer Y8 and two 70-100 acre fires in Y10; test seeds get 20-40 fires a century, a few over 100 acres"
  }
 ]

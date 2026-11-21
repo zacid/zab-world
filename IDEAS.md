@@ -292,3 +292,17 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A storm or a dog knocks a snowman down; the children rebuild it on the next snow day.
   - Children who played together pair up more often later (a "friends" link per person).
   - Snow depth as state (builds on snow days, melts on warm ones) would let snow slow walking and show bare patches in a mild winter.
+- Wildfire is done, as a problem only (SIM_VERSION 30; w.blaze {n, burnt, y, last, ash [[tile, tick, k 0 grass|1 trees|2 scorched]],
+  cur {at, x, y, wd, b [[tile, hours]], t, s, f, r, g, hands, first, gt/gd}}; BLAZE_* / ASH_* in sim.js; blazeDay/ashDay/blazeStart/blazeHour/
+  blazeOut/blazeOver/blazeFight; blazeOn() exported; task kind 'blaze'; drawAsh()/drawBlaze()/blazeAt() in render.js; yearly `burnt`).
+  Summer only: a heatwave day from the 3rd (x2 after a dry spring) or a storm breaking a 3+ day heat spell. Every able adult beats at the
+  flames nearest the hearth (within 22 tiles) from the 3rd hour; rain puts it out. Test seeds: ~20-40 fires a century, most 1-20 acres,
+  a few 100-400 when a west-or-east wind drives one through a big unbroken wood far from the village. Burnt land is grass for a year or more,
+  then saplings come back (ASH_TREE) and the normal creep refills it within ~3 years. Fields and roofs are rarely hit, because the beaters
+  stand between the fire and the houses. `scripts/_blazeprobe.mjs [years] [seed] [live]`, `scripts/_blazedet.mjs` (save/load mid-fire). Answers it invites:
+  - Firebreaks: after a big fire the village keeps a cleared strip between the woods and the fields (chop a ring of tiles each spring).
+  - Slash-and-burn: grain sown on fresh ash yields more for 2-3 harvests; the islanders notice and later burn scrub on purpose (a tech).
+  - Water lines: a bucket chain from the shore or a pond puts out tiles faster than branches; skins or jars as buckets (pottery).
+  - Beasts flee the smoke: wolves and boars driven out of the burning wood into the open, deer onto the beach; a scorched den moves.
+  - A fire-beater byname for whoever puts out the most tiles; the great fire as a winter tale with a lesson (stack wood away from the trees).
+  - The kiln, the bonfire or the beach watch fire as a human cause of a fire in a dry summer.

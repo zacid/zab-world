@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
 // the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
 const KILN = ['..kkkk..', '.kKKKKk.', 'kKKKKKKk', 'kKKKKKKk', 'kKKmmKKk', 'kKmmmmKk', 'kkmmmmkk', '........'];
@@ -101,6 +101,7 @@ function doing(p) {
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   if (p.task && p.task.k === 'watch') return p.x === p.px && p.y === p.py ? 'keeping watch on the beach by a driftwood fire' : 'going down to keep the beach watch';
   if (p.task && p.task.k === 'herd') return 'minding the goats';
+  if (p.task && p.task.k === 'blaze') return p.x === p.px && p.y === p.py ? 'beating at the flames with a green branch' : 'running to the fire';
   if (p.task && p.task.k === 'clay') return 'digging clay at the bank';
   if (p.task && p.task.k === 'shape') return 'coiling a jar by the kiln';
   if (p.task && p.task.k === 'fire') return 'firing the kiln';
@@ -230,6 +231,9 @@ function drawTerrain() {
   const pal = PAL[c.season];
   tc.clearRect(0, 0, PX, PX);
   surf = [];
+  ashAt = new Map();
+  if (w.blaze) for (const a of w.blaze.ash) ashAt.set(a[0], a);
+  if (S.blazeOn(w)) for (const [i] of w.blaze.cur.b) ashAt.set(i, 'lit');
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, t = w.tiles[i], X = x * TILE, Y = y * TILE;
     const h = S.hash(x, y, 3);
@@ -249,6 +253,8 @@ function drawTerrain() {
     // grass base for everything else
     px(tc, X, Y, pal.grass[0], 8, 8);
     for (let k = 0; k < 5; k++) { const hh = S.hash(x * 5 + k, y, 17); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, k < 3 ? pal.grass[1] : pal.grass[2]); }
+    const ash = ashAt.get(i);
+    if (ash) drawAsh(X, Y, x, y, ash, pal);
     if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, pal, h);
     else if (t === S.T.GRASS && w.wear && w.wear[i] >= S.WEAR_SEEN) drawPath(x, y, X, Y, w.wear[i], pal);
   }
@@ -266,6 +272,10 @@ function drawTerrain() {
       for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) px(tc, X + k * 2, Y + r * 2 + 1, '#b59b5c');
     } else if (f.flat) { // storm-flattened grain lying in the mud
       for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
+    }
+    if (f.burnt && f.stage === 'fallow') { // the grain went up in the fire: black stubble
+      px(tc, X, Y, '#1c1714', 8, 8);
+      for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#3a2e26', 7, 1);
     }
     if (f.root) { // boars have been at it: torn-up clods and bare black earth
       for (let k = 0; k < 6; k++) { const hh = S.hash(f.x * 6 + k, f.y, 23); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 7, k < 3 ? '#2a1a10' : '#7a5636', 2, 1); }
@@ -346,6 +356,63 @@ function drawTerrain() {
   }
 }
 const wxNow = () => (w.wx ? w.wx.k : 'clear');
+// burnt ground: black with grey ash and charred stumps for a season, then dark patches in the new grass,
+// then a scatter of fireweed. Trees that were saved stand over singed black earth for half a year.
+let ashAt = new Map();
+function drawAsh(X, Y, x, y, a, pal) {
+  if (a === 'lit') { px(tc, X, Y, '#2a1a12', 8, 8); return; }
+  const [, t, k] = a, age = (w.t - t) / S.TICKS_PER_DAY;
+  if (k === 2) {
+    if (age > 180) return;
+    for (let n = 0; n < 6; n++) { const hh = S.hash(x * 6 + n, y, 61); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, n < 4 ? '#1c1714' : '#3a2e26', 2, 1); }
+    return;
+  }
+  if (age < 90 && !pal.snow) {
+    px(tc, X, Y, '#1c1714', 8, 8);
+    for (let n = 0; n < 6; n++) { const hh = S.hash(x * 6 + n, y, 62); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, n < 4 ? '#4a4540' : '#6a645c'); }
+    if (age > 30) for (let n = 0; n < 3; n++) { const hh = S.hash(x * 3 + n, y, 64); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, pal.grass[1]); } // first green shoots
+  } else if (age < 360) {
+    for (let n = 0; n < 7; n++) { const hh = S.hash(x * 7 + n, y, 63); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, pal.snow ? '#9a948c' : '#241d18', 2, 1); }
+  } else if (!pal.snow) {
+    for (let n = 0; n < 3; n++) { const hh = S.hash(x * 3 + n, y, 65); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, n ? '#2e2620' : '#c86aa8'); } // fireweed
+  }
+  if (k === 1 && age < 360) { // charred stumps
+    const hh = S.hash(x, y, 66);
+    px(tc, X + 1 + ((hh * 5) | 0), Y + 4, '#0d0a08', 1, 2); px(tc, X + 5 - ((hh * 3) | 0), Y + 2, '#0d0a08', 1, 2);
+  }
+}
+// flames on every burning tile, smoke streaming downwind; returns the points that glow at night
+function drawBlaze(now) {
+  if (!S.blazeOn(w)) return [];
+  const C = w.blaze.cur, out = [], wind = [[1, 0], [0, 1], [-1, 0], [0, -1]][C.wd];
+  for (const [i, h] of C.b) {
+    const x = i % N, y = (i - x) / N, X = x * TILE, Y = y * TILE, big = w.tiles[i] === S.T.FOREST;
+    for (let k = 0; k < (big ? 4 : 2); k++) {
+      const hh = S.hash(x * 4 + k, y, 71), fx = X + 1 + ((hh * 6) | 0), ph = Math.floor(now / (110 + k * 23) + hh * 7) % 3;
+      const tall = (big ? 3 : 2) + (ph === 1 ? 1 : 0) - (h <= 1 ? 1 : 0);
+      px(sc, fx, Y + 7 - tall, '#e0521f', 1, tall); px(sc, fx, Y + 8 - tall - (ph === 2 ? 1 : 0), '#ffc23d', 1, 1);
+      if (ph === 0) px(sc, fx, Y + 6 - tall, '#ffe48a');
+    }
+    for (let k = 0; k < (big ? 3 : 1); k++) {
+      const ph = ((now / 90 + k * 13 + S.hash(x, y, 72) * 40) % 40) / 40;
+      const sx = X + 4 + wind[0] * ph * 14 + Math.sin(ph * 5 + k) * 1.5, sy = Y + 2 - ph * 10 + wind[1] * ph * 14;
+      sc.fillStyle = `rgba(120,110,100,${((1 - ph) * 0.5).toFixed(3)})`;
+      sc.fillRect(Math.round(sx), Math.round(sy), ph > 0.35 ? 2 : 1, ph > 0.35 ? 2 : 1);
+    }
+    out.push({ x: X + 4, y: Y + 5, big });
+  }
+  return out;
+}
+function blazeAt(mx, my) {
+  const x = Math.floor(mx), y = Math.floor(my);
+  if (x < 0 || y < 0 || x >= N || y >= N) return null;
+  const a = ashAt.get(y * N + x);
+  if (a === 'lit') return { lit: true };
+  if (!a) return null;
+  const age = (w.t - a[1]) / S.TICKS_PER_DAY;
+  if (a[2] === 2 ? age > 180 : age > 720) return null;
+  return { a, age };
+}
 // the burying ground: a low dry-stone wall with a gap toward the hearth, graves in rows inside.
 // A new grave is bare earth under a wooden stake, with flowers for the first weeks; within a year
 // it has grassed over and a grey stone stands at its head.
@@ -623,6 +690,7 @@ function frame() {
     px(sc, wat.x, wat.y + 1, '#e0521f', 2, 2); px(sc, wat.x + (f2 === 1 ? 1 : 0), wat.y - (f2 === 2 ? 1 : 0), '#ffc23d', 1, 2);
     if (f2 === 0) px(sc, wat.x + 1, wat.y - 1, '#ffe48a');
   }
+  const flames = drawBlaze(now);
   // people
   const shown = [];
   let horner = null;
@@ -715,6 +783,11 @@ function frame() {
       if (!moving && hornBlast(now) >= 0) { px(sc, X + 2, Y, '#e9dcc0', 2, 1); px(sc, X + 4, Y - 1, '#d8c39a', 1, 2); horner = { x, y }; }
       else { px(sc, X + 3, Y + 2, '#e9dcc0', 1, 1); px(sc, X + 3, Y + 1, '#d8c39a', 1, 1); }
     }
+    if (p.task && p.task.k === 'blaze' && age >= 14) { // a leafy green branch, swung down on the flames
+      const sw = !moving && Math.floor(now / 220 + p.id) % 2, bx = X + ((p.task.o % N) + 0.5 < p.x ? -2 : 3); // on the side of the flames
+      px(sc, bx + (bx < X ? 1 : 0), Y - 1 + sw, '#6e4a2a', 1, 3);
+      px(sc, bx - (bx < X ? 1 : 0), Y - 2 + sw * 3, '#5f9a3e', 2, 2);
+    }
     if (p.task && p.task.k === 'lost' && !moving && Math.floor(now / 900 + p.id) % 2) px(sc, X - 1, Y + 3, '#f4f4f4', 5, 1); // sat down, arms round the knees
     shown.push({ p, x, y });
   }
@@ -741,6 +814,7 @@ function frame() {
   const wx = wxNow();
   const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)', fog: 'rgba(190,198,204,0.30)' }[wx];
   if (tint) { sc.fillStyle = tint; sc.fillRect(0, 0, PX, PX); }
+  if (flames.length) { sc.fillStyle = `rgba(90,60,40,${Math.min(0.2, 0.05 + flames.length * 0.004).toFixed(3)})`; sc.fillRect(0, 0, PX, PX); } // smoke over the whole island
   if (horner) hornRings(horner, now);
   // night
   if (dark > 0) {
@@ -759,6 +833,7 @@ function frame() {
     glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : tale ? 32 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : tale ? 0.65 : 0.55)).toFixed(3)})`);
     if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
     if (kiln) glow(sc, kiln.x, kiln.y, kiln.firing ? 10 + Math.sin(now / 170) : 5, `rgba(255,120,40,${(dark * (kiln.firing ? 0.6 : 0.3)).toFixed(3)})`);
+    for (let k = 0, st = Math.ceil(flames.length / 60); k < flames.length; k += st) { const o = flames[k]; glow(sc, o.x, o.y, (o.big ? 12 : 7) + Math.sin(now / 150 + o.x) * 1.2, `rgba(255,110,40,${(dark * (o.big ? 0.5 : 0.35)).toFixed(3)})`); }
     if (wat) glow(sc, wat.x + 1, wat.y + 2, 13 + Math.sin(now / 230) * 1.2, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
@@ -854,6 +929,12 @@ function frame() {
     } else if ((best = snowmanAt(mx, my))) {
       const b = known.get(best.by) || w.people.find((q) => q.id === best.by);
       tip.innerHTML = `<b>${best.nm ? esc(best.nm) : 'Snowman'}</b><br>${best.m ? 'melting into the mud' : best.s < 3 ? 'half rolled' : 'standing by the hearth'}<br><span class="m">${best.nm ? 'a snowman · ' : ''}${b ? `begun by ${esc(b.name)}` : 'rolled by the children'}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = blazeAt(mx, my))) {
+      const C = w.blaze.cur, s = S.summary(w);
+      tip.innerHTML = best.lit ? `<b>Wildfire</b><br>${s.blazeAlight} ${s.blazeAlight === 1 ? 'tile' : 'tiles'} alight · ${s.blazeFighting ? `${s.blazeFighting} beating at the flames` : 'nobody near it'}<br><span class="m">lit ${when(C.at)} · ${C.t} burnt so far</span>`
+        : best.a[2] === 2 ? `<b>Scorched trees</b><br><span class="m">saved from the fire ${when(best.a[1])}</span>`
+        : `<b>Burnt ground</b><br>${best.age < 90 ? 'black ash' : best.age < 360 ? 'new grass through the ash' : 'fireweed and young grass'}<br><span class="m">${best.a[2] ? 'woods' : 'grass'} burnt ${when(best.a[1])}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
@@ -1188,7 +1269,7 @@ function updatePanels() {
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
@@ -1207,6 +1288,7 @@ function updatePanels() {
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
     ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back</span>`]] : []),
+    ...(s.blazeFires ? [['blaze', 'Fire', `${s.blaze ? `<span class="bad">the woods are burning · ${s.blazeAlight} alight · ${s.blazeFighting} beating</span> · ` : ''}<span class="m">${s.blazeFires} ${s.blazeFires === 1 ? 'fire' : 'fires'} · ${s.blazeBurnt.toLocaleString()} acres burnt${!s.blaze && w.blaze.last >= 0 ? ` · last ${when(w.blaze.last)}` : ''}</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
@@ -1276,7 +1358,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 29;
+export const SIM_VERSION = 30;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -405,7 +405,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null,
   };
   // name the island
   let nm = '';
@@ -550,6 +550,7 @@ export function step(w, fx) {
   if (c.hour === 19) supper(w);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
+  if (w.blaze && w.blaze.cur) blazeHour(w, c);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
@@ -599,14 +600,14 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.rats) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
@@ -620,7 +621,9 @@ function daily(w, c, fx) {
     if (rot) log(w, `${plural(rot, 'fence has', 'fences have')} rotted at the stakes over the year.`, 'info');
   }
   if (w.beasts) wilds(w, c);
+  const was = w.wx ? w.wx.k : 'clear', wasN = w.wx ? w.wx.n : 0;
   weather(w, c);
+  if (w.blaze !== undefined) blazeDay(w, c, was, wasN);
   festDay(w, c);
   taleDay(w, c);
   snowDay(w, c);
@@ -3342,6 +3345,8 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
+  // wildfire: everyone able goes out with green branches, dawn to late evening
+  if (w.blaze && w.blaze.cur && w.t - w.blaze.cur.at >= BLAZE_SEEN && a >= 14 && a < 65 && !p.sick && !p.hurt && h >= 5 && h < 23 && blazeFight(w, p, c)) return; // even in a storm
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
   const night = h >= 21 || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST); // the night's watcher sleeps late
@@ -3392,7 +3397,7 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -3443,8 +3448,8 @@ function finish(w, p, t, c, fx) {
       delete b.hands;
     }
     if (b.progress >= 1 && b.dmg) {
-      delete b.dmg;
-      log(w, b.kind === 'granary' ? 'The granary roof is thatched again.' : 'A storm-torn roof is mended.', 'good');
+      log(w, b.kind === 'granary' ? 'The granary roof is thatched again.' : b.burnt ? 'A burnt roof is thatched again.' : 'A storm-torn roof is mended.', 'good');
+      delete b.dmg; delete b.burnt;
     } else if (b.progress >= 1 && b.kind === 'granary') {
       const n = w.buildings.filter((o) => o.kind === 'granary' && o.progress >= 1).length;
       if (n === 1) milestone(w, `The first granary stands on ${w.name}, its floor raised above the damp.`);
@@ -3607,6 +3612,220 @@ function snowDay(w, c) {
   const had = S.men.length;
   S.men = S.men.filter((m) => m.s > 0 || (c.season === 3 && !m.m));
   if (had && !S.men.length && c.season !== 3) log(w, `The last snowman by the hearth slumps into the mud. Spring has come to ${w.name}.`, 'info');
+}
+
+// ---------- wildfire ----------
+// After a run of summer heat the woods are tinder. Dry thunder, or a storm that brings lightning but no
+// rain at first, can set a tall tree alight; the fire creeps from tree to tree with the wind, through
+// dry grass and into the standing grain, and can catch a roof. Every islander who can stand goes out
+// with green branches to beat at the edge nearest the houses; rain puts it out. Burnt woods lie black
+// for a season, then open grass, and in a few years birch saplings creep back.
+// w.blaze { n fires ever, burnt tiles ever, y tiles this year, last tick, ash [[tile, tick, k 0 grass|1 trees|2 scorched]],
+//   cur { at, x, y origin, wd wind 0..3, b [[tile, hours left]], t tiles burnt, s scorched, f fields, r roofs, g grain, hands [ids], first,
+//   gt/gd the hour and the spots where beaters stood } }
+const BLAZE_YEAR = 2;        // the first summer is too green
+const BLAZE_HEAT = 0.02;   // chance per heatwave day from the 4th that dry thunder strikes the woods
+const BLAZE_BOLT = 0.25;     // chance a summer storm that breaks a heat spell of 3+ days sets a tree alight first
+const BLAZE_SPREAD = 0.2;// chance per hour that a burning tree sets a full-grown neighbour alight
+const BLAZE_GRASS = 0.025;   // dry grass
+const BLAZE_CROP = 0.07;     // standing or ripe grain, or the stubble
+const BLAZE_ROOF = 0.04;     // a thatch next to the flames
+const BLAZE_GUARD = 0.25;    // x this with someone beating at the flames beside it
+const BLAZE_WIND = [1.8, 1, 0.4, 1]; // downwind, across, upwind, across
+const BLAZE_WX = { heat: 1.4, clear: 0.7, cold: 0.6, fog: 0.4, storm: 0.6, rain: 0.2, snow: 0 };
+const BLAZE_DOUSE = { rain: 0.35, storm: 0.25, fog: 0.06, snow: 1 }; // chance per hour each burning tile is put out
+const BLAZE_NIGHT = 0.5;     // the dew damps it down from dusk to dawn
+const BLAZE_BEAT = 0.15;     // chance per hour a beater puts out the tile in front of them
+const BLAZE_SEEN = 3;        // hours before the smoke is seen and the alarm goes round
+const BLAZE_REACH = 22 * 22; // flames farther than this from the hearth are left to burn
+const BLAZE_SCALD = 0.003;   // chance per hour a beater is burnt
+const BLAZE_GRAIN = 400;     // grain a burning granary loses at most
+const ASH_SPROUT = 360;      // days before saplings come up through the ash
+const ASH_TREE = 0.001;     // daily chance after that, for each burnt tile still open
+const ASH_KEEP = 1080;       // days the ground still shows the burn
+const DIRS4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+const WIND_NAME = ['west', 'north', 'east', 'south']; // the wind blows from here (it drives the fire the other way)
+function sideOf(w, x, y) {
+  const dx = x - w.fire.x, dy = y - w.fire.y, ns = dy < 0 ? 'north' : 'south', ew = dx < 0 ? 'west' : 'east';
+  return Math.abs(dy) * 2 < Math.abs(dx) ? ew : Math.abs(dx) * 2 < Math.abs(dy) ? ns : `${ns}-${ew}`;
+}
+export const blazeOn = (w) => !!(w.blaze && w.blaze.cur);
+function blazeDay(w, c, was, wasN) {
+  const B = w.blaze;
+  if (B) {
+    if (c.doy === 0) B.y = 0;
+    if (B.ash.length) B.ash = B.ash.filter((a) => ashDay(w, a));
+  }
+  if (B && B.cur) return;
+  if (c.year < BLAZE_YEAR || c.season !== 1 || !w.wx) return;
+  const k = w.wx.k;
+  let odds = 0, bolt = false;
+  if (k === 'heat' && w.wx.n >= 3) odds = BLAZE_HEAT * (w.harvest < 0.8 ? 2 : 1); // worse in a dry year
+  else if (k === 'storm' && w.wx.n === 1 && was === 'heat' && wasN >= 3) { odds = BLAZE_BOLT; bolt = true; }
+  if (!odds || rnd(w) >= odds) return;
+  let at = -1;
+  for (let tries = 0; tries < 300 && at < 0; tries++) {
+    const x = 1 + ri(w, MAP - 2), y = 1 + ri(w, MAP - 2), i = idx(x, y);
+    if (w.tiles[i] === T.FOREST && w.wood[i] >= 8 && d2(x, y, w.fire.x, w.fire.y) >= 36) at = i;
+  }
+  if (at < 0) return;
+  blazeStart(w, at, bolt, k === 'heat' ? w.wx.n : wasN);
+}
+// once a day each burnt tile ages: black, then grass, then saplings; dropped once it is built on, ploughed or grown over
+function ashDay(w, a) {
+  const [i, t, k] = a, age = (w.t - t) / TICKS_PER_DAY, tt = w.tiles[i];
+  if (age >= ASH_KEEP || (k === 2 ? tt !== T.FOREST : tt !== T.GRASS)) return false;
+  if (k === 2 || age < ASH_SPROUT || rnd(w) >= ASH_TREE) return true;
+  const x = i % MAP, y = (i - x) / MAP;
+  if ((w.wear && w.wear[i] >= PATH_AT) || nearBuild(w, x, y, 1) || DIRS4.some(([ax, ay]) => tile(w, x + ax, y + ay) === T.FIELD)) return true;
+  setTile(w, i, T.FOREST); w.wood[i] = 1;
+  return false;
+}
+function blazeStart(w, at, bolt, n) {
+  if (!w.blaze) w.blaze = { n: 0, burnt: 0, y: 0, last: -1, ash: [], cur: null };
+  const B = w.blaze, x = at % MAP, y = (at - x) / MAP, wd = ri(w, 4);
+  B.n++; B.last = w.t;
+  B.cur = { at: w.t, x, y, wd, b: [[at, blazeHours(w, at)]], t: 0, s: 0, f: 0, r: 0, g: 0, hands: [], first: B.n === 1 ? 1 : 0 };
+  const where = sideOf(w, x, y), wind = WIND_NAME[wd], far = d2(x, y, w.fire.x, w.fire.y) > BLAZE_REACH, who = elder(w);
+  const how = bolt ? 'A storm walks in off the sea with no rain in it yet, and lightning' : 'Dry thunder rolls over the island at noon, and a bolt';
+  if (B.n === 1) {
+    milestone(w, `${spellLen(n)} of heat have dried the woods of ${w.name} to tinder. ${how} strikes a tall tree in the ${where} woods. ` +
+      `By the time ${who ? who.name : 'anyone'} sees the smoke the treetops are alight, and ${wind === 'east' ? 'an' : 'a'} ${wind} wind is driving the flames on. Nobody on ${w.name} has fought a fire before. ` +
+      (far ? 'It is too far off to reach; the village can only watch it burn.' : `${who ? who.name : 'The eldest'} sends everyone who can stand to cut green branches and beat at the edge nearest the houses.`));
+  } else log(w, `${bolt ? 'Lightning' : 'Dry thunder'} sets the ${where} woods alight. Smoke rolls over ${w.name} on ${wind === 'east' ? 'an' : 'a'} ${wind} wind` + (far ? ', too far off to reach.' : ', and everyone runs for green branches.'), 'bad');
+}
+function blazeHours(w, i) {
+  const tt = w.tiles[i];
+  return tt === T.FOREST ? 3 + (w.wood[i] >> 2) : tt === T.FIELD ? 2 : 1;
+}
+// the hour's burning: each tile alight can set its neighbours going, then burns down a little
+function blazeHour(w, c) {
+  const B = w.blaze, C = B.cur, wx = w.wx ? w.wx.k : 'clear';
+  const busy = new Set();
+  for (const e of C.b) busy.add(e[0]);
+  for (let k = B.ash.length - 1; k >= 0 && B.ash[k][1] >= C.at; k--) busy.add(B.ash[k][0]);
+  const dry = wx === 'storm' && w.wx.n === 1 && C.at > w.t - 24; // the storm that brought the lightning has no rain in it at first
+  const f0 = (dry ? 1 : BLAZE_WX[wx] ?? 1) * (c.hour >= 21 || c.hour < 6 ? BLAZE_NIGHT : 1), douse = dry ? 0.02 : BLAZE_DOUSE[wx] || 0;
+  const gd = C.gt === w.t - 1 ? C.gd : []; // where the beaters stood last hour
+  const guarded = (x, y) => gd.some(([gx, gy]) => d2(gx, gy, x + 0.5, y + 0.5) <= 4);
+  const keep = [], lit = [];
+  for (const e of C.b) {
+    const i = e[0], x = i % MAP, y = (i - x) / MAP;
+    if (douse && rnd(w) < douse) { blazeOut(w, i, true); continue; }
+    for (let d = 0; d < 4; d++) {
+      const nx = x + DIRS4[d][0], ny = y + DIRS4[d][1];
+      if (!inMap(nx, ny)) continue;
+      const n = idx(nx, ny);
+      if (busy.has(n)) continue;
+      const tt = w.tiles[n], fw = BLAZE_WIND[(d - C.wd + 4) % 4] * f0;
+      if (tt === T.FOREST) {
+        if (rnd(w) < BLAZE_SPREAD * (0.3 + (0.7 * w.wood[n]) / TREE_MAX) * fw) { busy.add(n); lit.push([n, blazeHours(w, n)]); }
+      } else if (tt === T.GRASS) {
+        if (rnd(w) < BLAZE_GRASS * (wx === 'heat' ? 2 : 1) * fw) { busy.add(n); lit.push([n, 1]); }
+      } else if (tt === T.FIELD) {
+        const f = fieldAt(w, nx, ny);
+        if (!f || !(f.stage === 'ripe' || f.stage === 'harvested' || (f.stage === 'planted' && f.growth >= 0.4))) continue;
+        if (rnd(w) < BLAZE_CROP * fw * (guarded(nx, ny) ? BLAZE_GUARD : 1)) {
+          busy.add(n); lit.push([n, 2]);
+          if (f.stage !== 'harvested') C.f++;
+          f.stage = 'fallow'; f.growth = 0; f.burnt = 1; delete f.lost; delete f.fence;
+        }
+      } else if (tt === T.BUILD) {
+        const b = w.buildings.find((o) => o.x === nx && o.y === ny);
+        if (!b || b.progress < 1 || b.dmg) continue;
+        if (rnd(w) < BLAZE_ROOF * fw * (guarded(nx, ny) ? BLAZE_GUARD : 1)) {
+          busy.add(n);
+          b.progress = 0.75; b.dmg = 1; b.burnt = 1; C.r++;
+          let lost = 0;
+          if (b.kind === 'granary') {
+            const gs = w.buildings.filter((o) => o.kind === 'granary' && o.progress >= 0.75).length || 1;
+            lost = Math.round(Math.min(BLAZE_GRAIN, Math.max(0, w.food - sealed(w)) / gs));
+            w.food = Math.round((w.food - lost) * 100) / 100; C.g += lost;
+          }
+          log(w, b.kind === 'granary' ? `Sparks catch the granary thatch. The roof burns off${lost ? ` and ${lost} grain is scorched` : ''} before the fire can be beaten out.`
+            : 'Sparks catch a thatch by the woods. The roof burns off over the hearth inside; the family drag out what they can.', 'bad');
+        }
+      }
+    }
+    if (--e[1] <= 0) blazeOut(w, i, false);
+    else keep.push(e);
+  }
+  C.b = keep.concat(lit);
+  if (!C.b.length) blazeOver(w, wx);
+}
+function fieldAt(w, x, y) {
+  for (const f of w.fields) if (f.x === x && f.y === y) return f;
+  return null;
+}
+// a tile stops burning: put out (the trees stand scorched) or burnt down (ash)
+function blazeOut(w, i, saved) {
+  const B = w.blaze, C = B.cur, tt = w.tiles[i];
+  if (tt === T.FOREST && saved) { w.wood[i] = Math.max(1, w.wood[i] >> 1); B.ash.push([i, w.t, 2]); C.s++; return; }
+  if (tt === T.FOREST) { w.wood[i] = 0; setTile(w, i, T.GRASS); B.ash.push([i, w.t, 1]); C.t++; B.burnt++; B.y++; return; }
+  if (tt === T.GRASS) { B.ash.push([i, w.t, 0]); C.t++; B.burnt++; B.y++; }
+}
+function blazeOver(w, wx) {
+  const B = w.blaze, C = B.cur, hrs = w.t + 1 - C.at;
+  B.cur = null;
+  const where = `the ${sideOf(w, C.x, C.y)} woods`;
+  const long = hrs <= 30 ? 'a day' : spellLen(Math.max(2, Math.round(hrs / 24))).toLowerCase();
+  const head = BLAZE_DOUSE[wx] ? `Rain puts out the fire in ${where} after ${long}.`
+    : C.hands.length ? `The last flames in ${where} are beaten out after ${long}.` : `The fire in ${where} burns itself out after ${long}.`;
+  const hurt = [];
+  if (C.t) hurt.push(`${plural(C.t, 'acre', 'acres')} of wood and grass ${C.t === 1 ? 'is' : 'are'} black ash`);
+  if (C.s) hurt.push(`${plural(C.s, 'stand', 'stands')} of trees ${C.s === 1 ? 'was' : 'were'} saved, scorched`);
+  if (C.f) hurt.push(`${plural(C.f, 'field', 'fields')} of grain burnt`);
+  if (C.r) hurt.push(`${plural(C.r, 'roof', 'roofs')} lost${C.g ? ` and ${C.g} grain with it` : ''}`);
+  let text = head + (hurt.length ? ' ' + Cap(andJoin(hurt.join('; '))) + '.' : '');
+  const names = C.hands.map((id) => aliveId(w, id)).filter(Boolean);
+  if (names.length) {
+    const top = names.slice(0, 3).map((p) => p.name), more = names.length - top.length;
+    text += ` ${andJoin((more ? top.concat([`${more} more`]) : top).join('; '))} beat at the flames with green branches until their arms gave out.`;
+  }
+  if (C.first) text += ' Where the woods burnt, the grass will come up first.';
+  if (C.first || C.t >= 30 || C.r) milestone(w, text); else log(w, text, 'bad');
+}
+// someone able goes to beat at the flames nearest the houses, so long as they are within reach
+function blazeFight(w, p, c) {
+  const C = w.blaze.cur, fx = w.fire.x, fy = w.fire.y;
+  const cc = cacheOf(w);
+  if (!cc.blazeAt || cc.blazeAt.t !== w.t || cc.blazeAt.c !== C) cc.blazeAt = { t: w.t, c: C, n: new Map() }; // beaters already sent to each tile this hour
+  const G = cc.blazeAt;
+  if (C.gt !== w.t) { C.gt = w.t; C.gd = []; }
+  let t = p.task && p.task.k === 'blaze' && C.b.some((e) => e[0] === p.task.o) ? p.task.o : -1;
+  if (t < 0) {
+    let bs = 1e9;
+    for (const [i] of C.b) {
+      const x = i % MAP, y = (i - x) / MAP, dh = d2(x, y, fx, fy);
+      if (dh > BLAZE_REACH) continue;
+      const s = dh + d2(x + 0.5, y + 0.5, p.x, p.y) + 30 * (G.n.get(i) || 0);
+      if (s < bs && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) { bs = s; t = i; }
+    }
+    if (t < 0) return false;
+  }
+  G.n.set(t, (G.n.get(t) || 0) + 1);
+  const x = t % MAP, y = (t - x) / MAP, cx = x + 0.5, cy = y + 0.5;
+  if (!p.task || p.task.k !== 'blaze' || p.task.o !== t) {
+    release(w, p);
+    const dx = p.x - cx, dy = p.y - cy, dd = Math.sqrt(dx * dx + dy * dy) || 1;
+    p.task = { k: 'blaze', o: t, x: Math.round((cx + (dx / dd) * 0.9 - 0.5) * 100) / 100, y: Math.round((cy + (dy / dd) * 0.9 - 0.5) * 100) / 100, h: 99 };
+  }
+  p.asleep = false;
+  if (!walk(w, p, p.task.x + 0.5, p.task.y + 0.5)) return true;
+  C.gd.push([p.x, p.y]);
+  if (rnd(w) < BLAZE_SCALD) {
+    p.hurt = w.t + 6 * TICKS_PER_DAY;
+    log(w, `${p.name} is caught by a gust of flame and staggers back with ${poss(p)} arms burnt.`, 'bad');
+    release(w, p);
+    return true;
+  }
+  if (rnd(w) < BLAZE_BEAT) {
+    C.b = C.b.filter((e) => e[0] !== t);
+    blazeOut(w, t, true);
+    if (!C.hands.includes(p.id)) C.hands.push(p.id);
+    if (!C.b.length) blazeOver(w, w.wx ? w.wx.k : 'clear');
+  }
+  return true;
 }
 
 // ---------- upgrades ----------
@@ -3802,6 +4021,10 @@ const MIGRATIONS = {
   28: (w) => {
     if (w.snow === undefined) w.snow = null;
   },
+  // v29 -> v30: wildfire. Nothing has burnt yet; a summer heat spell can bring the first dry thunder.
+  29: (w) => {
+    if (w.blaze === undefined) w.blaze = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3850,6 +4073,8 @@ export function summary(w) {
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
     snowmen: w.snow ? w.snow.men.filter((m) => m.s >= 3).length : 0, snowmenEver: w.snow ? w.snow.n : 0,
+    blaze: blazeOn(w), blazeAlight: blazeOn(w) ? w.blaze.cur.b.length : 0, blazeFires: w.blaze ? w.blaze.n : 0, blazeBurnt: w.blaze ? w.blaze.burnt : 0,
+    blazeFighting: blazeOn(w) ? w.people.filter((p) => p.task && p.task.k === 'blaze').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
