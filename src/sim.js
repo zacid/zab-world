@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 45;
+export const SIM_VERSION = 46;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -70,6 +70,7 @@ export const TECHS = {
   bees:     { name: 'Bees', added: '2026-11-21T15:23Z', desc: 'A wild swarm found humming in a hollow tree, the log sawn off and stood up by the houses with a flat stone on top. The bees work the flowers from spring into autumn. When a hive grows crowded in late spring, half of it swarms; caught in time, it fills a new log. In late summer someone takes the honey with a smoking brand and leaves the bees enough to eat through the winter. A poor summer or a long hard winter can starve a hive. Honey dresses wounds, and at midsummer it is poured out as mead.', req: ['woodcut'] },
   lone:     { name: 'The lone wolf', added: '2026-11-21T16:37Z', desc: 'Years of spears have kept the pack at the den down to two, and a young wolf driven out of it has no pack to run with. It stays near the village, lies up in a thicket by the fields and walks the treeline by day, when the pack sleeps. It takes goats that stray and springs on anyone working alone. While it lives every hunt goes after it, and the pack at the den is left to grow. If nobody kills it, in a few years it moves on.', req: ['hunting'] },
   lore:     { name: 'Sky lore', added: '2026-11-21T20:43Z', desc: 'The eldest has sat out a lifetime of storms and at dusk reads the sky over the sea: a red sky in the west with mares\' tails high up, a long swell under a flat sea, gulls coming in off the water, hearth smoke that beats down instead of rising. When the signs say a storm by morning the village works on into the dark: the ripe grain is cut by firelight, and ropes weighted with stones are thrown over every roof so the wind cannot lift the thatch. The signs are not always right, and some storms come without any.', req: ['fire', 'shelter'] },
+  muck:     { name: 'Muck', added: '2026-11-21T21:34Z', desc: 'Dung forked out of the goat pen goes on a heap beside it, with the hearth ash and the kitchen scraps, and steams there through the winter. After the harvest it is carried out in baskets and forked over the bare fields, nearest the pen first. A mucked field stands thicker and heavier at its next harvest, by about a third, so the village needs fewer fields and fells less of the wood. The more goats, the bigger the heap.', req: ['goats', 'farming'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -178,6 +179,18 @@ const HEDGE_LEARN = 5;       // fences shouldered through (once fencing is known
 const HEDGE_WORK = 4;        // hours to dig the slips and set a field's edge
 export const HEDGE_GROW = 3 * 360 * 24; // ticks from planting until the thorn is thick enough to hold
 const HEDGE_HOLD = 0.97;     // chance a grown hedge turns a boar away
+// ---------- muck ----------
+// Dung forked out of the goat pen, with hearth ash and kitchen scraps, goes on a heap beside the pen. After the
+// harvest idle hands carry it out in baskets and fork it over the bare fields, nearest the pen first. A mucked
+// field yields a third more at its next harvest, so the village needs fewer fields and fells less of the wood.
+const MUCK_YEARS = 2;        // years of goats before someone sees the grain stand tallest by the pen
+const MUCK_NEAR = 6;         // the field whose harvest shows it lies within this many tiles of the pen
+const MUCK_GOAT = 1;         // heap per goat per day
+const MUCK_HOME = 0.2;       // heap per islander per day (ash and scraps)
+export const MUCK_FIELD = 100; // heap it takes to muck one field
+export const MUCK_CAP = 40;        // the heap holds at most this many fields' worth
+const MUCK_GAIN = 0.3;       // extra yield at the next harvest
+const MUCK_WORK = 3;         // hours to fork a field over
 
 // ---------- midsummer ----------
 const FEST_DAY = 135;        // day of the year (summer day 46); rain puts it off a few days, a storm until it passes
@@ -481,7 +494,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -678,7 +691,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -702,6 +715,7 @@ function daily(w, c, fx) {
     if (w.lone) w.lone.yh = 0;
     if (w.bow) w.bow.y = 0;
     if (w.lore) w.lore.y = 0;
+    if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -771,6 +785,7 @@ function daily(w, c, fx) {
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
+  if (w.muck) muckDay(w);
   if (w.dogs !== undefined) dogDay(w, c);
   lifeAndDeath(w, c);
   pairing(w);
@@ -2457,6 +2472,48 @@ function hedgeTask(w, p, c) {
   return f && { k: 'hedge', key: 'q' + f.id, x: f.x, y: f.y, h: HEDGE_WORK };
 }
 
+// ---------- muck ----------
+// w.muck { h heap, n fields mucked ever, y this year, g extra grain ever, yg this year, nm who saw it, at tick };
+// f.mk = 1 on a field mucked since its last harvest. The heap sits outside the pen; render draws it from h.
+// Learned at the harvest of a field near the pen, once goats have been kept MUCK_YEARS.
+function learnMuck(w, p, f) {
+  const G = w.goats, h = aliveId(w, G.hid), who = h && ageY(w, h) >= 14 ? h : p; // a grown herder knows the pen best
+  w.muck = { h: Math.min(MUCK_FIELD * MUCK_CAP, G.herd.length * 60), n: 0, y: 0, g: 0, yg: 0, nm: who.name, at: w.t };
+  w.techs.push('muck');
+  const P = pron(who), Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, `${p.name} straightens up from the sheaves and looks back along the rows. The grain on the side by the goat pen, where the dung has been forked out over the wattle for ${G.herd.length > 8 ? 'years' : 'two summers'}, stands a head taller than the rest, the ears fat and heavy. ${who === p ? Pc : who.name} says the muck should not be wasted on a corner. From now on it goes on a heap by the pen with the hearth ash and the scraps, and after the harvest it is carried out in baskets and forked over the bare fields. ${w.name} learns to muck its fields.`);
+}
+function muckDay(w) {
+  const M = w.muck, n = w.goats ? w.goats.herd.length : 0;
+  M.h = Math.min(MUCK_FIELD * MUCK_CAP, Math.round((M.h + n * MUCK_GOAT + w.people.length * MUCK_HOME) * 10) / 10);
+}
+// fields a year of muck can cover, counted as yield when the village decides whether it needs more fields
+function muckCover(w) {
+  if (!w.muck) return 0;
+  const n = w.goats ? w.goats.herd.length : 0;
+  return Math.min(w.fields.length, Math.floor(((n * MUCK_GOAT + w.people.length * MUCK_HOME) * DAYS_PER_YEAR) / MUCK_FIELD));
+}
+function muckTask(w, p) {
+  const M = w.muck;
+  if (!M || M.h < MUCK_FIELD || !w.goats) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'snow' || wx === 'storm') return null;
+  const cc = cacheOf(w);
+  if (cc.muckNone === w.t) return null; // nothing bare and unmucked this hour: don't search again
+  const f = nearest(w.fields, penMid(w.goats), (o) => !o.mk && (o.stage === 'harvested' || o.stage === 'fallow') && o.fr == null && w.res['m' + o.id] == null);
+  if (!f) { cc.muckNone = w.t; return null; }
+  M.h = Math.round((M.h - MUCK_FIELD) * 10) / 10; // the basket is filled at the heap; spilt if the work is broken off
+  return { k: 'muck', key: 'm' + f.id, x: f.x, y: f.y, h: MUCK_WORK };
+}
+function muckDone(w, p, t, pop) {
+  const f = w.fields.find((o) => 'm' + o.id === t.key);
+  if (!f || f.mk || !w.muck) return;
+  f.mk = 1; w.muck.n++; w.muck.y++;
+  pop('mucked', 'muted');
+  if (w.muck.n === 1) log(w, `${p.name} forks the first basket of muck over a bare field by the pen. It steams in the cold air.`, 'good');
+  else if (w.muck.n === 50 || w.muck.n === 250 || w.muck.n === 1000) log(w, `${w.muck.n} fields have been mucked from the heap by the pen.`, 'good');
+}
+
 // ---------- the hunt ----------
 const elder = (w) => w.people.filter((p) => !p.dead && ageY(w, p) >= 14).sort((a, b) => a.born - b.born || a.id - b.id)[0];
 function learnHunting(w) {
@@ -3917,7 +3974,7 @@ function needGranary(w) {
 }
 function woodTarget(w) { return HOUSE_COST * 2 + w.buildings.length * 25; }
 function needFields(w) {
-  const expect = w.fields.length * FIELD_YIELD * 0.9;
+  const expect = (w.fields.length + muckCover(w) * MUCK_GAIN) * FIELD_YIELD * 0.9;
   const pop = w.people.length;
   return expect < pop * DAYS_PER_YEAR * 1.3 || (w.food < pop * 120 && w.fields.length < pop * 2.5);
 }
@@ -4037,6 +4094,9 @@ function pickTask(w, p, c) {
   // hawthorn slips along the fields by the woods, in autumn and winter
   const qk = hedgeTask(w, p, c);
   if (qk) return qk;
+  // muck from the heap by the pen, forked over the bare fields after the harvest
+  const mk = muckTask(w, p);
+  if (mk) return mk;
   // the dugout: hollowing a new one, or out to the deep water, once the woodpile is seen to
   const uk = canoeTask(w, p, c);
   if (uk) return uk;
@@ -4509,8 +4569,12 @@ function finish(w, p, t, c, fx) {
   if (t.k === 'harvest') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (!f || f.stage !== 'ripe') return;
-    const y = Math.round(FIELD_YIELD * w.harvest * (1 - (f.lost || 0)));
-    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); delete f.lost;
+    const base = FIELD_YIELD * w.harvest * (1 - (f.lost || 0));
+    const y = Math.round(base * (f.mk ? 1 + MUCK_GAIN : 1));
+    if (f.mk && w.muck) { const more = y - Math.round(base); w.muck.g += more; w.muck.yg += more; }
+    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); delete f.lost; delete f.mk;
+    if (!w.muck && w.goats && w.learned && w.learned.goats != null && w.t - w.learned.goats >= MUCK_YEARS * TICKS_PER_YEAR &&
+      d2(f.x + 0.5, f.y + 0.5, penMid(w.goats).x, penMid(w.goats).y) <= MUCK_NEAR * MUCK_NEAR) learnMuck(w, p, f);
     deed(w, p, 'g', y);
     if (t.eve && w.lore) w.lore.g++;
     pop('+' + y, 'food');
@@ -4571,6 +4635,8 @@ function finish(w, p, t, c, fx) {
     if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
   } else if (t.k === 'rogue') {
     rogueDone(w, p, t, pop);
+  } else if (t.k === 'muck') {
+    muckDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
     const f = w.fields.find((o) => 'q' + o.id === t.key);
     if (!f || f.hg != null || !w.hedge) return;
@@ -5377,6 +5443,10 @@ const MIGRATIONS = {
   44: (w) => {
     if (w.lore === undefined) w.lore = null;
   },
+  // v45 -> v46: muck. Not learned yet; a harvest by the goat pen, once goats have been kept two years, shows it.
+  45: (w) => {
+    if (w.muck === undefined) w.muck = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5459,6 +5529,9 @@ export function summary(w) {
     loreCalls: w.lore ? w.lore.n : 0, loreRight: w.lore ? w.lore.h : 0, loreMissed: w.lore ? w.lore.m : 0, loreFalse: w.lore ? w.lore.f : 0,
     loreHeld: w.lore ? w.lore.s : 0, loreHeldYear: w.lore ? w.lore.y : 0, loreReaped: w.lore ? w.lore.g : 0,
     roofsTied: w.buildings.filter((b) => b.tie).length, roping: w.people.filter((p) => p.task && (p.task.k === 'tie' || p.task.eve)).length,
+    muck: !!w.muck, muckHeap: w.muck ? Math.floor(w.muck.h / MUCK_FIELD) : 0, mucked: w.fields.filter((f) => f.mk).length,
+    muckYear: w.muck ? w.muck.y : 0, muckEver: w.muck ? w.muck.n : 0, muckGrain: w.muck ? w.muck.g : 0, muckGrainYear: w.muck ? w.muck.yg : 0,
+    mucking: w.muck ? w.people.filter((p) => p.task && p.task.k === 'muck').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

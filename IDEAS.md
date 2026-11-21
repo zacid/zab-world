@@ -450,3 +450,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     when the reader dies, the next eldest starts less sure.
   - Storms still flatten tall green grain (Y11 on Hais: 14 fields). Staking, or sowing a shorter, stiffer grain, would answer it.
   - A storm called while the dugout or hunters are far out: a run to call them home.
+- Muck is done (SIM_VERSION 46; w.muck {h heap, n, y, g extra grain, yg, nm, at}, f.mk; learnMuck/muckDay/muckCover/muckTask/muckDone in sim.js,
+  MUCK_* constants, MUCK_FIELD/MUCK_CAP exported; heapRect/heapAt/muckAt in render.js; `scripts/_muckprobe.mjs [years] [seed|live]`).
+  Small villages muck every field and the heap sits full; late game goats cap at 14, so only about half the fields get muck. Answers it invites:
+  - A second pen (or pigs, or a byre for cattle off the far isle's boat) to feed a bigger heap as the village grows.
+  - Seaweed carried up from the beach after a storm as a second muck for the far fields (ties the coast to the farm).
+  - Night soil and a midden by every house: the heap grows with people, but a midden near the houses could bring sickness.
+  - Fields sown many years running without muck could tire (yield falls each year), so muck or rotation matters more.
+  - The muck heap as a rat and fly nest in a hot summer, or the dogs rolling in it (show only).
