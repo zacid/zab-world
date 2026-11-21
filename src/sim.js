@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 33;
+export const SIM_VERSION = 34;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -59,6 +59,7 @@ export const TECHS = {
   gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
   canoe:    { name: 'Dugout', added: '2026-11-21T06:13Z', desc: 'A tall oak felled above the beach, its back burnt out with small fires and scraped hollow with shell adzes, a little each dry day. Pushed into the sea it carries one islander past the surf to the deep water, where the shore fishers cannot reach and the big fish are. Out on calm days from spring to autumn, home by mid-afternoon. A storm can drag it off the sand and smash it, and in time the sun splits it, and a new oak must be felled.', req: ['fishing', 'farisle', 'woodcut'] },
   coppice:  { name: 'Coppice', added: '2026-11-21T07:01Z', desc: 'A hazel cut low sends up a ring of straight poles from the stump. Trees felled near the village are left as stools instead of grubbed out; the fields and houses go round them and the goats and deer are kept off. A stool grows back to a stand of poles in a year or two, far faster than a wild tree, so there is still wood in reach of the hearth when the fields have eaten the woods.', req: ['woodcut'] },
+  hedges:   { name: 'Hedges', added: '2026-11-21T09:42Z', desc: 'Slips of hawthorn dug from the wood\'s edge and set a hand apart along the fields by the trees, in autumn and winter while the thorn sleeps. For three years a hedge is only twigs behind the wattle; then it is a wall of thorn that turns nearly every boar and keeps the goats out of the grain. It costs no timber, does not rot and stands up to storms, so the fence behind it is left to fall. Only fire kills it.', req: ['fencing'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -135,6 +136,14 @@ const FENCE_HOLD = 0.85;     // chance a fence turns a boar away; otherwise it s
 const FENCE_ROT = 0.2;       // share of fences that rot through over a year
 const FENCE_STORM = 0.02;    // chance per storm day that a fence blows down
 const FENCE_LEARN = 8;       // raids before someone thinks of a fence
+// ---------- hedges ----------
+// Hawthorn slips dug from the wood's edge and set along the fields by the woods in autumn and winter.
+// A hedge does nothing for three years; grown, it turns nearly every boar, never rots, shrugs off storms
+// and costs no timber, so the wattle behind it is no longer mended.
+const HEDGE_LEARN = 5;       // fences shouldered through (once fencing is known) before someone thinks of thorn
+const HEDGE_WORK = 4;        // hours to dig the slips and set a field's edge
+export const HEDGE_GROW = 3 * 360 * 24; // ticks from planting until the thorn is thick enough to hold
+const HEDGE_HOLD = 0.97;     // chance a grown hedge turns a boar away
 
 // ---------- midsummer ----------
 const FEST_DAY = 135;        // day of the year (summer day 46); rain puts it off a few days, a storm until it passes
@@ -407,7 +416,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -602,7 +611,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -616,6 +625,7 @@ function daily(w, c, fx) {
       w.rats.y = 0;
     }
     if (w.lost) w.lost.y = 0;
+    if (w.hedge) w.hedge.y = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -969,15 +979,21 @@ function prowl(w, c) {
     w.stats.yr = (w.stats.yr || 0) + 1;
     const text = F.broke
       ? `A boar shoulders through ${F.broke === 1 ? 'a fence' : F.broke + ' fences'} and roots through ${plural(F.hit, 'field', 'fields')} in the night.`
+      : F.gap ? `A boar forces its way through a gap in the hawthorn and roots through ${plural(F.hit, 'field', 'fields')} in the night.`
       : `Boars root through ${plural(F.hit, 'field', 'fields')} by the woods in the night.`;
     if (!F.raids) milestone(w, `${text} The grain is trampled and torn up. Nobody on ${w.name} has an answer for them yet.`);
     else log(w, text, 'bad');
     F.raids++; F.hit = 0;
     learnHunting(w);
     if (F.raids >= FENCE_LEARN) learnFencing(w);
+    if (!w.hedge && (F.br || 0) >= HEDGE_LEARN) learnHedges(w, c);
   }
   if (h === 20 && w.goats) penNight(w, c, wx);
-  if (h === 6) { F.raid = 0; F.turned = 0; F.broke = 0; }
+  if (h === 6 && w.hedge && w.hedge.th && !w.hedge.held && !F.hit) {
+    w.hedge.held = 1;
+    milestone(w, `A boar comes snuffling out of the trees in the night and walks the length of the hawthorn, looking for a way through. There is none. In the morning there are tufts of bristle caught on the thorns and the grain behind them stands untouched. The hedges have grown.`);
+  }
+  if (h === 6) { F.raid = 0; F.turned = 0; F.broke = 0; F.gap = 0; if (w.hedge) w.hedge.th = 0; }
 }
 
 function wolf(w, b, active) {
@@ -1117,7 +1133,10 @@ function boar(w, b, active) {
   if (!moveBeast(b, b.tx + 0.5 + off, b.ty + 0.5 - off, BOAR_SPEED) || b.f == null) return;
   if (--b.h > 0) return;
   const f = w.fields.find((o) => o.id === b.f);
-  if (f && f.fence && (f.stage === 'planted' || f.stage === 'ripe')) { delete f.fence; F.broke = (F.broke || 0) + 1; }
+  if (f && f.fence && (f.stage === 'planted' || f.stage === 'ripe')) {
+    delete f.fence; F.broke = (F.broke || 0) + 1;
+    if (!w.hedge && w.techs.includes('fencing')) F.br = (F.br || 0) + 1;
+  } else if (f && hedged(w, f) && (f.stage === 'planted' || f.stage === 'ripe')) F.gap = (F.gap || 0) + 1; // the thorn springs back behind it
   if (f && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - 0.3) * 10000) / 10000); f.root = 1; F.hit++; }
   else if (f && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.4) * 100) / 100); f.root = 1; F.hit++; }
   b.f = null; b.tx = home.x; b.ty = home.y;
@@ -1173,6 +1192,7 @@ function pickCrop(w, b) {
   for (let k = 0; k < 6 && near.length; k++) {
     const f = near[ri(w, near.length)];
     if (!lineOfLand(w, b.x, b.y, f.x + 0.5, f.y + 0.5)) continue;
+    if (hedged(w, f) && rnd(w) < HEDGE_HOLD) { w.fauna.turned = 1; w.hedge.k++; w.hedge.th = 1; return null; } // a wall of thorn
     if (f.fence && rnd(w) < FENCE_HOLD) { w.fauna.turned = 1; return null; } // the wattle holds: the boar gives up for the night
     return f;
   }
@@ -1801,8 +1821,30 @@ function exposed(w) {
 }
 function fenceTask(w, p, c) {
   if (c.season === 3 || w.timber < FENCE_COST + HOUSE_COST || !w.techs.includes('fencing')) return null;
-  const f = nearest(exposed(w), p, (o) => !o.fence && w.res['g' + o.id] == null);
+  const f = nearest(exposed(w), p, (o) => !o.fence && !hedged(w, o) && w.res['g' + o.id] == null);
   return f && { k: 'fence', key: 'g' + f.id, x: f.x, y: f.y, h: FENCE_WORK };
+}
+
+// ---------- hedges ----------
+// w.hedge { n slips set ever (one field edge each), y set this year, k boars turned by grown thorn,
+// nm who first thought of it, at tick, held first night a grown hedge held, th turned tonight };
+// f.hg = tick the field's hedge was set. w.fauna.br counts fences broken before anyone thought of thorn.
+export const hedged = (w, f) => f.hg != null && w.t - f.hg >= HEDGE_GROW;
+function learnHedges(w, c) {
+  const who = elder(w);
+  w.hedge = { n: 0, y: 0, k: 0, nm: who ? who.name : null, at: w.t };
+  w.techs.push('hedges');
+  const P = who ? pron(who) : 'they', Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, who
+    ? `Five times since the fences went up a boar has shouldered through the wattle, and ${who.name} is tired of mending it. ${Pc} walks along the wood's edge and points at the thickets of hawthorn there: not one boar track goes through them. This ${c.season >= 2 ? 'winter' : 'autumn'}, ${P} says, slips of thorn will be dug from the woods and set along every field by the trees. For three summers they will be nothing but twigs, but then they will be a wall no boar can push through, and a hedge does not rot. ${w.name} learns to plant hedges.`
+    : `The islanders dig slips of hawthorn from the wood's edge to grow a wall of thorn around the fields. ${w.name} learns to plant hedges.`);
+}
+function hedgeTask(w, p, c) {
+  if (!w.hedge || c.season < 2) return null; // slips are set while the thorn sleeps, from the harvest to the end of winter
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'snow' || wx === 'storm' || wx === 'cold' || wx === 'fog') return null;
+  const f = nearest(exposed(w), p, (o) => o.hg == null && w.res['q' + o.id] == null);
+  return f && { k: 'hedge', key: 'q' + f.id, x: f.x, y: f.y, h: HEDGE_WORK };
 }
 
 // ---------- the hunt ----------
@@ -2508,8 +2550,8 @@ function goatHour(w, c) {
       const fx = Math.floor(g.x), fy = Math.floor(g.y);
       if (tile(w, fx, fy) === T.FIELD) {
         const f = w.fields.find((o) => o.x === fx && o.y === fy);
-        if (f && !f.fence && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - GOAT_NIBBLE) * 10000) / 10000); G.ate++; }
-        else if (f && !f.fence && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.02) * 100) / 100); G.ate++; }
+        if (f && !f.fence && !hedged(w, f) && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - GOAT_NIBBLE) * 10000) / 10000); G.ate++; }
+        else if (f && !f.fence && !hedged(w, f) && f.stage === 'ripe') { f.lost = Math.min(0.8, Math.round(((f.lost || 0) + 0.02) * 100) / 100); G.ate++; }
       }
     }
     if (--g.h <= 0) g.tx = null;
@@ -3206,6 +3248,9 @@ function pickTask(w, p, c) {
     const bt = nearestTimber(w, p);
     if (bt) return { k: 'chop', key: 't' + bt.i, x: bt.x, y: bt.y, h: 3 };
   }
+  // hawthorn slips along the fields by the woods, in autumn and winter
+  const qk = hedgeTask(w, p, c);
+  if (qk) return qk;
   // the dugout: hollowing a new one, or out to the deep water, once the woodpile is seen to
   const uk = canoeTask(w, p, c);
   if (uk) return uk;
@@ -3704,6 +3749,12 @@ function finish(w, p, t, c, fx) {
     w.fauna.fences = (w.fauna.fences || 0) + 1;
     pop('fenced', 'wood');
     if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
+  } else if (t.k === 'hedge') {
+    const f = w.fields.find((o) => 'q' + o.id === t.key);
+    if (!f || f.hg != null || !w.hedge) return;
+    f.hg = w.t; w.hedge.n++; w.hedge.y++;
+    pop('hedge', 'food');
+    if (w.hedge.n === 1) milestone(w, `${p.name} comes back from the woods with a basket of thorny slips and torn hands, and heels them into a trench along the field by the trees, a hand apart. They look like nothing at all. The first hedge is planted on ${w.name}.`);
   } else if (t.k === 'tend') {
     const o = w.people.find((q) => q.id === t.o), H = w.heal;
     if (!o || o.dead || !(o.sick || o.hurt) || !H || H.s < 1) return;
@@ -3955,7 +4006,7 @@ function blazeHour(w, c) {
         if (rnd(w) < BLAZE_CROP * fw * (guarded(nx, ny) ? BLAZE_GUARD : 1)) {
           busy.add(n); lit.push([n, 2]);
           if (f.stage !== 'harvested') C.f++;
-          f.stage = 'fallow'; f.growth = 0; f.burnt = 1; delete f.lost; delete f.fence;
+          f.stage = 'fallow'; f.growth = 0; f.burnt = 1; delete f.lost; delete f.fence; delete f.hg;
         }
       } else if (tt === T.BUILD) {
         const b = w.buildings.find((o) => o.x === nx && o.y === ny);
@@ -4265,6 +4316,11 @@ const MIGRATIONS = {
   32: (w) => {
     if (!w.roll) w.roll = [];
   },
+  // v33 -> v34: hedges. Nobody has thought of thorn yet; fences broken from now on are counted toward it.
+  33: (w) => {
+    if (w.hedge === undefined) w.hedge = null;
+    if (w.fauna && w.fauna.br === undefined) w.fauna.br = 0;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4292,6 +4348,7 @@ export function summary(w) {
     afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,
     hunting: w.techs.includes('hunting'), hides: w.hides || 0,
     fencing: w.techs.includes('fencing'), fenced: w.fields.filter((f) => f.fence).length,
+    hedging: !!w.hedge, hedges: w.fields.filter((f) => f.hg != null).length, hedgesGrown: w.fields.filter((f) => hedged(w, f)).length, hedgeTurned: (w.hedge && w.hedge.k) || 0,
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
     deer: (w.beasts || []).filter((b) => b.k === 'deer').length, deerTaken: (w.fauna && w.fauna.sd) || 0,
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,

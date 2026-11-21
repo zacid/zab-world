@@ -336,3 +336,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The tree shows infant deaths plainly († aged 0): a midwife or herb lore for childbirth could cut them.
   - w.roll grows by ~100 bytes per sunk grave (~60 KB a century at 300 people); drop `why` from roll entries if save
     size starts to matter.
+- Hedges are done (SIM_VERSION 34; w.hedge {n, y, k boars turned, nm, at, held, th}, f.hg planting tick, fauna.br fences broken
+  before learning; hedged() exported, HEDGE_GROW exported; hedgeTask/learnHedges in sim.js; drawHedges()/hedgeAt() in render.js;
+  `scripts/_hedgeprobe.mjs [years] [seed|live]`). Nearly every exposed field is hedged in the first autumn, so the boars lose
+  almost all their raids ~3 years later. Answers it invites:
+  - Boars shut out of the grain turn hungry: they root up the burying ground or the gardens by the houses, or grow bold and charge.
+  - Haws and sloes from the hedges as autumn wild food; birds nest in them (more gulls/finches on screen in spring).
+  - Hedge laying: an old hedge grows gappy after ~20 years unless someone lays it in winter (a craft and a byname, "the Hedger").
+  - Wolves or deer could use hedgerows as cover to come close to the village; a fire runs along a hedge line in a dry summer.
+  - Fences now only matter for the 3 years a hedge grows; timber saved on fences could show in History.

@@ -119,7 +119,7 @@ function doing(p) {
     return t ? `listening to ${t.name}'s tale by the hearth` : 'sitting by the hearth on the longest night';
   }
   if (p.task && p.task.k === 'search') { const o = w.lost && w.lost.cur && w.people.find((q) => q.id === w.lost.cur.id); return o ? `searching for ${o.name}` : 'searching the fog'; }
-  return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
+  return p.task && p.task.k === 'fest' ? 'dancing at the midsummer fire' : a < 14 ? 'playing' : p.hurt ? 'nursing a wolf bite' : a >= 65 ? 'resting' : ({ harvest: 'harvesting', plant: 'sowing', clear: 'clearing a field', fence: 'weaving a fence', hedge: 'planting a hawthorn hedge', chop: 'felling trees', build: 'building', forage: 'foraging', fish: 'fishing', idle: 'idling', gather: 'at the fire',
     hunt: p.task && p.task.q === 'wolf' ? 'hunting wolves' : p.task && p.task.q === 'deer' ? 'stalking deer' : 'hunting boar', haul: `carrying a ${(p.task && p.task.q) || 'boar'} home` })[p.task ? p.task.k : 'idle'] || 'idling';
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
@@ -320,6 +320,7 @@ function drawTerrain() {
     if (open(1, 0)) { px(tc, X + 7, Y, rod, 1, 8); px(tc, X + 7, Y + 3, stake); }
     for (const [cx, cy] of [[0, 0], [7, 0], [0, 7], [7, 7]]) px(tc, X + cx, Y + cy, stake);
   }
+  drawHedges(pal, c.season);
   // fire ring, stores
   const fx = w.fire.x * TILE, fy = w.fire.y * TILE;
   px(tc, fx - 8, fy, '#7d6a4e', 24, 8);
@@ -544,6 +545,45 @@ function drawSnowmen() {
 function snowmanAt(mx, my) {
   if (!w.snow) return null;
   return w.snow.men.find((m) => m.s >= 1 && mx >= m.x && mx < m.x + 1 && my >= m.y && my < m.y + 1) || null;
+}
+// hawthorn hedges on the outer edges of each hedged block: a row of twigs the first year, then little
+// bushes, then a thick dark wall two pixels deep. Grown thorn flowers white in late spring, carries red
+// haws in autumn and stands bare and purple-brown in winter.
+function drawHedges(pal, season) {
+  if (!w.hedge) return;
+  const hedged = new Set();
+  for (const f of w.fields) if (f.hg != null) hedged.add(f.y * S.MAP + f.x);
+  if (!hedged.size) return;
+  const doy = S.clock(w.t).doy;
+  for (const f of w.fields) {
+    if (f.hg == null) continue;
+    const X = f.x * TILE, Y = f.y * TILE, age = (w.t - f.hg) / S.HEDGE_GROW;
+    const open = (ax, ay) => !hedged.has((f.y + ay) * S.MAP + f.x + ax);
+    const edges = [];
+    if (open(0, -1)) edges.push([0, 0, 1, 0, 0, 1]);   // x0, y0, step x, step y, inward x, inward y
+    if (open(0, 1)) edges.push([0, 7, 1, 0, 0, -1]);
+    if (open(-1, 0)) edges.push([0, 0, 0, 1, 1, 0]);
+    if (open(1, 0)) edges.push([7, 0, 0, 1, -1, 0]);
+    const bare = season === 3, leaf = bare ? '#4a3a3e' : age < 1 ? '#5e8a3e' : '#2f5a2a', dark = bare ? '#33282c' : '#22421e';
+    for (const [x0, y0, sx, sy, ix, iy] of edges) {
+      for (let k = 0; k < 8; k++) {
+        const ex = X + x0 + sx * k, ey = Y + y0 + sy * k, hh = S.hash(f.x * 8 + k, f.y * 8 + x0 + y0, 41);
+        if (age < 1 / 3) { if (k % 2 === 0) px(tc, ex, ey, '#6a5a3a'); continue; }      // bare slips heeled in a row
+        if (age < 1) { if (k % 2 === 0 || age > 2 / 3) px(tc, ex, ey, k % 2 ? leaf : '#4e7a34'); continue; } // little bushes
+        px(tc, ex, ey, hh < 0.5 ? leaf : dark);
+        if (hh > 0.3) px(tc, ex + ix, ey + iy, dark);
+        if (pal.snow && hh > 0.4) px(tc, ex, ey, '#e8eef0');
+        else if (season === 0 && doy >= 55 && hh > 0.55) px(tc, ex, ey, '#f2f0e4');       // may blossom
+        else if (season === 2 && hh > 0.7) px(tc, ex + ix * (hh > 0.85 ? 1 : 0), ey + iy * (hh > 0.85 ? 1 : 0), '#b0302a'); // haws
+      }
+    }
+  }
+}
+function hedgeAt(mx, my) { // a hedged field whose edge is under the pointer
+  if (!w.hedge) return null;
+  const x = Math.floor(mx), y = Math.floor(my), fx = mx - x, fy = my - y;
+  if (Math.min(fx, fy, 1 - fx, 1 - fy) > 0.25) return null;
+  return w.fields.find((f) => f.hg != null && f.x === x && f.y === y) || null;
 }
 function stoolAt(mx, my) { // the stool tile under the pointer, or null
   if (!w.copse) return null;
@@ -986,6 +1026,10 @@ function frame() {
         : best.a[2] === 2 ? `<b>Scorched trees</b><br><span class="m">saved from the fire ${when(best.a[1])}</span>`
         : `<b>Burnt ground</b><br>${best.age < 90 ? 'black ash' : best.age < 360 ? 'new grass through the ash' : 'fireweed and young grass'}<br><span class="m">${best.a[2] ? 'woods' : 'grass'} burnt ${when(best.a[1])}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = hedgeAt(mx, my))) {
+      const a = (w.t - best.hg) / S.HEDGE_GROW, s = S.summary(w);
+      tip.innerHTML = `<b>Hawthorn hedge</b><br>${a < 1 / 3 ? 'slips just heeled in' : a < 1 ? `young thorn, ${Math.ceil((1 - a) * 3)} ${Math.ceil((1 - a) * 3) === 1 ? 'summer' : 'summers'} from holding` : 'a wall of thorn: the boars turn back'}<br><span class="m">planted ${when(best.hg)} · ${s.hedgesGrown} of ${s.hedges} hedges grown${s.hedgeTurned ? ` · ${s.hedgeTurned} boars turned` : ''}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = stoolAt(mx, my)) != null) {
       const v = w.wood[best], K = w.copse;
       tip.innerHTML = `<b>Coppice stool</b><br>${v < 1 ? 'cut back to the stump · new shoots' : v < 6 ? 'young poles growing from the stump' : 'a stand of poles ready to cut'}<br><span class="m">${K.s.length} ${K.s.length === 1 ? 'stool' : 'stools'} kept near the village · first left by ${esc(K.nm)}</span>`;
@@ -1352,7 +1396,7 @@ function updatePanels() {
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
-    ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced)</span>` : s.fields],
+    ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced${s.hedging ? ` · ${s.hedges} hedged, ${s.hedgesGrown} grown` : ''})</span>` : s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.copse ? [['copse', 'Coppice', `${s.copseStools} <span class="m">stools · ${s.copseReady} ready to cut · ${s.copseYear.toLocaleString()} timber this year</span>`]] : []),
@@ -1437,7 +1481,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

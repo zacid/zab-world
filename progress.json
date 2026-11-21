@@ -178,5 +178,10 @@
   "at": "2026-11-21T07:51:19.621Z",
   "title": "Add a Families view: a family tree of every islander",
   "body": "- New \"⋔ Families\" button (top left, beside Sky and History) opens a tree of every line on the island: each settler couple and their children, grandchildren and so on, with partners beside each name, ages for the living and year and age of death for the dead\n- Living names are links: click one to go back to the island and follow them. The life card gets a \"family tree\" link that opens the tree on that person\n- SIM_VERSION 33 (w.roll): graves now keep the partner (g.pt), and a grave that sinks when the burying ground is full, or an islander who sails to the far isle, is written to a roll of names so old ancestors stay in the tree. Nothing in the step path reads it, so behaviour is unchanged\n- The Sky, History and Families buttons now sit in one row so the life card no longer covers the History button\n- Watch: Hais has 17 living in about 8 lines; the first third generation should appear when Wenra (born Y2) has children"
+ },
+ {
+  "at": "2026-11-21T10:05:31.538Z",
+  "title": "Add hawthorn hedges that turn the boars for good",
+  "body": "- SIM_VERSION 34 (w.hedge, f.hg, fauna.br; HEDGE_* in sim.js; tech 'hedges'; task kind 'hedge'; yearly `hedges`/`hedgesNew`): after 5 fences are shouldered through, the eldest sees that boars never go through the hawthorn thickets\n- In autumn and winter (not in snow, storm, frost or fog) idle adults set thorn slips along every field by the woods. No timber cost. A hedge holds nothing for 3 years, then turns 97% of boars, keeps goats out of the grain, never rots and ignores storms. Fences are not rebuilt behind grown hedges. Fire kills a hedge\n- Visible: bare slips, then small bushes, then a dark wall of thorn with white blossom in late spring, red haws in autumn and bare stems in winter; hover tip, Fields row shows hedged/grown, History line\n- Watch: Hais should learn it in spring Y9, plant ~29 hedges that autumn, and see boar raid nights fall from 5-9 a year to 0-1 from Y12-13"
  }
 ]
