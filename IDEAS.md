@@ -254,3 +254,17 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     already cut RAID_LEAN, so a "peace-weaving" wedding could end raids for a generation.
   - A raider caught in the scuffle (left behind with a twisted ankle) who is kept over the winter and either weds in or is rowed home.
   - Revenge as a twist: once the islanders have boats, young hotheads row over to the far isle after a raid.
+- Pottery is done (SIM_VERSION 26; tech 'pottery', w.pot {id, nm, k, kx/ky kiln tile (BUILD), cx/cy clay bank, c clay, wet, sd, j, made, broke,
+  f, lf}; POT_* / JAR_HOLD in sim.js; sealed() exported; learnPottery/potDay/potTask/fireKiln/pickPotter; drawKiln() and the kiln fire in
+  render.js; yearly `jars`). Rats now only count and eat loose grain (food - sealed). Test seeds learn it Y3-4; ~45 jars in the first year,
+  then 50-56 held. Late game (40-70k grain) 60 jars seal only a sliver, so rats come back to full strength; POT_MAX could scale with granaries.
+  The kiln burns 6 timber a firing (~2-3 a year). Over 100 years rat losses fell 24k->19k, 85k->32k, 94k->20k and Y100 pop went
+  230->245, 199->332, 237->260 (seeds 20261114, 777, 4242; scripts/_potpop.mjs). Seed 777 grows fastest and its jars fall to 11 by
+  Y100 because timber runs out and the kiln cannot be fired: the late-game wood shortage now hits pottery too. Answers it invites:
+  - Cooking pots and porridge: a pot on every hearth stretches grain (less eaten per head) or feeds the sick better (ties to herbs).
+  - A tiled or clay-daubed granary floor, or staddle stones: the next answer to the rats once the stores outgrow the jars.
+  - Pots as trade with the far isle (they have none): jars for hides, or a gift jar that eases the feud after a raid.
+  - Raiders could smash jars or carry off sealed ones; a storm could crack the kiln; a wet spring delays the firing.
+  - Beakers and decorated ware: each potter's mark on the sherds; graves get a pot (a visible offering in the burying ground).
+  - A named potter (deed 'the Potter' after 200 jars) and an apprentice child who learns the coils.
+  - Salt fish in sealed jars: preserved catch for winter once food is tight.

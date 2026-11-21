@@ -10,8 +10,12 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a' };
-const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a' };
+const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
+// the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
+const KILN = ['..kkkk..', '.kKKKKk.', 'kKKKKKKk', 'kKKKKKKk', 'kKKmmKKk', 'kKmmmmKk', 'kkmmmmkk', '........'];
+const KCOL = { k: '#6e4a30', K: '#94643f', m: '#1e130c' };
+const JAR = '#a4532e', JAR_HI = '#c06a3e', JAR_WET = '#b9a48a';
 
 const HOUSE = ['...rr...', '..rRRr..', '.rRRRRr.', 'rRRRRRRr', '.wwwwww.', '.wywdyw.', '.wwwdww.', '........'];
 const FRAME = ['........', '...bb...', '..b..b..', '.b....b.', '.bbbbbb.', '.b....b.', '.b....b.', '........'];
@@ -96,6 +100,9 @@ function doing(p) {
   if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   if (p.task && p.task.k === 'herd') return 'minding the goats';
+  if (p.task && p.task.k === 'clay') return 'digging clay at the bank';
+  if (p.task && p.task.k === 'shape') return 'coiling a jar by the kiln';
+  if (p.task && p.task.k === 'fire') return 'firing the kiln';
   if (p.task && p.task.k === 'lost') return 'lost in the fog';
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
   if (p.task && p.task.k === 'tale') {
@@ -261,6 +268,7 @@ function drawTerrain() {
   }
   drawYard(pal);
   drawPen(pal);
+  drawKiln(pal);
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -292,12 +300,19 @@ function drawTerrain() {
   // the healer's house: bundles of herbs hang drying under the eaves, one for every ten in store
   const healer = w.heal && w.heal.id != null ? w.people.find((p) => p.id === w.heal.id) : null;
   const herbHome = healer && healer.home != null ? healer.home : null;
+  let jarsLeft = w.pot ? w.pot.j : 0; // one jar drawn for every ten in the stores
   // houses
   for (const b of w.buildings) {
     if (b.kind === 'granary') {
       const rows = b.progress >= 1 ? GRANARY : b.progress > 0.5 ? GRANARY.slice(3) : GRANARY.slice(6);
       sprite(tc, rows, b.x * TILE, b.y * TILE + 8 - rows.length, GCOL);
       if (pal.snow && b.progress >= 1) px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
+      if (b.progress >= 1 && jarsLeft > 0) { // sealed jars stand in the shade under the raised floor
+        for (let k = 0; k < 2 && jarsLeft > 0; k++, jarsLeft -= 10) {
+          const jx = b.x * TILE + 2 + k * 2, jy = b.y * TILE + 6;
+          px(tc, jx, jy, JAR, 2, 2); px(tc, jx, jy, JAR_HI, 1, 1); px(tc, jx, jy - 1, '#7a3e22', 2, 1);
+        }
+      }
       continue;
     }
     if (b.dmg) { // storm took the roof: walls stand, rafters show through
@@ -394,6 +409,18 @@ function drawPen(pal) {
     const by = back === 'n' ? Y0 - 1 : back === 's' ? Y0 + H : Y0 + H / 2 - 1;
     px(tc, bx, by, rod); px(tc, bx + (back === 'n' || back === 's' ? 2 : 0), by + (back === 'w' || back === 'e' ? 2 : 0), rod);
   }
+}
+// the kiln and the clay bank above the beach where the potter digs
+function drawKiln(pal) {
+  const P = w.pot;
+  if (!P) return;
+  const CX = P.cx * TILE, CY = P.cy * TILE; // dug-out hollows of grey clay in the sand
+  for (let k = 0; k < 4; k++) { const h = S.hash(P.cx * 4 + k, P.cy, 83); px(tc, CX + 1 + ((h * 5) | 0), CY + 1 + ((h * 41) | 0) % 5, k % 2 ? '#6b665e' : '#857e72', 2, 2); }
+  const X = P.kx * TILE, Y = P.ky * TILE;
+  sprite(tc, KILN, X, Y, KCOL);
+  if (pal.snow) px(tc, X + 2, Y, '#eef3f7', 4, 1);
+  const wet = Math.min(4, P.wet); // shaped jars set out to stiffen beside the kiln
+  for (let k = 0; k < wet; k++) { const jx = X + 8 + (k % 2) * 3, jy = Y + 2 + ((k / 2) | 0) * 4; px(tc, jx, jy, JAR_WET, 2, 3); px(tc, jx, jy, '#d4c4aa', 1, 1); }
 }
 function graveAt(mx, my) {
   if (!w.yard) return null;
@@ -533,6 +560,27 @@ function frame() {
     px(sc, fx0 + 1, fy0 + 6, '#6e4a2a', 6, 1);
     px(sc, fx0 + 2, fy0 + 4 - (fl === 1 ? 1 : 0), '#e0521f', 1, 2 + (fl === 1 ? 1 : 0)); px(sc, fx0 + 5, fy0 + 4 - (fl === 2 ? 1 : 0), '#e0521f', 1, 2 + (fl === 2 ? 1 : 0));
   }
+  // the kiln while it is fired: flames in the mouth, smoke rolling off the dome; it smoulders for half a day after
+  let kiln = null;
+  if (w.pot) {
+    const P = w.pot, kp = w.people.find((p) => p.id === P.id);
+    const firing = !!(kp && kp.task && kp.task.k === 'fire' && kp.x === kp.px && kp.y === kp.py && Math.abs(kp.x - P.kx - 0.5) < 1 && Math.abs(kp.y - P.ky - 1.5) < 1);
+    const smoulder = P.lf >= 0 && w.t - P.lf < 12;
+    if (firing || smoulder) {
+      const KX = P.kx * TILE, KY = P.ky * TILE;
+      if (firing) {
+        px(sc, KX + 2, KY + 5, '#e0521f', 4, 2); px(sc, KX + 3, KY + 4, '#f0742b', 2, 1);
+        px(sc, KX + 2 + ((now / 130) | 0) % 4, KY + 5, '#ffc23d'); if (fl === 2) px(sc, KX + 3, KY + 4, '#ffe48a');
+      } else px(sc, KX + 3, KY + 6, '#7a2a14', 2, 1);
+      for (let k = 0; k < (firing ? 4 : 2); k++) {
+        const ph = ((now / (firing ? 70 : 120) + k * 17) % 40) / 40;
+        const sx = KX + 3.5 + Math.sin(ph * 6 + k) * 1.5 + ph * 4, sy = KY - ph * 12;
+        sc.fillStyle = `rgba(${firing ? '150,140,130' : '170,170,170'},${((1 - ph) * (firing ? 0.55 : 0.3)).toFixed(3)})`;
+        sc.fillRect(Math.round(sx), Math.round(sy), firing && ph > 0.4 ? 2 : 1, firing && ph > 0.4 ? 2 : 1);
+      }
+      kiln = { x: KX + 4, y: KY + 5, firing };
+    }
+  }
   // people
   const shown = [];
   let horner = null;
@@ -604,6 +652,10 @@ function frame() {
       const top = age < 14 ? Y - 1 : Y - 2;
       px(sc, X + 3, top, '#9a7a4e', 1, Y + 4 - top); px(sc, X + 4, top, '#9a7a4e'); px(sc, X + 4, top + 1, '#9a7a4e');
     }
+    if (p.task && !moving && age >= 14) {
+      if (p.task.k === 'shape') { px(sc, X + 3, Y + 2, JAR_WET, 2, 2); if (Math.floor(now / 450 + p.id) % 2) px(sc, X + 3, Y + 1, '#f1c9a5'); } // coiling a jar, hands on the rim
+      else if (p.task.k === 'clay' && Math.floor(now / 320 + p.id) % 2) px(sc, X + 3, Y + 3, '#857e72', 2, 1); // digging at the bank
+    }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     if (p.task && p.task.k === 'search') { // a pitch torch held high, flickering
       const fl = Math.floor(now / 160 + p.id) % 3;
@@ -656,6 +708,7 @@ function frame() {
     for (const o of guests) if (o.chase) glow(sc, o.x * TILE + 2.5, o.y * TILE - 4.5, 7 + (Math.floor(now / 140 + o.g.id) % 3) * 0.7, `rgba(255,160,60,${(dark * 0.6).toFixed(3)})`);
     glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : tale ? 32 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : tale ? 0.65 : 0.55)).toFixed(3)})`);
     if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
+    if (kiln) glow(sc, kiln.x, kiln.y, kiln.firing ? 10 + Math.sin(now / 170) : 5, `rgba(255,120,40,${(dark * (kiln.firing ? 0.6 : 0.3)).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
       const ex = o.X + (o.face > 0 ? 5 : 0), ey = o.Y + 1;
@@ -1089,6 +1142,7 @@ function updatePanels() {
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
+    ...(w.pot ? [['pot', 'Jars', `${s.jars} <span class="m">· ${s.jarsSealed.toLocaleString()} grain sealed · ${s.potter ? esc(s.potter) + ' pots' : 'no potter'}${s.jarsWet ? ` · ${s.jarsWet} drying` : ''}</span>`]] : []),
     ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
     ...(s.dogsCame ? [['dog', 'Dogs', s.dogs ? `${s.dogs} <span class="m">· ${w.dogs.d.filter((d) => w.t - d.b >= S.TICKS_PER_YEAR).map((d) => { const o = w.people.find((q) => q.id === d.own); return esc(d.nm) + (o ? ' with ' + esc(o.name) : ''); }).join(' · ') || 'all pups'}${s.dogsTurned ? ` · ${s.dogsTurned} ${s.dogsTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}${s.dogsFound ? ` · ${s.dogsFound} lost found` : ''}${s.dogsRats ? ` · ${s.dogsRats} rats` : ''}</span>` : '<span class="m">none left</span>']] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
@@ -1163,7 +1217,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

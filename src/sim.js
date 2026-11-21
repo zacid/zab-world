@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 25;
+export const SIM_VERSION = 26;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -53,6 +53,7 @@ export const TECHS = {
   foghorn:  { name: 'Fog horn', added: '2026-11-17T21:42Z', desc: 'A great whelk shell from the beach with its tip knocked off. On fog days the oldest islander who can stand keeps by the hearth and blows it every little while. Within earshot nobody is alone: a wolf will not single out someone who can call back to the horn. Someone lost in the grey can follow the sound home.', req: ['fire', 'fishing'] },
   tales:    { name: 'Winter tales', added: '2026-11-18T01:02Z', desc: 'On the longest night of the year the whole island sits close round the hearth, children in front, and the eldest tells a tale from the island\'s own past: the landing, the dead in the burying ground and what they did, how the named got their names, what the fog can do. A new tale each winter. Once the fog has been told of, the children keep close to the houses when it comes in.', req: ['fire', 'burial'] },
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
+  pottery:  { name: 'Pottery', added: '2026-11-21T00:12Z', desc: 'Clay dug from the bank above the beach, coiled into big-bellied jars and fired in a domed kiln of turf and clay. One potter digs, shapes a jar a day in dry weather and fires them in batches; some crack in the fire. Grain sealed in a jar under a lid of clay is out of reach of the rats. Jars break with use and must be made again.', req: ['granary', 'fire'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -179,6 +180,18 @@ const RAT_FOOD = 80;         // and never more than one per this much grain in s
 const RAT_EAT = 0.05;        // grain each rat eats (and fouls) per day
 const RAT_FEVER = 0.6;       // a swarming colony makes a fever up to 60% more likely to take hold
 const RAT_SWARM = 40;        // past this the village notices how many there are
+// pottery: sealed jars keep grain from the rats
+const POT_LEARN = 1500;      // grain the rats have eaten before anyone thinks of sealing it away
+const POT_SPARK = 0.03;      // daily chance in spring to autumn, after that, that someone does
+const JAR_HOLD = 100;        // grain one jar holds under its clay lid
+const POT_MAX = 60;          // jars the potter keeps the stores in
+const POT_CLAY = 3;          // lumps of clay dug in one trip to the bank
+const POT_GAP = 2;           // days between jars: each is coiled, smoothed and left to stiffen before the next
+const POT_BATCH = 8;         // shaped jars before the kiln is worth firing
+const POT_WOOD = 6;          // timber burned in one firing
+const POT_CRACK = 0.25;      // chance each jar cracks in the fire
+const POT_BREAK = 0.12;      // chance each jar is broken over a year of use
+const POT_OLD = 60;          // at this age the potter's hands are too stiff for the coils
 
 // ---------- the far isle ----------
 const ISLE_YEAR = 3;         // from this year a towering midsummer fire can be seen from the far isle
@@ -376,7 +389,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null,
   };
   // name the island
   let nm = '';
@@ -569,7 +582,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg } : {}), ...(w.pot ? { jars: w.pot.j } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -634,6 +647,7 @@ function daily(w, c, fx) {
   } else w.stats.cold = false;
 
   if (w.rats !== undefined) rats(w, c);
+  if (w.pot !== undefined) potDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
@@ -1884,7 +1898,8 @@ function rats(w, c) {
   R.n += whole + (rnd(w) < d - whole ? 1 : 0);
   let gran = 0;
   for (const b of w.buildings) if (b.kind === 'granary' && b.progress >= 1) gran++;
-  const cap = Math.min(RAT_MAX, RAT_BASE + RAT_PER_GRANARY * gran, Math.floor(w.food / RAT_FOOD));
+  const loose = w.food - sealed(w); // grain sealed in jars is out of their reach
+  const cap = Math.min(RAT_MAX, RAT_BASE + RAT_PER_GRANARY * gran, Math.floor(loose / RAT_FOOD));
   if (R.n > cap) R.n -= Math.ceil((R.n - cap) * 0.25); // the hungry ones fight, starve or wander off
   if (R.n <= 0) {
     R.n = 0;
@@ -1892,7 +1907,7 @@ function rats(w, c) {
     return;
   }
   if (R.n > R.top) R.top = R.n;
-  const eat = Math.min(w.food, Math.round(R.n * RAT_EAT * 100) / 100);
+  const eat = Math.max(0, Math.min(loose, Math.round(R.n * RAT_EAT * 100) / 100));
   w.food = Math.round((w.food - eat) * 100) / 100;
   R.y = Math.round((R.y + eat) * 100) / 100;
   R.all = Math.round((R.all + eat) * 100) / 100;
@@ -1903,6 +1918,107 @@ function rats(w, c) {
     else log(w, 'The rats swarm in the stores again. The thatch squeaks all night.', 'bad');
   }
   if (R.n < RAT_SWARM / 4) R.sw = 0;
+}
+
+// ---------- pottery ----------
+// Once the rats have eaten enough of the stores, someone digs clay from the bank above the beach and
+// coils it into jars. From then on there is one potter (w.pot: id, nm, k potters so far, kx/ky the kiln,
+// cx/cy the clay bank, c lumps of clay, wet jars shaped but not fired, sd day of the last jar, j whole
+// jars in use, made, broke, f firings, lf tick of the last firing). In dry weather from spring to autumn
+// the potter digs clay and shapes one jar a day; with a batch ready, a morning's firing in the kiln burns
+// timber and cracks some of them. Grain sealed in jars is out of the rats' reach. Jars break with use.
+export const sealed = (w) => (w.pot ? Math.min(w.food, w.pot.j * JAR_HOLD) : 0);
+function findKilnSite(w) {
+  let best = null, bs = 1e9;
+  const { x: fx, y: fy } = w.fire;
+  for (let y = 2; y < MAP - 3; y++) for (let x = 2; x < MAP - 2; x++) {
+    const tt = tile(w, x, y), below = tile(w, x, y + 1);
+    if ((tt !== T.GRASS && tt !== T.FOREST) || (below !== T.GRASS && below !== T.FOREST && below !== T.FIELD && below !== T.SAND)) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < 16 || dd > 81 || nearBuild(w, x, y, 1)) continue;
+    const sc = Math.abs(Math.sqrt(dd) - 6) + (tt === T.FOREST ? 1 : 0) + hash(x, y, w.seed + 29) * 2;
+    if (sc >= bs || !lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+function clayBank(w, k) {
+  let best = null, bd = 1e9;
+  for (const i of w.shore || []) {
+    const x = i % MAP, y = (i - x) / MAP, dd = d2(x, y, k.x, k.y);
+    if (dd < bd && lineOfLand(w, x + 0.5, y + 0.5, k.x + 0.5, k.y + 1.5)) { bd = dd; best = { x, y }; }
+  }
+  return best;
+}
+// the potter: a grown child or housemate of the last one first, then whoever is nearest 24; never the
+// healer, the goatherd or the keeper of the horn, who have their own work
+function pickPotter(w, old) {
+  let best = null, bs = 1e9;
+  const busy = [w.heal && w.heal.id, w.goats && w.goats.hid, w.horn && w.horn.hid];
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || p === old || a < 16 || a > 45 || p.sick || busy.includes(p.id)) continue;
+    const tier = old && (p.mother === old.id || p.father === old.id) ? 0 : old && old.home != null && p.home === old.home ? 1 : 2;
+    const sc = tier * 100 + Math.abs(a - 24);
+    if (sc < bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+function learnPottery(w, c) {
+  if (c.season === 3 || !w.rats || w.rats.all < POT_LEARN || !w.techs.includes('granary') || rnd(w) >= POT_SPARK) return;
+  const who = pickPotter(w, null), k = findKilnSite(w), cb = k && clayBank(w, k);
+  if (!who || !k || !cb) return;
+  const i = idx(k.x, k.y);
+  w.timber += w.wood[i]; w.wood[i] = 0;
+  setTile(w, i, T.BUILD);
+  w.pot = { id: who.id, nm: who.name, k: 1, kx: k.x, ky: k.y, cx: cb.x, cy: cb.y, c: 0, wet: 0, sd: -1, j: 0, made: 0, broke: 0, f: 0, lf: -1 };
+  w.techs.push('pottery');
+  const P = pron(who), Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, `Sick of sweeping rat droppings out of the grain, ${who.name} digs sticky grey clay from the bank above the beach, rolls it into ropes and coils them into a jar with a fat belly and a narrow neck. ${Pc} heaps turf and clay into a dome beside the village to fire it in. Grain sealed in a jar under a clay lid is out of the rats' reach. ${w.name} learns to make pots.`);
+}
+function potDay(w, c) {
+  if (w.pot === null) { learnPottery(w, c); return; }
+  const P = w.pot;
+  if (c.doy === 0 && P.j > 0) { // jars knocked over, chipped, dropped on the granary floor
+    let b = 0;
+    for (let k = 0; k < P.j; k++) if (rnd(w) < POT_BREAK) b++;
+    if (b) { P.j -= b; P.broke += b; log(w, `${plural(b, 'jar was', 'jars were')} broken over the year. ${P.j} still stand in the stores.`, 'info'); }
+  }
+  const cur = aliveId(w, P.id);
+  const busy = cur && ((w.heal && w.heal.id === cur.id) || (w.goats && w.goats.hid === cur.id) || (w.horn && w.horn.hid === cur.id));
+  if (cur && !busy && ageY(w, cur) < POT_OLD) return;
+  const next = pickPotter(w, cur || (P.id != null ? { id: P.id, home: null } : null)); // the dead potter's children still come first
+  if (!next) { if (!cur) P.id = null; return; }
+  const before = P.nm;
+  P.id = next.id; P.nm = next.name; P.k++;
+  if (cur && busy) log(w, `${cur.name} has no time for the clay now, and ${next.name} takes over the kiln.`, 'info');
+  else if (cur) log(w, `${cur.name}'s fingers are too stiff for the coils. ${next.name} takes over the kiln.`, 'info');
+  else log(w, `With ${before} gone, ${next.name} takes up the clay. ${w.name} has its ${ORD[P.k] || `${P.k}th`} potter.`, 'info');
+}
+// the potter's own work, on dry days from spring to autumn
+function potTask(w, p, c) {
+  const P = w.pot;
+  if (!P || P.id !== p.id || c.season === 3 || c.hour > 13) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'rain' || wx === 'storm' || wx === 'fog' || wx === 'snow') return null;
+  const late = c.doy >= DAYS_PER_SEASON * 3 - 10; // fire what is left before the winter damp gets into it
+  if ((P.wet >= POT_BATCH || (late && P.wet >= 3)) && c.hour <= 10 && wx !== 'cold' && w.timber >= POT_WOOD * 2) return { k: 'fire', x: P.kx, y: P.ky + 1, h: 6 };
+  const want = Math.min(POT_MAX, Math.ceil(w.food / JAR_HOLD));
+  if (P.j + P.wet >= want || P.wet >= POT_BATCH * 2 || c.day - P.sd < POT_GAP || late) return null;
+  if (P.c >= 1) return { k: 'shape', x: P.kx, y: P.ky + 1, h: 4 };
+  return { k: 'clay', x: P.cx, y: P.cy, h: 3 };
+}
+function fireKiln(w, p) {
+  const P = w.pot, n = P.wet;
+  if (!n || w.timber < POT_WOOD) return 0;
+  let ok = 0;
+  for (let k = 0; k < n; k++) if (rnd(w) >= POT_CRACK) ok++;
+  w.timber = Math.round((w.timber - POT_WOOD) * 100) / 100;
+  P.wet = 0; P.j += ok; P.made += ok; P.broke += n - ok; P.f++; P.lf = w.t;
+  if (P.f === 1) milestone(w, `${p.name} rakes the embers off the kiln and lifts out the first jars, still warm: ${ok} of ${n} come out whole and ring like stone when tapped. The grain is poured in and the lids are sealed with wet clay. For the first time the rats run over the jars and cannot get in.`);
+  else if (!ok) log(w, `${p.name} opens the kiln to a heap of sherds: all ${n} jars cracked in the fire.`, 'bad');
+  else log(w, `${p.name} opens the kiln: ${ok} of ${n} jars come out whole${n - ok ? `, ${n - ok} cracked in the fire` : ''}.`, 'good');
+  return ok;
 }
 
 // ---------- herb lore ----------
@@ -2926,6 +3042,11 @@ function pickTask(w, p, c) {
     const hk = healerGather(w, p, c);
     if (hk) return hk;
   }
+  // the potter at the clay bank and the kiln
+  if (w.pot && w.pot.id === p.id) {
+    const pk = potTask(w, p, c);
+    if (pk) return pk;
+  }
   // construction
   let b = nearest(L.raw, p, (o) => o.progress < 1 && free('b' + o.id));
   if (b) return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
@@ -3258,6 +3379,19 @@ function finish(w, p, t, c, fx) {
     const got = Math.min(HERB_CAP - H.s, 4 + ri(w, 3));
     H.s += got;
     if (got > 0) pop('+' + got + ' herbs', 'herb');
+  } else if (t.k === 'clay') {
+    if (!w.pot) return;
+    w.pot.c += POT_CLAY;
+    pop('+clay', 'muted');
+  } else if (t.k === 'shape') {
+    const P = w.pot;
+    if (!P || P.c < 1) return;
+    P.c--; P.wet++; P.sd = c.day;
+    pop('a jar', 'pot');
+  } else if (t.k === 'fire') {
+    if (!w.pot) return;
+    const ok = fireKiln(w, p);
+    if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'forage') {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
@@ -3453,6 +3587,10 @@ const MIGRATIONS = {
   24: (w) => {
     if (w.raid === undefined) w.raid = null;
   },
+  // v25 -> v26: pottery. No jars yet; once the rats have eaten enough grain, someone thinks of sealing it away.
+  25: (w) => {
+    if (w.pot === undefined) w.pot = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3497,6 +3635,7 @@ export function summary(w) {
     tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
     raids: w.raid ? w.raid.n : 0, raidGrain: w.raid ? w.raid.g : 0, raidsDriven: w.raid ? w.raid.d : 0, raidLean: !!(w.raid && w.raid.lean === c.year),
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
+    jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
