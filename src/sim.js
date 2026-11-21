@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 44;
+export const SIM_VERSION = 45;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -69,6 +69,7 @@ export const TECHS = {
   rogue:    { name: 'Rogueing', added: '2026-11-21T14:42Z', desc: 'After a bad rust year the islanders treat sick grain the way the healer treats a fever: keep it apart from the well. A day or two after orange flecks are seen in a field, idle hands walk its rows, pull every spotted plant up by the roots and carry the armfuls off to burn. The field gives a little less, but the rust goes no further from it. Once every spotted field is pulled clean, the outbreak is over. The faster the rows are walked, the fewer fields it reaches.', req: ['rust'] },
   bees:     { name: 'Bees', added: '2026-11-21T15:23Z', desc: 'A wild swarm found humming in a hollow tree, the log sawn off and stood up by the houses with a flat stone on top. The bees work the flowers from spring into autumn. When a hive grows crowded in late spring, half of it swarms; caught in time, it fills a new log. In late summer someone takes the honey with a smoking brand and leaves the bees enough to eat through the winter. A poor summer or a long hard winter can starve a hive. Honey dresses wounds, and at midsummer it is poured out as mead.', req: ['woodcut'] },
   lone:     { name: 'The lone wolf', added: '2026-11-21T16:37Z', desc: 'Years of spears have kept the pack at the den down to two, and a young wolf driven out of it has no pack to run with. It stays near the village, lies up in a thicket by the fields and walks the treeline by day, when the pack sleeps. It takes goats that stray and springs on anyone working alone. While it lives every hunt goes after it, and the pack at the den is left to grow. If nobody kills it, in a few years it moves on.', req: ['hunting'] },
+  lore:     { name: 'Sky lore', added: '2026-11-21T20:43Z', desc: 'The eldest has sat out a lifetime of storms and at dusk reads the sky over the sea: a red sky in the west with mares\' tails high up, a long swell under a flat sea, gulls coming in off the water, hearth smoke that beats down instead of rising. When the signs say a storm by morning the village works on into the dark: the ripe grain is cut by firelight, and ropes weighted with stones are thrown over every roof so the wind cannot lift the thatch. The signs are not always right, and some storms come without any.', req: ['fire', 'shelter'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -109,6 +110,17 @@ const HORN_WALK = 2;         // tiles per hour, walking toward the sound
 const HORN_HOME = 16;        // this close (squared) to the hearth and they are home
 const STORM_FLATTEN = 0.03;  // chance per storm day that a tall or ripe field is flattened
 const STORM_ROOF = 0.15;    // chance per storm day that one building loses its roof
+// sky lore: the eldest reads the dusk sky and calls a storm a day ahead. Once it is learned, tomorrow's weather is rolled a
+// day early (w.wx.nx) so a reading can be right; the reader still misses some storms and calls some that never come
+const LORE_STORMS = 100;     // storm days the island has lived through before the signs are put together
+const LORE_AGE = 30;         // and the eldest must be at least this old
+const LORE_READ = 19;        // the hour the sky is read, at the evening fire
+const LORE_HIT = 0.8;        // chance a coming storm is read right
+const LORE_FALSE = 0.025;    // chance, on an evening before rain or fog, of calling a storm that never comes
+const LORE_LATE = 23;        // on a warned night the work goes on until this hour
+const LORE_HOLD = 0.85;      // chance a stone-weighted roof holds through a gust that would have torn it
+const LORE_REAP = 2;         // hours to cut a ripe field by firelight, all hands
+const LORE_SIGNS = ['the sky in the west is red as an ember and mares\' tails stand high up', 'a long swell rolls in under a sea as flat as a plate', 'the gulls are coming in off the sea in a hurry', 'the hearth smoke beats down and creeps along the ground', 'a ring stands round the sun as it goes down'];
 
 // ---------- creatures ----------
 const WOLF_SPEED = 4;        // tiles per hour
@@ -469,7 +481,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -613,6 +625,7 @@ export function step(w, fx) {
   if (w.watch) watchHour(w, c);
   if (w.smudge) smudgeHour(w, c);
   if (c.hour === 19) supper(w);
+  if (w.lore && c.hour === LORE_READ) loreRead(w, c);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
   if (w.blaze && w.blaze.cur) blazeHour(w, c);
@@ -665,7 +678,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -688,6 +701,7 @@ function daily(w, c, fx) {
     if (w.rogue) w.rogue.y = 0;
     if (w.lone) w.lone.yh = 0;
     if (w.bow) w.bow.y = 0;
+    if (w.lore) w.lore.y = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -802,16 +816,17 @@ const COUNT = ['', 'A day', 'Two days', 'Three days', 'Four days', 'Five days', 
 const spellLen = (n) => COUNT[n] || (n === 14 ? 'Two weeks' : `${n} days`);
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
+function rollWx(w, season, k) {
+  const odds = WX_ODDS[season];
+  if (odds.some(([q]) => q === k) && rnd(w) < WEATHER[k].stay) return k;
+  let r = rnd(w) * 100;
+  for (const [q, p] of odds) { if (r < p) return q; r -= p; }
+  return odds[odds.length - 1][0];
+}
 function weather(w, c) {
   const s = w.wx;
-  const odds = WX_ODDS[c.season];
-  const fits = odds.some(([k]) => k === s.k);
-  let next = s.k;
-  if (!fits || rnd(w) >= WEATHER[s.k].stay) {
-    let r = rnd(w) * 100;
-    next = odds[odds.length - 1][0];
-    for (const [k, p] of odds) { if (r < p) { next = k; break; } r -= p; }
-  }
+  const next = s.nx || rollWx(w, c.season, s.k); // with sky lore, today was already rolled yesterday
+  if (w.lore) loreMorning(w, c, s.k, next);
   if (next === s.k) s.n++;
   else {
     endSpell(w, s);
@@ -819,14 +834,68 @@ function weather(w, c) {
     if (s.fk || s.fs) frostTold(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
     if ((s.k === 'rain' || s.k === 'storm') && s.n >= BOW_RAIN && (next === 'clear' || next === 'heat') && c.season < 3) bowComes(w, c, s);
-    if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
+    if (next === 'storm' && w.lore) { /* told in loreMorning */ }
+    else if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
     else if (next === 'heat') log(w, 'The sun beats down. The soil cracks.', 'info');
     else if (next === 'fog') fogComes(w);
   }
   if (w.wx.k === 'storm') storm(w);
   if (w.wx.k === 'fog') w.stats.yg = (w.stats.yg || 0) + 1;
+  if (w.lore === null && s.k === 'storm' && next !== 'storm' && s.r) learnLore(w);
+  if (w.lore) w.wx.nx = rollWx(w, clock(w.t + TICKS_PER_DAY).season, w.wx.k);
 }
+
+// ---------- sky lore ----------
+// w.lore { nm first reader, at, n storms called, h called right, m storms missed, f false alarms, s roofs held, y this year,
+// g fields cut by firelight, on the day a storm is called for, rd who called it }; b.tie: the roof is roped down with stones
+const stormDays = (w) => (w.hist.yearly || []).reduce((n, r) => n + (r.storms || 0), 0) + (w.stats.ys || 0);
+function learnLore(w) {
+  const who = elder(w);
+  if (!who || ageY(w, who) < LORE_AGE || stormDays(w) < LORE_STORMS) return;
+  w.lore = { nm: who.name, at: w.t, n: 0, h: 0, m: 0, f: 0, s: 0, y: 0, g: 0, on: -1, rd: who.name };
+  if (!w.techs.includes('lore')) w.techs.push('lore');
+  milestone(w, `The wind drops and ${who.name} climbs up to look at the torn thatch. ${who.name} has sat out ${stormDays(w)} days of storm on ${w.name}, and says every one of them was told the evening before, for anyone who could read it: ` +
+    `a red sky in the west, mares' tails high up, the gulls coming in off the sea, the hearth smoke beating down. From now on, at the evening fire, the eldest will look out over the sea and say what the morning will bring. ${w.name} learns to read the sky.`);
+}
+// the evening fire: the eldest looks at the sky over the sea
+function loreRead(w, c) {
+  const L = w.lore, nx = w.wx.nx;
+  if (w.wx.k === 'storm' || !nx) return; // in a storm already: the stones stay on
+  const who = elder(w);
+  if (!who) return;
+  let call = false;
+  if (nx === 'storm') { if (rnd(w) < LORE_HIT) call = true; else L.m++; }
+  else if ((nx === 'rain' || nx === 'fog') && rnd(w) < LORE_FALSE) call = true;
+  if (!call) return;
+  L.on = c.day + 1; L.n++; L.rd = who.name;
+  log(w, `At the evening fire ${who.name} looks out to sea: ${LORE_SIGNS[c.day % LORE_SIGNS.length]}. "A storm by morning." The ripe grain is cut by firelight and stones are hung on the thatch.`, 'info');
+}
+// first thing in the morning: was the reading right? The stones come off once the wind has gone
+function loreMorning(w, c, was, next) {
+  const L = w.lore;
+  if (L.on === c.day) {
+    L.on = -1;
+    if (next === 'storm') {
+      L.h++;
+      if (L.h === 1) milestone(w, `Black clouds roll in off the sea at first light, just as ${L.rd} said they would. This time the ripe grain is already in and the roofs are roped down with stones, and everyone is indoors before the first gust. Nobody on ${w.name} laughs at sky-reading now.`);
+      else log(w, `The storm ${L.rd} read in the sky comes in at first light. The village is ready for it.`, 'bad');
+    } else {
+      L.f++;
+      log(w, `${L.rd} called a storm, but the morning comes in ${next === 'rain' ? 'grey and drizzling' : next === 'fog' ? 'thick with fog' : 'calm'}. The children laugh at the stones hanging off the roofs.`, 'info');
+    }
+  } else if (next === 'storm' && was !== 'storm') log(w, 'Black clouds roll in off the sea with no warning in last night\'s sky. Everyone runs for shelter.', 'bad');
+  if (next !== 'storm') for (const b of w.buildings) if (b.tie) delete b.tie;
+}
+// a warned evening: cut what is ripe, then rope the roofs
+function prepTask(w, p) {
+  const f = nearestFree(w, workLists(w).ripe, p, 'ripe', 'f');
+  if (f) return { k: 'harvest', key: 'f' + f.id, x: f.x, y: f.y, h: LORE_REAP, eve: 1 };
+  const b = nearest(w.buildings, p, (o) => o.progress >= 1 && !o.dmg && !o.tie && w.res['y' + o.id] == null);
+  if (b) return { k: 'tie', key: 'y' + b.id, x: b.x, y: b.y, h: 1 };
+  return null;
+}
+export const loreTied = (b) => !!b.tie;
 
 function fogComes(w) {
   w.stats.fogs = (w.stats.fogs || 0) + 1;
@@ -850,7 +919,8 @@ function storm(w) {
     const standing = w.buildings.filter((b) => b.progress >= 1);
     if (standing.length) {
       const b = standing[ri(w, standing.length)];
-      b.progress = 0.75; b.dmg = 1; s.r++;
+      if (b.tie && rnd(w) < LORE_HOLD) { s.held = (s.held || 0) + 1; w.lore.s++; w.lore.y++; }
+      else { b.progress = 0.75; b.dmg = 1; delete b.tie; s.r++; }
     }
   }
 }
@@ -859,13 +929,14 @@ function storm(w) {
 function endSpell(w, s) {
   const n = s.n, len = spellLen(n), v = (vb) => (len.startsWith('A ') ? vb + 's' : vb); // "A week of rain ends"
   let text = null, k = 'bad', big = false;
-  if (s.k === 'storm' && (n >= 3 || s.f || s.r || s.g >= 3)) {
+  if (s.k === 'storm' && (n >= 3 || s.f || s.r || s.g >= 3 || s.held)) {
     const hurt = [];
     if (s.f) hurt.push(`${plural(s.f, 'field', 'fields')} flattened`);
     if (s.r) hurt.push(`${plural(s.r, 'roof', 'roofs')} torn away`);
     if (s.g) hurt.push(`${plural(s.g, 'fence', 'fences')} blown down`);
     text = n === 1 ? `A storm tears across ${w.name}` : `${len} of storms ${v('batter')} ${w.name}`;
     text += hurt.length ? `: ${hurt.join(', ')}.` : ', but the village holds.';
+    if (s.held) text += ` The stones on the thatch held ${s.held === 1 ? 'a roof' : plural(s.held, 'roof', 'roofs')} the wind tried to lift.`;
     big = n >= 7 || s.r >= 3 || s.f >= Math.max(10, w.fields.length >> 3);
   } else if (s.k === 'heat' && n >= 7) {
     text = `${len} of blazing heat ${v('break')} at last. The grain stood still in the sun.`;
@@ -4336,7 +4407,8 @@ function act(w, p, c, fx) {
   if (w.blaze && w.blaze.cur && w.t - w.blaze.cur.at >= BLAZE_SEEN && a >= 14 && a < 65 && !p.sick && !p.hurt && h >= 5 && h < 23 && blazeFight(w, p, c)) return; // even in a storm
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
-  const night = h >= 21 || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST) || (w.smudge && h < SMUDGE_REST && w.smudge.last.includes(p.id)); // the night's watcher sleeps late, and so do the smudgers
+  const warned = !!(w.lore && w.lore.on === c.day + 1) && h >= LORE_READ && h < LORE_LATE && a >= 14 && a < 65 && !p.hurt && !p.sick; // a storm is called: work on by firelight
+  const night = (h >= 21 && !warned) || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST) || (w.smudge && h < SMUDGE_REST && w.smudge.last.includes(p.id)); // the night's watcher sleeps late, and so do the smudgers
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
   if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
@@ -4366,6 +4438,23 @@ function act(w, p, c, fx) {
     return;
   }
   p.asleep = false;
+  if (warned) {
+    if (p.task && p.task.k !== 'tie' && !p.task.eve) release(w, p);
+    if (!p.task) { const t = prepTask(w, p); if (t) reserve(w, p, t); }
+    const t = p.task;
+    if (t) {
+      if (!walk(w, p, t.x + 0.5, t.y + 0.5)) return;
+      if (--t.h > 0) return;
+      finish(w, p, t, c, fx);
+      release(w, p);
+      return;
+    }
+    if (h >= 21) { // nothing left to do: to bed
+      const home = homeOf(w, p);
+      if (walk(w, p, home.x + 0.5 + (p.id % 3) * 0.25 - 0.25, home.y + 0.5)) p.asleep = p.home != null;
+      return;
+    }
+  }
   if (evening) {
     if (p.task && p.task.k !== 'gather') release(w, p);
     if (!p.task) {
@@ -4423,6 +4512,7 @@ function finish(w, p, t, c, fx) {
     const y = Math.round(FIELD_YIELD * w.harvest * (1 - (f.lost || 0)));
     w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); delete f.lost;
     deed(w, p, 'g', y);
+    if (t.eve && w.lore) w.lore.g++;
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
@@ -4520,6 +4610,9 @@ function finish(w, p, t, c, fx) {
     if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'snow') {
     snowDone(w, p, t);
+  } else if (t.k === 'tie') {
+    const b = w.buildings.find((o) => 'y' + o.id === t.key);
+    if (b && b.progress >= 1 && !b.dmg) { b.tie = 1; pop('roped', 'muted'); }
   } else if (t.k === 'bow') {
     bowDone(w, p);
   } else if (t.k === 'wade') {
@@ -5280,6 +5373,10 @@ const MIGRATIONS = {
   43: (w) => {
     if (w.bow === undefined) w.bow = null;
   },
+  // v44 -> v45: sky lore. Not learned yet; the eldest may put the signs together after a storm that tears a roof.
+  44: (w) => {
+    if (w.lore === undefined) w.lore = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5358,6 +5455,10 @@ export function summary(w) {
     loneKilled: w.lone ? w.lone.dead : 0, loneLast: (w.lone && w.lone.last) || null,
     rainbows: w.bow ? w.bow.n : 0, rainbowYear: w.bow ? w.bow.y : 0, rainbow: bowOn(w, c), rainbowReached: w.bow ? w.bow.k : 0,
     rainbowChasers: bowOn(w, c) ? w.people.filter((p) => p.task && p.task.k === 'bow').length : 0,
+    lore: !!w.lore, skyReader: w.lore ? w.lore.rd : null, stormCalled: !!(w.lore && w.lore.on === c.day + 1 && c.hour >= LORE_READ),
+    loreCalls: w.lore ? w.lore.n : 0, loreRight: w.lore ? w.lore.h : 0, loreMissed: w.lore ? w.lore.m : 0, loreFalse: w.lore ? w.lore.f : 0,
+    loreHeld: w.lore ? w.lore.s : 0, loreHeldYear: w.lore ? w.lore.y : 0, loreReaped: w.lore ? w.lore.g : 0,
+    roofsTied: w.buildings.filter((b) => b.tie).length, roping: w.people.filter((p) => p.task && (p.task.k === 'tie' || p.task.eve)).length,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

@@ -438,3 +438,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The children's search could find something real now and then at the foot: a flint nodule, an amber lump (a midsummer gift or trade good).
   - A double rainbow once in a while (a second, fainter arc with the colours turned round) and a line in the chronicle for it.
   - The far isle has its own word for it, and a guest who weds in teaches it (a small kinship/language thread).
+- Sky lore is done, for storms only (SIM_VERSION 45; w.lore {nm, at, n calls, h right, m missed, f false, s roofs held, y this year,
+  g fields cut by firelight, on day called for, rd reader}; b.tie roped roof; w.wx.nx is tomorrow's weather, rolled a day early once
+  learned; rollWx/learnLore/loreRead/loreMorning/prepTask in sim.js, LORE_* constants; tasks 'tie' and harvest with t.eve;
+  `scripts/_loreprobe.mjs [years] [seed|live]`). Learned after a storm that tears a roof once the island has seen 100 storm days.
+  Calls ~80% of storms, a false alarm now and then; roped roofs hold 85% of the time. Firelight reaping is rare: ripe grain is
+  usually cut before a storm anyway. Answers it invites:
+  - Now that w.wx.nx exists, the same reader can call other weather: a hard frost (stack wood, smudge on the first night instead of
+    the second), fog (keep the goats in, nobody to the shore), a heatwave (the children to the shallows, water the young grain).
+  - The reader's skill could grow with years of reading (LORE_HIT rising from 0.6), and a byname ("Weather-eye") after many right calls;
+    when the reader dies, the next eldest starts less sure.
+  - Storms still flatten tall green grain (Y11 on Hais: 14 fields). Staking, or sowing a shorter, stiffer grain, would answer it.
+  - A storm called while the dugout or hunters are far out: a run to call them home.

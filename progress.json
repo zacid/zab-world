@@ -233,5 +233,10 @@
   "at": "2026-11-21T17:59:29.438Z",
   "title": "Add rainbows after rain that the children run to find",
   "body": "- SIM_VERSION 44 (w.bow {n, y, nm, at, c, k}, w.wx.bow {a, b, d, x, y, r}; bowComes/bowOn/bowTask/bowDone, BOW_* in sim.js; task 'bow'; yearly `bows`): when 3+ days of rain or storm break into a clear day (spring to autumn), 3 in 10 times a rainbow stands for 3 hours, in the west at 07:00 or the east at 15:00\n- Two of every three children at play run to the spot where its foot comes down; the first to arrive is logged (wet grass, a puddle, it moved on). The first rainbow is a milestone\n- Visible: a 7-band pixel arc over the island that fades in and out and thins towards its feet, a top-line note, a Rainbows row in the panel, hover text, a History line\n- Watch: Hais should see its first rainbow in spring Y8 and about 2-3 a year after that"
+ },
+ {
+  "at": "2026-11-21T21:29:59.379Z",
+  "title": "Add sky lore: the eldest calls storms a day ahead",
+  "body": "- SIM_VERSION 45 (w.lore, b.tie, w.wx.nx; LORE_* in sim.js; tech 'lore'; tasks 'tie' and firelight harvest; yearly `held`): after a storm that tears a roof, once the island has seen 100 storm days, the eldest (30+) learns to read the dusk sky\n- Once it is learned, tomorrow's weather is rolled a day early. At 19:00 the reader calls about 80% of coming storms, plus a false alarm on 2.5% of evenings before rain or fog. On a warned evening adults work until 23:00: they cut ripe grain by firelight, then throw stone-weighted ropes over every roof. A roped roof holds 85% of the gusts that would tear it\n- Visible: ropes and hanging stones on the thatch from the warned evening until the storm passes, a red note in the top line, a Sky lore row in the panel (calls right/missed, false alarms, roofs held), new hover text and work animation, a History line\n- Watch: Hais should learn it at the next storm that tears a roof (probe: summer Y8) and then save about 1-3 roofs a year. Look for the children laughing at the stones after a false alarm"
  }
 ]

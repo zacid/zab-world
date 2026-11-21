@@ -119,6 +119,8 @@ function doing(p) {
   if (p.task && p.task.k === 'wade') return p.x === p.px && p.y === p.py ? (p.id + Math.floor(w.t / 2)) % 3 ? 'paddling in the shallows' : 'feeling for cockles with their toes' : 'running down to the shallows';
   if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
+  if (p.task && p.task.k === 'tie') return p.x === p.px && p.y === p.py ? 'roping down the thatch with stones before the storm' : 'carrying stones and rope to a roof';
+  if (p.task && p.task.eve) return p.x === p.px && p.y === p.py ? 'cutting ripe grain by firelight before the storm' : 'hurrying out to the ripe grain before the storm';
   if (p.task && p.task.k === 'tale') {
     if (w.tale && w.tale.id === p.id) return 'telling a tale on the longest night';
     const t = w.tale && w.people.find((q) => q.id === w.tale.id);
@@ -221,6 +223,9 @@ function work(k, id, X, Y, now) {
     if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
     else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
     if (f === 2) px(sc, X + 5 + (ph(200) % 2), Y + 2, spade ? '#6b4a2e' : 'rgba(230,230,230,0.7)'); // dust or a clod
+  } else if (k === 'tie') { // a stone on a rope swung up and over the eaves
+    const f = ph(300) % 3;
+    px(sc, X + 3, Y - f, '#4a3826', 1, 1 + f); px(sc, X + 3, Y - 1 - f, '#8f8b82', 2, 1);
   } else if (k === 'forage' || k === 'gather') { // a basket on the hip, a hand reaching down and coming up full
     const f = ph(380) % 4;
     px(sc, X - 1, Y + 2, WOOD, 1, 2);
@@ -415,6 +420,7 @@ function drawTerrain() {
       const rows = b.progress >= 1 ? GRANARY : b.progress > 0.5 ? GRANARY.slice(3) : GRANARY.slice(6);
       sprite(tc, rows, b.x * TILE, b.y * TILE + 8 - rows.length, GCOL);
       if (pal.snow && b.progress >= 1) px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
+      if (b.tie && b.progress >= 1) roped(b.x * TILE, b.y * TILE);
       if (b.progress >= 1 && jarsLeft > 0) { // sealed jars stand in the shade under the raised floor
         for (let k = 0; k < 2 && jarsLeft > 0; k++, jarsLeft -= 10) {
           const jx = b.x * TILE + 2 + k * 2, jy = b.y * TILE + 6;
@@ -438,6 +444,7 @@ function drawTerrain() {
       px(tc, b.x * TILE + 2, b.y * TILE + 1, '#eef3f7', 4, 1);
       if (wxNow() === 'snow') { px(tc, b.x * TILE + 1, b.y * TILE + 2, '#eef3f7', 6, 1); px(tc, b.x * TILE + 3, b.y * TILE, '#eef3f7', 2, 1); }
     }
+    if (b.tie && b.progress >= 1) roped(b.x * TILE, b.y * TILE);
     if (b.id === herbHome && b.progress >= 1) {
       const n = Math.min(3, Math.ceil(w.heal.s / 10));
       for (let k = 0; k < n; k++) {
@@ -448,6 +455,13 @@ function drawTerrain() {
   }
 }
 const wxNow = () => (w.wx ? w.wx.k : 'clear');
+// sky lore: two ropes thrown over the thatch before a storm, a stone hanging from each end below the eaves
+function roped(X, Y) {
+  for (const rx of [2, 5]) {
+    px(tc, X + rx, Y + 1, '#3e2e1e', 1, 3); // the rope over the thatch
+    px(tc, X + rx, Y + 4, '#8f8b82'); px(tc, X + rx, Y + 5, '#6a675f'); // the stone at its end
+  }
+}
 // burnt ground: black with grey ash and charred stumps for a season, then dark patches in the new grass,
 // then a scatter of fireweed. Trees that were saved stand over singed black earth for half a year.
 let ashAt = new Map();
@@ -1705,7 +1719,7 @@ function updatePanels() {
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.stormCalled ? ` · <span class="bad">${esc(s.skyReader)} reads the sky: a storm by morning</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
@@ -1720,6 +1734,7 @@ function updatePanels() {
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
       : s.loneLast ? [['lone', 'Lone wolf', `<span class="m">${esc(s.loneLast.nm)} ${s.loneLast.how === 'killed' ? `killed by ${esc(s.loneLast.by)}` : 'moved on'}</span>`]] : []),
+    ...(s.lore ? [['lore', 'Sky lore', `${s.stormCalled ? `<span class="bad">${esc(s.skyReader)} calls a storm by morning</span>${s.roping ? ` · <span class="fest">${s.roping} at work by firelight</span>` : ''} · ` : s.roofsTied ? `<span class="fest">${s.roofsTied} ${s.roofsTied === 1 ? 'roof' : 'roofs'} roped with stones</span> · ` : ''}<span class="m">${s.loreRight} of ${s.loreRight + s.loreMissed} storms called · ${s.loreFalse} false ${s.loreFalse === 1 ? 'alarm' : 'alarms'} · ${s.loreHeld} ${s.loreHeld === 1 ? 'roof' : 'roofs'} held${s.loreHeldYear ? ` (${s.loreHeldYear} this year)` : ''}${s.loreReaped ? ` · ${s.loreReaped} ${s.loreReaped === 1 ? 'field' : 'fields'} cut by firelight` : ''}</span>`]] : []),
     ...(s.rainbows ? [['bow', 'Rainbows', `${s.rainbows} <span class="m">seen${s.rainbowYear ? ` · ${s.rainbowYear} this year` : ''} · the children reached the end of ${s.rainbowReached}</span>${s.rainbow ? ' · <span class="fest">one stands now</span>' : ''}`]] : []),
     ...(s.copse ? [['copse', 'Coppice', `${s.copseStools} <span class="m">stools · ${s.copseReady} ready to cut · ${s.copseYear.toLocaleString()} timber this year</span>`]] : []),
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
@@ -1807,7 +1822,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'),n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'), n(h.held, 'roof held by the storm stones', 'roofs held by the storm stones'),n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
