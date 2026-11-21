@@ -228,5 +228,10 @@
   "at": "2026-11-21T17:14:28.373Z",
   "title": "Add a lone wolf that stalks the fields by day",
   "body": "- SIM_VERSION 43 (w.lone {n, y, dead, gone, yh, cur {id, nm, at, t, g, b, k, h}, last}; LONE_* in sim.js; beast kind 'lone'; tech 'lone'; yearly `lone`): once hunters have taken 3+ wolves and the pack is held at two, a named wolf driven from the den may turn up in spring (half the time, at most once every 8 years)\n- It lies up in a thicket 10-20 tiles from the hearth and walks the treeline from 6:00 to 19:00, when the pack sleeps. It springs on anyone working alone and takes straying goats, then lies low for 5 days\n- Once it has drawn blood, every hunt goes after it instead of the den (10% a hunt for a pair, and it can turn on the hunters), so the pack can grow meanwhile. If nobody kills it, it leaves after 3 years\n- Visible: a bigger, paler wolf sprite that sits up to watch the village, named hover text, a Lone wolf row in the panel, a History line\n- Watch: Hais should meet One-Ear in spring Y9; test seeds see 4-7 lone wolves a century, each lasting from a season to two years"
+ },
+ {
+  "at": "2026-11-21T17:59:29.438Z",
+  "title": "Add rainbows after rain that the children run to find",
+  "body": "- SIM_VERSION 44 (w.bow {n, y, nm, at, c, k}, w.wx.bow {a, b, d, x, y, r}; bowComes/bowOn/bowTask/bowDone, BOW_* in sim.js; task 'bow'; yearly `bows`): when 3+ days of rain or storm break into a clear day (spring to autumn), 3 in 10 times a rainbow stands for 3 hours, in the west at 07:00 or the east at 15:00\n- Two of every three children at play run to the spot where its foot comes down; the first to arrive is logged (wet grass, a puddle, it moved on). The first rainbow is a milestone\n- Visible: a 7-band pixel arc over the island that fades in and out and thins towards its feet, a top-line note, a Rainbows row in the panel, hover text, a History line\n- Watch: Hais should see its first rainbow in spring Y8 and about 2-3 a year after that"
  }
 ]

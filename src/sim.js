@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 43;
+export const SIM_VERSION = 44;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -469,7 +469,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -665,7 +665,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -687,6 +687,7 @@ function daily(w, c, fx) {
     if (w.rust) { w.rust.y = 0; w.rust.cur = null; }
     if (w.rogue) w.rogue.y = 0;
     if (w.lone) w.lone.yh = 0;
+    if (w.bow) w.bow.y = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -817,6 +818,7 @@ function weather(w, c) {
     if (s.k === 'storm') whaleStorm(w, c, s.n);
     if (s.fk || s.fs) frostTold(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
+    if ((s.k === 'rain' || s.k === 'storm') && s.n >= BOW_RAIN && (next === 'clear' || next === 'heat') && c.season < 3) bowComes(w, c, s);
     if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
     else if (next === 'heat') log(w, 'The sun beats down. The soil cracks.', 'info');
@@ -885,6 +887,61 @@ function endSpell(w, s) {
   }
   if (!text) return;
   if (big) milestone(w, text); else log(w, text, k);
+}
+
+// ---------- rainbows ----------
+// When a spell of rain or storm breaks into a clear day, the low sun may throw a rainbow over the island for
+// a few hours: in the morning it stands in the west, in the late afternoon in the east. The children run off
+// to find where it comes down. Nothing is gained but wet feet; it is there to be seen.
+// w.wx.bow { a from hour, b to hour, d side (-1 west, 1 east), x, y foot tile or null, r someone reached it };
+// w.bow { n rainbows ever, y this year, nm first child to chase one, at, c chases, k reached the foot }.
+const BOW_RAIN = 3;          // days of rain before a clearing can bring one
+const BOW_ODDS = 0.3;        // chance that a clearing brings a rainbow
+const BOW_HOURS = 3;         // how long it stands
+const BOW_CHASE = 2;         // of every 3 children at play, how many run after it
+export const BOW_R = 12;     // tiles from the foot to the middle of the arc (render draws it from the foot)
+const BOW_TOLD = ['finds only wet grass and a puddle with the sky in it', 'finds that it has moved on, further out over the sea',
+  'stands in the wet grass and looks up, and cannot see it at all from there', 'comes back soaked to the knees, sure it was just past the next field'];
+
+function bowComes(w, c, s) {
+  if (rnd(w) >= BOW_ODDS) return;
+  const am = rnd(w) < 0.5, d = am ? -1 : 1, a = am ? 7 : 15;
+  let foot = null;
+  for (let k = 0; k < 12 && !foot; k++) {
+    const x = w.fire.x + d * (8 + ri(w, 9)), y = w.fire.y + ri(w, 13) - 6;
+    if (x < 1 || y < 1 || x >= MAP - 1 || y >= MAP - 1 || tile(w, x, y) === T.WATER) continue;
+    if (lineOfLand(w, w.fire.x + 0.5, w.fire.y + 0.5, x + 0.5, y + 0.5)) foot = [x, y];
+  }
+  w.wx.bow = { a, b: a + BOW_HOURS, d, x: foot ? foot[0] : null, y: foot ? foot[1] : null, r: 0 };
+  w.bow ||= { n: 0, y: 0, nm: null, at: null, c: 0, k: 0 };
+  const B = w.bow, what = s.k === 'storm' ? 'storms' : 'rain';
+  B.n++; B.y++;
+  const len = spellLen(s.n).toLowerCase(), side = am ? 'west' : 'east';
+  if (B.n > 1) { log(w, `${am ? 'In the morning' : 'Late in the afternoon'} a rainbow stands over the ${side} of ${w.name}, after ${len} of ${what}.`, 'good'); return; }
+  const kids = w.people.filter((p) => { const g = ageY(w, p); return g >= 5 && g < 14; });
+  const kid = kids.length ? kids[ri(w, kids.length)] : null;
+  if (kid) { B.nm = kid.name; B.at = w.t; }
+  milestone(w, `After ${len} of ${what} the clouds tear open. ${am ? 'In the morning' : 'Late in the afternoon'} the sun comes out low ` +
+    `and a great bow of colours stands over the ${side} of ${w.name}, its feet in the wet grass. Nobody has a word for it.` +
+    (kid ? ` ${kid.name} runs off to find where it comes down, and the other children run after.` : ''));
+}
+export function bowOn(w, c, hf = c.hour) {
+  const b = w.wx && w.wx.bow;
+  return !!b && hf >= b.a && hf < b.b;
+}
+function bowTask(w, p) {
+  const b = w.wx.bow;
+  for (let k = 0; k < 4; k++) {
+    const x = b.x + ri(w, 3) - 1, y = b.y + ri(w, 3) - 1;
+    if (tile(w, x, y) !== T.WATER && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) { w.bow.c++; return { k: 'bow', x, y, h: 1 }; }
+  }
+  return null;
+}
+function bowDone(w, p) {
+  const b = w.wx.bow;
+  if (!b || b.r) return;
+  b.r = 1; w.bow.k++;
+  log(w, `${p.name} reaches the place where the rainbow came down and ${BOW_TOLD[ri(w, BOW_TOLD.length)]}.`, 'info');
 }
 
 // ---------- late frost ----------
@@ -4342,6 +4399,7 @@ function act(w, p, c, fx) {
   if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
+    else if (a >= 5 && a < 14 && w.wx.bow && w.wx.bow.x != null && bowOn(w, c) && (p.id + c.day) % 3 < BOW_CHASE) p.task = bowTask(w, p) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a < 14 && w.snow && snowOk(w, c) && (p.id + c.day) % 3 < SNOW_PLAY) p.task = snowTask(w, p, c) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a < 14 && a >= WADE_AGE && w.wade && wadeOk(w, c, h) && (p.id + c.day) % 3 < (w.wx.k === 'heat' ? 2 : 1)) p.task = wadeTask(w, p) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a < 14) p.task = wander(w, p, w.fire.x, w.fire.y, 6, 2);
@@ -4462,6 +4520,8 @@ function finish(w, p, t, c, fx) {
     if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'snow') {
     snowDone(w, p, t);
+  } else if (t.k === 'bow') {
+    bowDone(w, p);
   } else if (t.k === 'wade') {
     wadeDone(w, p, c, pop);
   } else if (t.k === 'whale') {
@@ -5216,6 +5276,10 @@ const MIGRATIONS = {
   42: (w) => {
     if (w.lone === undefined) w.lone = null;
   },
+  // v43 -> v44: rainbows. None seen yet; one may stand over the island when a spell of rain breaks into a clear day.
+  43: (w) => {
+    if (w.bow === undefined) w.bow = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5292,6 +5356,8 @@ export function summary(w) {
     lone: (w.lone && w.lone.cur && w.lone.cur.nm) || null, loneCame: w.lone ? w.lone.n : 0, loneGoats: (w.lone && w.lone.cur && w.lone.cur.g) || 0,
     loneBit: (w.lone && w.lone.cur && w.lone.cur.b) || 0, loneHunts: (w.lone && w.lone.cur && w.lone.cur.h) || 0,
     loneKilled: w.lone ? w.lone.dead : 0, loneLast: (w.lone && w.lone.last) || null,
+    rainbows: w.bow ? w.bow.n : 0, rainbowYear: w.bow ? w.bow.y : 0, rainbow: bowOn(w, c), rainbowReached: w.bow ? w.bow.k : 0,
+    rainbowChasers: bowOn(w, c) ? w.people.filter((p) => p.task && p.task.k === 'bow').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

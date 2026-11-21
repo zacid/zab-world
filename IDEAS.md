@@ -430,3 +430,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Its pelt as a lasting thing: a cloak worn by whoever killed it, shown on the sprite; a winter tale of each one by name.
   - Lone wolf names repeat over a century (5 names, only the last is skipped); more names, or "the second One-Ear".
   - While it lives the den is left alone, so the pack grows and the winter pen raids climb: watch whether that is too harsh.
+- Rainbows are done, for show only (SIM_VERSION 44; w.bow {n, y, nm, at, c chases, k reached}, w.wx.bow {a, b hours, d side, x, y foot, r};
+  bowComes/bowOn/bowTask/bowDone in sim.js, BOW_* constants, BOW_R exported; task 'bow'; drawBow()/bowSprite() in render.js; yearly `bows`;
+  `scripts/_bowprobe.mjs [years] [seed|live]`). About 2-3 a year. Answers it invites:
+  - Weather lore at last: an elder who has watched many rainbows learns "a rainbow in the morning, the rain comes back" (a west bow means
+    more rain, so the harvest is hurried in) — the first real sky-reading, and a way into frost and storm lore.
+  - The children's search could find something real now and then at the foot: a flint nodule, an amber lump (a midsummer gift or trade good).
+  - A double rainbow once in a while (a second, fainter arc with the colours turned round) and a line in the chronicle for it.
+  - The far isle has its own word for it, and a guest who weds in teaches it (a small kinship/language thread).

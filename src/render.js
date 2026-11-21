@@ -117,6 +117,7 @@ function doing(p) {
     return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
   }
   if (p.task && p.task.k === 'wade') return p.x === p.px && p.y === p.py ? (p.id + Math.floor(w.t / 2)) % 3 ? 'paddling in the shallows' : 'feeling for cockles with their toes' : 'running down to the shallows';
+  if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
   if (p.task && p.task.k === 'tale') {
     if (w.tale && w.tale.id === p.id) return 'telling a tale on the longest night';
@@ -1081,6 +1082,7 @@ function frame() {
   const wx = wxNow();
   const tint = { rain: 'rgba(18,26,40,0.22)', storm: 'rgba(8,12,22,0.42)', heat: 'rgba(255,170,60,0.09)', cold: 'rgba(150,190,255,0.12)', snow: 'rgba(200,215,235,0.10)', fog: 'rgba(190,198,204,0.30)' }[wx];
   if (tint) { sc.fillStyle = tint; sc.fillRect(0, 0, PX, PX); }
+  drawBow(c, hf, dark);
   if (flames.length) { sc.fillStyle = `rgba(90,60,40,${Math.min(0.2, 0.05 + flames.length * 0.004).toFixed(3)})`; sc.fillRect(0, 0, PX, PX); } // smoke over the whole island
   if (horner) hornRings(horner, now);
   // night
@@ -1626,6 +1628,37 @@ function hornRings(at, now) {
     sc.beginPath(); sc.arc(cx, cy, 2 + f * reach, 0, Math.PI * 2); sc.stroke();
   }
 }
+// a rainbow after the rain: seven 2-pixel bands, red outside, drawn once into a small canvas and laid over the
+// island, one foot where the children run to and the arc standing away from the village. It fades in and out
+// over its hours and thins out towards the feet, as if it rose out of the wet grass.
+const BOW_COL = [[232, 67, 74], [240, 138, 58], [242, 214, 74], [95, 207, 90], [74, 160, 232], [90, 90, 216], [154, 90, 208]];
+let bowImg = null;
+function bowSprite() {
+  if (bowImg) return bowImg;
+  const R = S.BOW_R * TILE, W = R * 2 + 2, H = R + 1;
+  bowImg = document.createElement('canvas'); bowImg.width = W; bowImg.height = H;
+  const g = bowImg.getContext('2d'), img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const dx = x + 0.5 - (R + 1), dy = R - (y + 0.5), band = Math.floor((R - Math.hypot(dx, dy)) / 2);
+    if (dy < 0 || band < 0 || band >= BOW_COL.length) continue;
+    const i = (y * W + x) * 4, [r, gg, b] = BOW_COL[band];
+    img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b;
+    img.data[i + 3] = Math.round(255 * Math.min(1, dy / (R * 0.55)));
+  }
+  g.putImageData(img, 0, 0);
+  return bowImg;
+}
+function drawBow(c, hf, dark) {
+  const b = w.wx && w.wx.bow;
+  if (!b || !S.bowOn(w, c, hf)) return;
+  const k = Math.min(1, (hf - b.a) / 0.75, (b.b - hf) / 0.75) * (1 - dark);
+  if (k <= 0) return;
+  const R = S.BOW_R * TILE, fx = b.x != null ? b.x * TILE + 4 : w.fire.x * TILE + 4 + b.d * 10 * TILE, fy = b.y != null ? b.y * TILE + 6 : w.fire.y * TILE + 6;
+  const cx = fx + b.d * R;
+  sc.globalAlpha = 0.34 * k;
+  sc.drawImage(bowSprite(), Math.round(cx - R - 1), Math.round(fy - R));
+  sc.globalAlpha = 1;
+}
 function glow(c, x, y, r, col) {
   const g = c.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1638,7 +1671,7 @@ function updatePanels() {
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
@@ -1653,6 +1686,7 @@ function updatePanels() {
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
       : s.loneLast ? [['lone', 'Lone wolf', `<span class="m">${esc(s.loneLast.nm)} ${s.loneLast.how === 'killed' ? `killed by ${esc(s.loneLast.by)}` : 'moved on'}</span>`]] : []),
+    ...(s.rainbows ? [['bow', 'Rainbows', `${s.rainbows} <span class="m">seen${s.rainbowYear ? ` · ${s.rainbowYear} this year` : ''} · the children reached the end of ${s.rainbowReached}</span>${s.rainbow ? ' · <span class="fest">one stands now</span>' : ''}`]] : []),
     ...(s.copse ? [['copse', 'Coppice', `${s.copseStools} <span class="m">stools · ${s.copseReady} ready to cut · ${s.copseYear.toLocaleString()} timber this year</span>`]] : []),
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
@@ -1739,7 +1773,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'),n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'),n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
