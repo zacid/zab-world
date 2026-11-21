@@ -148,5 +148,10 @@
   "at": "2026-11-21T03:04:14.891Z",
   "title": "Add a beach watch fire that turns raiders back",
   "body": "- SIM_VERSION 27 (w.watch {hid, last, x, y, n nights, s boats turned back, k turn}; tech 'watch'; task kind 'watch'): learned at the start of the raiding season once the far isle has raided twice\n- From autumn to winter day 45, one adult (16-55, not herder, healer or horn keeper) in turn sits by a driftwood fire on the beach below the granary nearest the sea from 19:00 to 06:00 and sleeps until 11:00; costs 1 timber a night, skipped on storm, snow and tale nights; wolves leave the watcher alone\n- A dugout rowing in is seen 80% of the time on a clear night (25% in fog, 50% in rain): it turns back with nothing and no feud follows, so the next midsummer boat still comes\n- Visible: a small fire and glow on the beach at night, a hover tip for the watcher, a Watch row in the panel\n- Watch: Hais (2 raids) learns it this autumn (Y7); test seeds learn it Y9-18 and turn back about one boat in 30 years"
+ },
+ {
+  "at": "2026-11-21T03:28:34.752Z",
+  "title": "Add peace gifts: hungry guests go home with grain",
+  "body": "- SIM_VERSION 28 (w.raid.peace gifts, pg grain given, yv this year, gift year; tech 'gifts'; GIFT_* in sim.js; yearly `given`): in a thin year on the far isle its midsummer guests bring nothing to trade, and before the first raid they only eye the granaries\n- Once raided, the islanders send each guest home with a 60-grain sack (at most 10% of the stores, 300 kept back per islander); that year no raid comes. The first gift is the tech milestone, told by the eldest\n- Hungry years make the midsummer boat 1.5x likelier to come; a lean year with no visit, or the feud summer after a raid, can still bring raiders\n- Visible: guests sleep beside and carry grain sacks to the dugout at first light, \"at peace this year\" and gift totals in the Raiders row, gifts in History\n- Watch: Hais was raided twice and is in its feud summer; from Y8 a thin-year boat should bring the first gift. Test seeds: raids drop from 5-12 to 3-7 per century, 4-5 gifts"
  }
 ]

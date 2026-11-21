@@ -276,3 +276,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Peace instead of watching: grain sent back with the midsummer boat in a lean year, or a wedding that ends raids for a generation.
   - Raiders who are turned back might try a second beach, out of sight of the fire (raidTarget picks the next-nearest granary).
   - The watcher is safe from wolves by the fire; if the driftwood runs out on a hungry winter fog night, that could change.
+- Peace gifts are done (SIM_VERSION 28; tech 'gifts', w.raid.peace/pg/yv/gift; GIFT_*, ISLE_HUNGRY in sim.js; isleGift(); guest g.s sack;
+  yearly `given`). Learned at the first thin-year midsummer after a raid. Test seeds: 4-5 gifts and 3-7 raids per century (was 5-12).
+  Raids still come in lean years with no visit (40-60% chance the boat stays home) and in feud summers. Answers it invites:
+  - Gratitude: guests who were given grain come back the next summer with something new (seed of a second crop, a dog of a new coat, flint).
+  - A gift remembered: a year after a gift, the lean-year odds drop (they trust the island), or a gift-giver is named "the Open-handed".
+  - Grudges: someone hurt in a raid refuses to give, and the eldest overrules them (a family feud seed for later visits).
+  - Sending grain over unasked: once there are boats, the islanders could row a gift across in a lean year that the guests did not come.
+  - `scripts/_giftprobe.mjs [years] [seed]` prints raids and gifts per 20 years.

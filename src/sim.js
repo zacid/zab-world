@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 27;
+export const SIM_VERSION = 28;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -55,6 +55,7 @@ export const TECHS = {
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   pottery:  { name: 'Pottery', added: '2026-11-21T00:12Z', desc: 'Clay dug from the bank above the beach, coiled into big-bellied jars and fired in a domed kiln of turf and clay. One potter digs, shapes a jar a day in dry weather and fires them in batches; some crack in the fire. Grain sealed in a jar under a lid of clay is out of reach of the rats. Jars break with use and must be made again.', req: ['granary', 'fire'] },
   watch:    { name: 'Beach watch', added: '2026-11-21T02:39Z', desc: 'Robbed twice by the far isle, the village keeps watch. On autumn and early-winter nights one islander in turn sits up by a driftwood fire on the beach below the granary and watches the sea. A dugout seen coming in is shouted at with a burning branch and turns back before it lands. The fire keeps the wolves off; the watcher sleeps late the next morning.', req: ['fire', 'farisle'] },
+  gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -233,6 +234,11 @@ const WATCH_WOOD = 1;        // timber burnt on the beach each night
 const WATCH_SEE = 0.8;       // chance the watcher sees a dugout come in on a clear night
 const WATCH_DIM = { fog: 0.25, rain: 0.5, cold: 0.9 }; // and in worse weather
 const WATCH_AT = 4;          // (squared) the watcher must be this close to the fire to see anything
+// peace gifts: once robbed, the islanders send hungry guests home with grain, and the raid does not come
+const GIFT_SACK = 60;        // grain in each guest's sack
+const GIFT_SHARE = 0.1;      // never more than this share of the stores
+const GIFT_KEEP = 300;       // grain kept back for each islander first
+const ISLE_HUNGRY = 1.5;     // x ISLE_COME in a thin year there: they come for the feast as much as the dance
 export const PEN_W = 2;      // tiles inside the goat pen's wattle
 export const PEN_H = 2;
 const GOAT_COME = 0.05;      // daily chance in spring and summer (year 2 on) that the drifting raft finds the beach
@@ -592,7 +598,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg } : {}), ...(w.pot ? { jars: w.pot.j } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -1424,7 +1430,7 @@ function landAt(w, x, y, out) {
 function boatComes(w, c) {
   if (c.year < ISLE_YEAR || Math.min(FEST_WOOD, Math.floor(w.timber / 4)) < 6 || (w.isle && w.isle.boat)) return; // only a towering fire is seen
   if (w.isle && w.isle.feud >= c.year) return; // the summer after a raid, nobody from the far isle dares show their face
-  if (rnd(w) >= (w.isle ? ISLE_COME : ISLE_SEEN)) return;
+  if (rnd(w) >= (w.isle ? ISLE_COME * (w.raid && w.raid.lean === c.year ? ISLE_HUNGRY : 1) : ISLE_SEEN)) return;
   const L = landing(w);
   if (!L) return;
   w.isle ||= { n: 0, wed: 0, gone: 0, hides: 0, grain: 0, boat: null };
@@ -1464,11 +1470,13 @@ function isleWed(w) {
 function isleFeast(w) {
   const B = w.isle.boat, I = w.isle, pop = w.people.length;
   if (B.st !== 'ashore') return ' Out on the dark water a boat is still paddling toward the fire.';
-  const n = B.gs.length + (B.wed ? 1 : 0);
+  const n = B.gs.length + (B.wed ? 1 : 0), R = w.raid, y = clock(w.t).year;
   let text = ` ${n === 2 ? 'Two' : n === 3 ? 'Three' : n === 4 ? 'Four' : n} guests from the far isle dance with them.`;
-  const take = Math.max(0, Math.min(ISLE_TRADE, Math.floor(w.food - pop * 400)));
+  const lean = !!(R && R.lean === y);
+  const take = lean ? 0 : Math.max(0, Math.min(ISLE_TRADE, Math.floor(w.food - pop * 400)));
   const give = take >= 50 ? 1 + ri(w, 3) : 0;
-  if (give) {
+  if (lean) text += isleGift(w, B, R, y);
+  else if (give) {
     w.food = Math.round((w.food - take) * 100) / 100; w.hides = (w.hides || 0) + give;
     I.grain += take; I.hides += give;
     text += ` They trade ${plural(give, 'hide', 'hides')} for ${take} grain.`;
@@ -1476,6 +1484,24 @@ function isleFeast(w) {
   if (B.wed) text += ` ${B.wed}.`;
   if (I.feud) { text += ' Nobody speaks of the stolen grain.'; delete I.feud; }
   return text;
+}
+// a thin year on the far isle: the guests come with nothing to trade. Once the islanders have been robbed they
+// know what that means, and send each guest home with a sack of grain; that year no dugout comes by night.
+function isleGift(w, B, R, y) {
+  if (!R.n) return ' They are thin and have brought nothing to trade, and their eyes keep going to the granaries.';
+  const want = B.gs.filter((g) => !g.isl).length * GIFT_SACK;
+  const give = Math.max(0, Math.min(want, Math.floor(w.food * GIFT_SHARE), Math.floor(w.food - w.people.length * GIFT_KEEP)));
+  if (give < GIFT_SACK) return ' They are thin and have brought nothing to trade, and there is no grain to spare for them.';
+  if (!w.techs.includes('gifts')) {
+    w.techs.push('gifts');
+    const who = elder(w), nm = who ? who.name : 'The eldest';
+    milestone(w, `${nm} watches the guests at the midsummer fire: sharp cheekbones, no hides, nothing to trade. ${nm} remembers the open granary door of year ${R.y} and says it is better to give the grain by day than lose it by night. ${w.name} learns to send hungry guests home with a gift.`);
+  }
+  w.food = Math.round((w.food - give) * 100) / 100;
+  R.peace = (R.peace || 0) + 1; R.pg = (R.pg || 0) + give; R.yv = (R.yv || 0) + give; R.gift = y;
+  B.gift = give;
+  for (const g of B.gs) if (!g.isl) g.s = 1;
+  return ` They are thin and have brought nothing to trade. Before they sleep, ${give} grain is sacked up for them to carry home.`;
 }
 function boatLands(w, B) {
   const I = w.isle;
@@ -1550,9 +1576,9 @@ function isleHour(w, c) {
 // After a raid w.isle.feud holds the next year: no boat comes to that midsummer fire.
 function raidYear(w, c) {
   const I = w.isle;
-  if (w.raid) w.raid.yg = 0;
+  if (w.raid) w.raid.yg = w.raid.yv = 0;
   if (!I || !I.n) return;
-  w.raid ||= { n: 0, g: 0, yg: 0, d: 0, lean: 0, y: 0, on: null, cur: null };
+  w.raid ||= { n: 0, g: 0, yg: 0, d: 0, lean: 0, y: 0, on: null, cur: null, peace: 0, pg: 0, yv: 0, gift: 0 };
   if (rnd(w) < RAID_LEAN / (1 + Math.min(I.wed, 2))) w.raid.lean = c.year; // kin on both shores make them think twice
 }
 // the finished granary nearest the sea
@@ -1566,7 +1592,7 @@ function raidTarget(w) {
 }
 function raidNight(w, c, wx) {
   const R = w.raid;
-  if (R.lean !== c.year || R.cur || R.on != null || R.y === c.year) return;
+  if (R.lean !== c.year || R.gift === c.year || R.cur || R.on != null || R.y === c.year) return;
   if (!raidSeason(c) || wx === 'storm' || wx === 'snow') return;
   if (w.food < RAID_RICH || (w.isle && w.isle.boat) || !raidTarget(w)) return;
   if (rnd(w) < RAID_NIGHT * (wx === 'fog' ? RAID_FOG : 1)) { R.on = c.day; R.y = c.year; }
@@ -3676,6 +3702,10 @@ const MIGRATIONS = {
   26: (w) => {
     if (w.watch === undefined) w.watch = null;
   },
+  // v27 -> v28: peace gifts. Not learned yet; the first thin-year guests after a raid go home with grain.
+  27: (w) => {
+    if (w.raid) { w.raid.peace ||= 0; w.raid.pg ||= 0; w.raid.yv ||= 0; w.raid.gift ||= 0; }
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3720,6 +3750,7 @@ export function summary(w) {
     tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
     raids: w.raid ? w.raid.n : 0, raidGrain: w.raid ? w.raid.g : 0, raidsDriven: w.raid ? w.raid.d : 0, raidLean: !!(w.raid && w.raid.lean === c.year),
     watch: !!w.watch, watcher: (watchOn(w) && (aliveId(w, w.watch.hid) || {}).name) || null, watchNights: w.watch ? w.watch.n : 0, watchTurned: w.watch ? w.watch.s : 0,
+    gifts: (w.raid && w.raid.peace) || 0, giftGrain: (w.raid && w.raid.pg) || 0, gifted: !!(w.raid && w.raid.gift === c.year),
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,

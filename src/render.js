@@ -834,6 +834,7 @@ function drawIsle(frac, now, fest) {
   aboard.forEach((g, i) => { // heads and shoulders in a row, paddles dipping
     const gx = X + 1 + i * 2;
     px(sc, gx, Y - 2, '#f1c9a5'); px(sc, gx, Y - 1, g.isl ? '#d9d9d9' : GUEST);
+    if (g.s) px(sc, gx + 1, Y - 1, SACK); // a gift sack in the bottom of the boat
     if (going && (Math.floor(now / 300) + i) % 2) px(sc, gx + 1, Y + 1 + ((i & 1) ? -2 : 2), '#b49a6a', 1, 2);
   });
   out.push({ g: {}, boat: true, n: aboard.length, x: bx, y: by });
@@ -845,6 +846,7 @@ function drawIsle(frac, now, fest) {
     if (g.k === 'sleep' && !moving) { // rolled in a cloak by the embers
       const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE);
       px(sc, GX - 1, GY, '#f1c9a5'); px(sc, GX, GY, GUEST, 4, 1); px(sc, GX + 1, GY - 1, '#4f7fa0', 2, 1);
+      if (g.s) px(sc, GX + 4, GY - 1, SACK, 2, 2); // the gift sack at their feet
       out.push({ g, x, y });
       continue;
     }
@@ -860,6 +862,7 @@ function drawIsle(frac, now, fest) {
     px(sc, GX + 1, GY, '#f1c9a5'); px(sc, GX, GY + 1, GUEST, 3, 2); px(sc, GX + 1, GY + 1, '#4f7fa0', 1, 1); // a shell bead on the breast
     px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
     px(sc, GX + 1, GY - 1, '#e9dcc0'); // and a white feather in the hair
+    if (g.s && !(fest && g.k === 'fest')) { px(sc, GX - 1, GY, SACK, 2, 3); px(sc, GX - 1, GY, '#d6c08a'); } // carrying the gift home
     out.push({ g, x, y });
   }
   return out;
@@ -1157,7 +1160,7 @@ function updatePanels() {
     ...(s.dogsCame ? [['dog', 'Dogs', s.dogs ? `${s.dogs} <span class="m">· ${w.dogs.d.filter((d) => w.t - d.b >= S.TICKS_PER_YEAR).map((d) => { const o = w.people.find((q) => q.id === d.own); return esc(d.nm) + (o ? ' with ' + esc(o.name) : ''); }).join(' · ') || 'all pups'}${s.dogsTurned ? ` · ${s.dogsTurned} ${s.dogsTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}${s.dogsFound ? ` · ${s.dogsFound} lost found` : ''}${s.dogsRats ? ` · ${s.dogsRats} rats` : ''}</span>` : '<span class="m">none left</span>']] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
-    ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off</span>`]] : []),
+    ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
     ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
@@ -1228,7 +1231,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
