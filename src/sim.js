@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 41;
+export const SIM_VERSION = 42;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -67,6 +67,7 @@ export const TECHS = {
   moon:     { name: 'Moon lore', added: '2026-11-21T12:31Z', desc: 'The moon fills and empties every thirty days, twelve times a year. Sitting up night after night by the beach fire, the watchers learn what the far isle already knew: a dugout only comes in when the moon is dark, or under a fog. A notch is cut in the doorpost of the granary for each night, and on bright nights the beach fire is left unlit and the watcher sleeps in a bed. Fog still keeps somebody down by the water.', req: ['watch'] },
   rust:     { name: 'Grain rust', added: '2026-11-21T13:07Z', desc: 'In a warm, wet summer orange flecks come up on the leaves of the grain, like rust on a blade. Wet days and wind carry it from a spotted field to the fields beside it, and wherever it sits the ears fill thin and light. Hot dry weather stops it; the harvest or the autumn frost ends it for the year. Fields packed side by side lose the most. Nobody on the island yet knows how to stop it spreading.', req: ['farming'] },
   rogue:    { name: 'Rogueing', added: '2026-11-21T14:42Z', desc: 'After a bad rust year the islanders treat sick grain the way the healer treats a fever: keep it apart from the well. A day or two after orange flecks are seen in a field, idle hands walk its rows, pull every spotted plant up by the roots and carry the armfuls off to burn. The field gives a little less, but the rust goes no further from it. Once every spotted field is pulled clean, the outbreak is over. The faster the rows are walked, the fewer fields it reaches.', req: ['rust'] },
+  bees:     { name: 'Bees', added: '2026-11-21T15:23Z', desc: 'A wild swarm found humming in a hollow tree, the log sawn off and stood up by the houses with a flat stone on top. The bees work the flowers from spring into autumn. When a hive grows crowded in late spring, half of it swarms; caught in time, it fills a new log. In late summer someone takes the honey with a smoking brand and leaves the bees enough to eat through the winter. A poor summer or a long hard winter can starve a hive. Honey dresses wounds, and at midsummer it is poured out as mead.', req: ['woodcut'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -213,6 +214,25 @@ const POT_WOOD = 6;          // timber burned in one firing
 const POT_CRACK = 0.25;      // chance each jar cracks in the fire
 const POT_BREAK = 0.12;      // chance each jar is broken over a year of use
 const POT_OLD = 60;          // at this age the potter's hands are too stiff for the coils
+// bees: log hives by the houses, honey in late summer, mead at midsummer
+const BEE_YEAR = 3;          // from this year a woodcutter may hear a wild swarm in a hollow tree
+const BEE_FIND = 0.02;       // daily chance, on a warm summer day, that someone does
+const BEE_FLY = { clear: 0.42, heat: 0.3, rain: 0.04, fog: 0.08, cold: 0, storm: 0, snow: 0 }; // comb a hive fills on a day like this
+const BEE_FROM = 20, BEE_TO = 230; // flowers from the end of the spring cold to the middle of autumn
+const BEE_SEASON = [0.8, 1.2, 0.45, 0]; // blossom in spring, clover and lime in summer, a little heather in autumn
+const BEE_COMB = 80;         // comb one log holds
+const BEE_EAT = 0.12;       // comb a hive eats on each flowerless day, and twice this in a cold snap or snow
+const BEE_KEEP = 22;         // comb left in the log at the honey taking, to see the bees through the winter
+const BEE_KEEP_MORE = 12;    // after a winter loss the takers leave 4 more, up to this much more
+const BEE_TAKE = 160, BEE_LAST = 215; // the days of the year the honey is taken
+const BEE_SWARM = 0.04;      // daily chance in late spring that a crowded hive swarms
+const BEE_SWARM_AT = 12;    // comb a hive needs before it is crowded enough to swarm
+const BEE_CATCH = 0.7;       // chance the swarm is caught before it flies off into the woods
+const BEE_MAX = 8;           // logs in the bee garden at most
+const BEE_STORE = 240;       // honey the village can keep
+const BEE_STUNG = 0.12;      // chance the honey taker comes home stung
+const MEAD_PAIR = 0.6;       // chance a single woman finds a partner at a midsummer with mead (else FEST_PAIR)
+const HONEY_WOUND = 2;       // extra days honey on a dressing takes off a wound's healing
 
 // ---------- the far isle ----------
 const ISLE_YEAR = 3;         // from this year a towering midsummer fire can be seen from the far isle
@@ -435,7 +455,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -631,7 +651,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -714,6 +734,7 @@ function daily(w, c, fx) {
 
   if (w.rats !== undefined) rats(w, c);
   if (w.pot !== undefined) potDay(w, c);
+  if (w.bees !== undefined) beeDay(w, c);
   if (w.canoe !== undefined) canoeDay(w, c);
   if (w.copse !== undefined) copseDay(w, c);
   if (w.whale) whaleDay(w, c);
@@ -1584,6 +1605,7 @@ function midsummer(w, c, fx) {
   if (h === ISLE_SAIL) boatComes(w, c); // on the far isle they know the day, and the smoke of the fire-building
   if (h === FEST_FROM) {
     F.k = 0; F.pairs = [];
+    F.mead = meadPoured(w, pop);
     F.wood = Math.min(FEST_WOOD, Math.floor(w.timber / 4));
     w.timber = Math.round((w.timber - F.wood) * 100) / 100;
     if (fx) fx.push({ x: w.fire.x + 0.5, y: w.fire.y - 1, text: 'midsummer', color: 'food' });
@@ -1593,7 +1615,7 @@ function midsummer(w, c, fx) {
     if (F.feast >= pop) for (const p of w.people) p.hunger = 0;
   } else if (h === 21) { // late in the dance, the unpaired find each other
     for (const f of w.people) {
-      if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= FEST_PAIR) continue;
+      if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= (F.mead ? MEAD_PAIR : FEST_PAIR)) continue;
       const m = mate(w, f);
       if (!m) continue;
       f.partner = m.id; m.partner = f.id; f.wants = true;
@@ -1604,7 +1626,11 @@ function midsummer(w, c, fx) {
     F.n = (F.n || 0) + 1;
     const feast = F.feast >= pop ? ' and feast on the best of the stores' : F.feast > 0 ? ' and share what the stores can spare' : ' on empty stomachs';
     const fire = F.wood >= 6 ? 'a towering bonfire' : F.wood > 0 ? 'a small bonfire' : 'the hearth, with no wood to spare for more';
-    let text = `${F.wait ? `After ${plural(F.wait, 'day', 'days')} of waiting for the sky to clear, midsummer` : 'Midsummer'} on ${w.name}: ${pop} ${pop === 1 ? 'soul dances' : 'people dance'} around ${fire}${feast}.`;
+    let text = `${F.wait ? `After ${plural(F.wait, 'day', 'days')} of waiting for the sky to clear, midsummer` : 'Midsummer'} on ${w.name}: ${pop} ${pop === 1 ? 'soul dances' : 'people dance'} around ${fire}${feast}${F.mead ? ', and the mead goes round' : ''}.`;
+    if (F.mead && w.bees.m === 1) {
+      const by = w.people.find((q) => q.name === w.bees.nm) || elder(w);
+      milestone(w, `Last summer's honey has stood all year in ${w.pot ? 'a sealed jar' : 'a covered tub'} with water from the spring, and it has turned. ${by ? by.name : 'Somebody'} lifts the lid at midsummer and the smell fills the hearth: sweet, sharp and strong. A bowl goes from hand to hand round the bonfire, and the dancing gets louder and later than it has ever been. ${w.name} has mead.`);
+    }
     const P = F.pairs;
     if (P.length === 1) text += ` ${P[0]} are pledged in the firelight.`;
     else if (P.length > 1) text += ` ${P.length} couples are pledged in the firelight: ${P.slice(0, 3).join(', ')}${P.length > 3 ? ' and more' : ''}.`;
@@ -1612,7 +1638,7 @@ function midsummer(w, c, fx) {
     if (F.n === 1) milestone(w, `${text} The first midsummer fire on ${w.name} burns until nearly midnight.`);
     else if (F.n % 25 === 0) milestone(w, `${text} It is the ${F.n}th midsummer kept on ${w.name}.`);
     else log(w, text, P.length ? 'love' : 'good');
-    delete F.pairs; delete F.feast; delete F.wood; delete F.wait;
+    delete F.pairs; delete F.feast; delete F.wood; delete F.wait; delete F.mead;
   }
 }
 
@@ -2479,6 +2505,162 @@ function fireKiln(w, p) {
   else if (!ok) log(w, `${p.name} opens the kiln to a heap of sherds: all ${n} jars cracked in the fire.`, 'bad');
   else log(w, `${p.name} opens the kiln: ${ok} of ${n} jars come out whole${n - ok ? `, ${n - ok} cracked in the fire` : ''}.`, 'good');
   return ok;
+}
+
+// ---------- bees ----------
+// One warm summer day a woodcutter hears a hum in a hollow tree. The log with the swarm in it is sawn
+// off and stood up by the houses. From then on there is a bee garden (w.bees: h hives [{x, y, c comb,
+// a alive, s year it last swarmed}], nm finder, at tick found, hy honey kept, g honey ever taken, y this
+// year, sw swarms caught, sl swarms lost, d hives died, st stings, m midsummers with mead, mw wounds
+// dressed with honey, ml tick of the last mead, kp extra comb left after winter losses). On flower days each hive fills comb; on every other day it
+// eats it. A crowded hive swarms in late spring, and the swarm is shaken into a new log if there is room
+// and someone is quick. In late summer idle hands take the honey, leaving each log enough for the winter.
+// A hive that runs out of comb dies, and the empty log waits for a swarm.
+const beeCap = (w) => Math.min(BEE_MAX, 2 + Math.floor(w.people.length / 8));
+const beesAlive = (w) => (w.bees ? w.bees.h.filter((h) => h.a).length : 0);
+function findHiveSite(w) {
+  const B = w.bees, hs = B ? B.h : [];
+  let best = null, bs = 1e9;
+  const { x: fx, y: fy } = w.fire;
+  for (let y = 2; y < MAP - 3; y++) for (let x = 2; x < MAP - 2; x++) {
+    const tt = tile(w, x, y);
+    if ((tt !== T.GRASS && tt !== T.FOREST) || tile(w, x, y + 1) === T.WATER || (w.wear && w.wear[idx(x, y)] >= PATH_AT) || isStool(w, idx(x, y))) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < 16 || dd > (hs.length ? 196 : 100)) continue;
+    let sc;
+    if (!hs.length) {
+      if (nearBuild(w, x, y, 1)) continue;
+      sc = Math.abs(Math.sqrt(dd) - 7) + hash(x, y, w.seed + 41) * 2;
+    } else { // the next log goes beside the others, never against a house, the kiln or the granary
+      const h0 = hs[0], dh = d2(x, y, h0.x, h0.y);
+      if (dh > 25) continue;
+      let clash = false;
+      for (let yy = y - 1; yy <= y + 1 && !clash; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (tile(w, xx, yy) === T.BUILD && !hs.some((h) => h.x === xx && h.y === yy)) { clash = true; break; }
+      if (clash) continue;
+      sc = dh + hash(x, y, w.seed + 43);
+    }
+    if (tt === T.FOREST) sc += 3; // a clear spot first; a tree is felled for the log only if there is none
+    if (sc >= bs || !lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+function beeHand(w, not) { // whoever is grown, steady and at hand: the healer, the herder and the horn keeper have their own work
+  const busy = [w.heal && w.heal.id, w.goats && w.goats.hid, w.horn && w.horn.hid, not];
+  let best = null, bs = 1e9;
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || p.sick || p.hurt || a < 14 || a > 60 || busy.includes(p.id)) continue;
+    const sc = Math.abs(a - 30) + hash(p.id, w.t % 997, 47) * 20;
+    if (sc < bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+function newHive(w, c0) {
+  const s = findHiveSite(w);
+  if (!s) return null;
+  const i = idx(s.x, s.y);
+  w.timber += w.wood[i]; w.wood[i] = 0;
+  setTile(w, i, T.BUILD);
+  const h = { x: s.x, y: s.y, c: c0, a: 1, s: 0 };
+  w.bees.h.push(h);
+  return h;
+}
+function learnBees(w, c) {
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (c.year < BEE_YEAR || c.season !== 1 || (wx !== 'clear' && wx !== 'heat') || !w.techs.includes('woodcut') || rnd(w) >= BEE_FIND) return;
+  const who = beeHand(w, null);
+  if (!who) return;
+  w.bees = { h: [], nm: who.name, at: w.t, hy: 0, g: 0, y: 0, sw: 0, sl: 0, d: 0, st: 0, m: 0, mw: 0, ml: -1, kp: 0 };
+  if (!newHive(w, 14)) { w.bees = null; return; }
+  w.techs.push('bees');
+  const P = pron(who), Pc = Cap(P);
+  milestone(w, `${who.name} is splitting a dead oak at the edge of the woods when the axe goes into a hollow and the whole trunk starts to hum. ${Pc} runs, stung on the neck and the hands. That evening ${P} comes back with a smoking brand, saws the hollow length off above and below, plugs the ends with turf and rolls it home with the bees still inside. ` +
+    `The log is stood on end beside the village with a flat stone on top, and by morning the bees are going in and out of the split as if nothing had happened. ${w.name} keeps bees.`);
+}
+function beeDay(w, c) {
+  if (w.bees === null) { learnBees(w, c); return; }
+  const B = w.bees, wx = w.wx ? w.wx.k : 'clear';
+  if (c.doy === 0) B.y = 0;
+  const flowers = c.doy >= BEE_FROM && c.doy <= BEE_TO;
+  let died = 0;
+  for (const h of B.h) {
+    if (!h.a) continue;
+    if (flowers && BEE_FLY[wx] > 0) h.c = Math.min(BEE_COMB, Math.round((h.c + BEE_FLY[wx] * BEE_SEASON[c.season]) * 100) / 100);
+    else h.c = Math.round((h.c - BEE_EAT * (wx === 'cold' || wx === 'snow' ? 2 : 1)) * 100) / 100;
+    if (h.c <= 0) { h.a = 0; h.c = 0; died++; }
+  }
+  if (died) {
+    B.d += died;
+    const left = beesAlive(w), winter = c.season === 3 || c.doy < BEE_FROM;
+    let why = winter ? 'The winter was too long for the comb they had.' : 'The flowers failed them.';
+    if (winter && (B.kp || 0) < BEE_KEEP_MORE) { B.kp = Math.min(BEE_KEEP_MORE, (B.kp || 0) + 4); why += ' From now on more comb is left in the logs at the honey taking.'; }
+    if (B.d === died) milestone(w, `The log by the houses has gone quiet. When the stone is lifted the comb is empty and the bees lie in a dry heap at the bottom. ${why} ${left ? `${plural(left, 'hive still hums', 'hives still hum')} beside it.` : `There are no bees left on ${w.name} but the wild ones in the woods.`}`);
+    else log(w, `${plural(died, 'hive has', 'hives have')} died in the log${died > 1 ? 's' : ''}. ${why}${left ? '' : ' The bee garden is silent.'}`, 'bad');
+  }
+  // late spring: a crowded hive sends out half its bees with the old queen
+  if (c.season === 0 && c.doy >= 40 && (wx === 'clear' || wx === 'heat')) {
+    for (const h of B.h.slice()) {
+      if (!h.a || h.s >= c.year || h.c < BEE_SWARM_AT || rnd(w) >= BEE_SWARM) continue;
+      h.s = c.year; h.c = Math.round(h.c * 0.6 * 100) / 100;
+      const room = beesAlive(w) < beeCap(w), who = beeHand(w, null);
+      const empty = B.h.find((o) => !o.a);
+      if (room && who && rnd(w) < BEE_CATCH && (empty || B.h.length < BEE_MAX)) {
+        const nh = empty || newHive(w, 0);
+        if (!nh) { B.sl++; log(w, 'A hive swarms, and there is nowhere left by the houses to stand another log. The swarm goes off into the woods.', 'info'); continue; }
+        nh.a = 1; nh.c = 6; nh.s = c.year;
+        B.sw++;
+        if (B.sw === 1) milestone(w, `A roar goes up from the bee log and a cloud of bees pours out into the sun, whirls over the houses and settles in a hanging clump on a hazel bough. ${who.name} holds ${empty ? 'the empty log' : 'a fresh hollow log'} under it and gives the bough one hard shake. Most of the bees fall in, and the rest follow them by dusk. ${beesAlive(w) === 2 ? `${w.name} has two hives` : `There are ${beesAlive(w)} hives by the houses now`}.`);
+        else log(w, `A hive swarms. ${who.name} shakes the clump off a branch into ${empty ? 'an empty log' : 'a new log'}. ${plural(beesAlive(w), 'hive', 'hives')} in the bee garden now.`, 'good');
+      } else {
+        B.sl++; // with every log full the swarms just go back to the woods, unremarked
+        if (room) log(w, 'A hive swarms, and the swarm is up and over the trees before anyone can reach it. It goes off into the woods.', 'info');
+      }
+    }
+  }
+  // a summer day with no hive left: another wild swarm may yet be found
+  if (!beesAlive(w) && c.season === 1 && (wx === 'clear' || wx === 'heat') && rnd(w) < BEE_FIND / 2) {
+    const who = beeHand(w, null), h = B.h[0];
+    if (who && h) {
+      h.a = 1; h.c = 12; h.s = c.year;
+      log(w, `${who.name} finds a wild swarm in a hollow ash and brings it home in a sack. The old log by the houses hums again.`, 'good');
+    }
+  }
+}
+// late summer: an idle grown-up takes the honey from a full log with a smoking brand
+function beeTask(w, p, c) {
+  const B = w.bees;
+  if (!B || c.doy < BEE_TAKE || c.doy > BEE_LAST || c.hour < 9 || c.hour > 15 || B.hy >= BEE_STORE) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx !== 'clear' && wx !== 'heat') return null;
+  const a = ageY(w, p);
+  if (a < 14 || a > 60) return null;
+  for (let k = 0; k < B.h.length; k++) {
+    const h = B.h[k];
+    if (!h.a || h.c < BEE_KEEP + B.kp + 6 || w.res['e' + k] != null) continue;
+    return { k: 'honey', key: 'e' + k, x: h.x, y: h.y, h: 2, o: k };
+  }
+  return null;
+}
+function honeyDone(w, p, t, pop) {
+  const B = w.bees, h = B && B.h[t.o];
+  if (!h || !h.a || h.c < BEE_KEEP + B.kp + 6) return;
+  const got = Math.min(Math.floor(h.c - BEE_KEEP - B.kp), BEE_STORE - B.hy);
+  if (got <= 0) return;
+  h.c = Math.round((h.c - got) * 100) / 100;
+  B.hy += got; B.g += got; B.y += got;
+  pop('+' + got + ' honey', 'food');
+  const first = B.g === got;
+  if (first) milestone(w, `${p.name} lifts the stone off the bee log, wafts in smoke from a smouldering brand and cuts out the heavy comb from the top, leaving the bottom for the bees to winter on. The comb is squeezed through a cloth into ${w.pot ? 'a clay jar' : 'a wooden bowl'}: ${got} measures of dark honey. The children lick the cloth clean.`);
+  else if (rnd(w) < BEE_STUNG) { B.st++; log(w, `${p.name} takes ${got} honey from the bee log and comes home stung, ${poss(p)} face swelling.`, 'info'); }
+}
+// at midsummer the honey kept from last year goes into the mead
+function meadPoured(w, pop) {
+  const B = w.bees;
+  if (!B || B.hy < Math.ceil(pop / 2)) return 0;
+  const m = Math.min(B.hy, pop);
+  B.hy -= m; B.m++; B.ml = w.t;
+  return m;
 }
 
 // ---------- herb lore ----------
@@ -3528,6 +3710,9 @@ function pickTask(w, p, c) {
     const pk = potTask(w, p, c);
     if (pk) return pk;
   }
+  // the honey, from the logs that hold more than the bees need for the winter
+  const ek = beeTask(w, p, c);
+  if (ek) return ek;
   // construction
   let b = nearest(L.raw, p, (o) => o.progress < 1 && free('b' + o.id));
   if (b) return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
@@ -4090,14 +4275,18 @@ function finish(w, p, t, c, fx) {
     H.s--; H.n++; o.tend = c.day;
     deed(w, p, 'n');
     if (o.sick && w.fever) w.fever.t = (w.fever.t || 0) + 1;
-    if (o.hurt) o.hurt = Math.max(w.t + 1, o.hurt - HERB_WOUND * TICKS_PER_DAY);
-    pop('tended', 'herb');
+    let honey = 0;
+    if (o.hurt && w.bees && w.bees.hy >= 1) { w.bees.hy--; w.bees.mw++; honey = HONEY_WOUND; } // honey on the dressing keeps the bite clean
+    if (o.hurt) o.hurt = Math.max(w.t + 1, o.hurt - (HERB_WOUND + honey) * TICKS_PER_DAY);
+    pop(honey ? 'honey dressing' : 'tended', 'herb');
   } else if (t.k === 'herb') {
     const H = w.heal;
     if (!H) return;
     const got = Math.min(HERB_CAP - H.s, 4 + ri(w, 3));
     H.s += got;
     if (got > 0) pop('+' + got + ' herbs', 'herb');
+  } else if (t.k === 'honey') {
+    honeyDone(w, p, t, pop);
   } else if (t.k === 'clay') {
     if (!w.pot) return;
     w.pot.c += POT_CLAY;
@@ -4859,6 +5048,10 @@ const MIGRATIONS = {
   40: (w) => {
     if (w.rogue === undefined) w.rogue = null;
   },
+  // v41 -> v42: bees. None kept yet; from year 3 a woodcutter may find a wild swarm in a hollow tree on a warm summer day.
+  41: (w) => {
+    if (w.bees === undefined) w.bees = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4929,6 +5122,9 @@ export function summary(w) {
     rogue: !!w.rogue, rogueEver: w.rogue ? w.rogue.n : 0, rogueStopped: w.rogue ? w.rogue.k : 0,
     rogued: w.fields.filter((f) => f.rg != null && growing(f)).length,
     rogueing: w.rogue && w.rust && w.rust.cur ? w.people.filter((p) => p.task && p.task.k === 'rogue').length : 0,
+    bees: !!w.bees, hives: beesAlive(w), hiveLogs: w.bees ? w.bees.h.length : 0, honey: w.bees ? w.bees.hy : 0, honeyYear: w.bees ? w.bees.y : 0,
+    honeyEver: w.bees ? w.bees.g : 0, swarms: w.bees ? w.bees.sw : 0, swarmsLost: w.bees ? w.bees.sl : 0, hivesDied: w.bees ? w.bees.d : 0,
+    meads: w.bees ? w.bees.m : 0, honeyWounds: w.bees ? w.bees.mw : 0, honeyTaking: w.bees ? w.people.filter((p) => p.task && p.task.k === 'honey').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

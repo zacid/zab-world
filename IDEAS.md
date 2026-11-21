@@ -410,3 +410,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The burning heaps could set off a wildfire in a dry, windy summer (the smoking heap is already drawn).
   - Still open from rust: hedges as breaks, a second crop in rotation, burning stubble.
 - Housekeeping: scripts/_surgeprobe.mjs is a dead stub and scripts/_coastprobe.mjs (field distance to the sea) is a one-off; both can go.
+- Bees are done (SIM_VERSION 42; w.bees {h hives [{x, y, c, a, s}], nm, at, hy, g, y, sw, sl, d, st, m, mw, ml, kp}; beeDay/learnBees/
+  beeTask/honeyDone/meadPoured/findHiveSite in sim.js, BEE_* constants; hives are T.BUILD tiles beside the first log; `scripts/_beeprobe.mjs
+  [years] [seed|live]`, `scripts/_beebench.mjs`, `scripts/_beeprof.mjs` times the bee functions alone, ~13 ms/yr at 300 people). Honey
+  fills the store (240) in big villages and mead is poured almost every midsummer. Seed 4242 reached ~400 at Y100 (was ~260), but 777 and
+  20261114 grew about as before, so check whether mead pairing is part of it. Answers it invites:
+  - Wax: candles for the longest night (a warm glow in the windows) or a wax seal on the jar lids.
+  - A bee keeper as a lasting role with a byname; "telling the bees" when a keeper dies (an old custom: the hives are told of every death).
+  - Honey traded to the far isle at midsummer, or a jar of mead as a peace gift that works better than grain.
+  - A wet summer (many rain days) starves the hives as well as rusting the grain: honey and harvest fail in the same year.
+  - Bears or martens at the logs, or the boars knocking one over; wolves are no threat to bees.
+  - Fields of clover or beans (a second crop) would feed the bees and the soil: ties into crop rotation.
