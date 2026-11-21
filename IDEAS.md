@@ -364,3 +364,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Seed corn: resowing is free now. A kept seed store (in jars) that a bad frost can empty would make a double frost really bite.
   - Hedges as shelter: hedged fields could be nipped less (a windbreak), giving the hawthorn a second use.
   - A frost tale on the longest night that teaches the children not to sow before the blackthorn flowers.
+- The shallows are done (SIM_VERSION 37; w.wade {b bathing tile, n spells, c cockle bed, g ever, y this year, nm, at, s scares, sy, sn rescuer};
+  learnWade/wadeTask/wadeDone/wadeDay in sim.js, WADE_* constants; the bathing beach must be within 24 tiles of the hearth by a dry line;
+  `scripts/_wadeprobe.mjs [years] [seed|live]`, `scripts/_wadebench.mjs` HEAD vs working copy). Cockles are tiny next to grain. Answers it invites:
+  - A rescuer byname ("the Swimmer") after two rescues, or a deed tally for it; the rescued child remembers it in a tale when grown.
+  - Swimming as a skill: children who waded every summer could later be the ones chosen to paddle the dugout, or survive a capsize.
+  - Older children (10-13) could fish with a hand line off the rocks beside the bathers; a dog splashing with them.
+  - A real danger: a drowning would be a heavy event; only worth it once there is something to answer it (a rule, a watcher on the beach).
+  - The cockle bed could run out in a crowded late game, sending the children farther along the beach (or to the far shore).
+  - Shell necklaces worn at midsummer (a colour on the dancers' sprites), or shells pressed into the clay of the pots as a pattern.

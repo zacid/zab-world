@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 36;
+export const SIM_VERSION = 37;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -55,6 +55,7 @@ export const TECHS = {
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   pottery:  { name: 'Pottery', added: '2026-11-21T00:12Z', desc: 'Clay dug from the bank above the beach, coiled into big-bellied jars and fired in a domed kiln of turf and clay. One potter digs, shapes a jar a day in dry weather and fires them in batches; some crack in the fire. Grain sealed in a jar under a lid of clay is out of reach of the rats. Jars break with use and must be made again.', req: ['granary', 'fire'] },
   watch:    { name: 'Beach watch', added: '2026-11-21T02:39Z', desc: 'Robbed twice by the far isle, the village keeps watch. On autumn and early-winter nights one islander in turn sits up by a driftwood fire on the beach below the granary and watches the sea. A dugout seen coming in is shouted at with a burning branch and turns back before it lands. The fire keeps the wolves off; the watcher sleeps late the next morning.', req: ['fire', 'farisle'] },
+  wading:   { name: 'The shallows', added: '2026-11-21T11:20Z', desc: 'On hot summer afternoons the children are let off down to the beach below the village. They wade in to the knee, shriek at the cold, splash each other and feel in the wet sand with their toes for cockles, which they carry home in their shirts. The beach is close to the houses, but the sea pulls harder than it looks, and now and then someone grown has to go in after a child who went too far.', req: ['fishing'] },
   snowmen:  { name: 'Snowmen', added: '2026-11-21T04:41Z', desc: 'When the snow lies deep the children are sent out of the smoke and onto the green by the hearth. They roll it into balls, stack three, and give each figure pebble eyes, a stick nose and a name: often the name of someone the island tells of. Up to three stand at once, the rest of the snow goes in fights. They keep all winter and slump into the mud in the first warm days of spring.', req: ['fire'] },
   gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
   canoe:    { name: 'Dugout', added: '2026-11-21T06:13Z', desc: 'A tall oak felled above the beach, its back burnt out with small fires and scraped hollow with shell adzes, a little each dry day. Pushed into the sea it carries one islander past the surf to the deep water, where the shore fishers cannot reach and the big fish are. Out on calm days from spring to autumn, home by mid-afternoon. A storm can drag it off the sand and smash it, and in time the sun splits it, and a new oak must be felled.', req: ['fishing', 'farisle', 'woodcut'] },
@@ -418,7 +419,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -613,7 +614,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -629,6 +630,7 @@ function daily(w, c, fx) {
     if (w.lost) w.lost.y = 0;
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
+    if (w.wade) w.wade.y = 0;
     w.stats.yfr = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
@@ -643,6 +645,7 @@ function daily(w, c, fx) {
   festDay(w, c);
   taleDay(w, c);
   snowDay(w, c);
+  if (w.wade !== undefined) wadeDay(w, c);
   const wx = w.wx.k;
   if (w.raid) raidNight(w, c, wx);
   if (w.raid && !w.watch && w.raid.n >= WATCH_RAIDS && raidSeason(c)) learnWatch(w);
@@ -3733,6 +3736,7 @@ function act(w, p, c, fx) {
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
     else if (a < 14 && w.snow && snowOk(w, c) && (p.id + c.day) % 3 < SNOW_PLAY) p.task = snowTask(w, p, c) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
+    else if (a < 14 && a >= WADE_AGE && w.wade && wadeOk(w, c, h) && (p.id + c.day) % 3 < (w.wx.k === 'heat' ? 2 : 1)) p.task = wadeTask(w, p) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a < 14) p.task = wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a >= 65 || p.hurt) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 4);
     else reserve(w, p, pickTask(w, p, c));
@@ -3845,6 +3849,8 @@ function finish(w, p, t, c, fx) {
     if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'snow') {
     snowDone(w, p, t);
+  } else if (t.k === 'wade') {
+    wadeDone(w, p, c, pop);
   } else if (t.k === 'whale') {
     whaleCut(w, p, pop);
   } else if (t.k === 'dig') {
@@ -3953,6 +3959,93 @@ function snowDay(w, c) {
   const had = S.men.length;
   S.men = S.men.filter((m) => m.s > 0 || (c.season === 3 && !m.m));
   if (had && !S.men.length && c.season !== 3) log(w, `The last snowman by the hearth slumps into the mud. Spring has come to ${w.name}.`, 'info');
+}
+
+// ---------- the shallows ----------
+// On hot summer afternoons the children go down to the beach nearest the village to paddle. They stand in
+// the surf, splash, and feel for cockles with their toes (a handful of food, not much). The bed thins as it
+// is dug and fills again slowly. Once a summer at most, the sea pulls a child out and the nearest grown
+// islander goes in after them; nobody drowns. w.wade { b bathing tile (sand), n spells ever, c cockles in
+// the bed, g cockles ever, y this year, nm first child, at tick learned, s scares ever, sy year of the last
+// scare, sn who went in }
+const WADE_AGE = 5;          // from this age
+const WADE_R2 = 24 * 24;    // the bathing beach is within this of the hearth (squared)
+const WADE_SPREAD = 4 * 4;   // the children spread along this much of it (squared)
+const WADE_FROM = 10, WADE_TO = 18; // hours
+const WADE_BED = 60;         // cockles the bed holds
+const WADE_REFILL = 2;       // a day, spring to autumn
+const WADE_DIG = 0.5;        // chance a spell turns any up
+const WADE_GAP = 3;          // summers at least between two of them
+const WADE_SCARE = 0.006;  // chance per spell that the sea takes a child out (once a summer at most)
+const wadeOk = (w, c, h) => c.season === 1 && h >= WADE_FROM && h < WADE_TO && !!w.wx && (w.wx.k === 'heat' || w.wx.k === 'clear');
+function wadeBeach(w) {
+  let best = -1, bd = WADE_R2 + 1;
+  for (const i of w.shore || []) {
+    const x = i % MAP, y = (i - x) / MAP, dd = d2(x, y, w.fire.x, w.fire.y);
+    if (dd < bd && lineOfLand(w, w.fire.x + 0.5, w.fire.y + 0.5, x + 0.5, y + 0.5)) { bd = dd; best = i; }
+  }
+  return best;
+}
+function seaSide(w, x, y) {
+  for (const [a, b] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) if (tile(w, x + a, y + b) === T.WATER) return [a, b];
+  return null;
+}
+function learnWade(w, c) {
+  if (c.season !== 1 || !w.wx || w.wx.k !== 'heat' || !w.techs.includes('fishing')) return;
+  const kids = w.people.filter((p) => !p.dead && ageY(w, p) >= WADE_AGE && ageY(w, p) < 14);
+  if (kids.length < 2) return;
+  const b = wadeBeach(w);
+  if (b < 0) return;
+  const a = kids[0], k = kids[kids.length - 1];
+  w.wade = { b, n: 0, c: WADE_BED, g: 0, y: 0, nm: a.name, at: w.t, s: 0, sy: -99, sn: null };
+  w.techs.push('wading');
+  milestone(w, `The heat lies on ${w.name} like a blanket and the children are good for nothing, so ${a.name} leads them down to the beach below the village. ` +
+    `They wade in to the knee and shriek at the cold, and ${k.name} feels something hard under a toe: a cockle. By evening they come home wet through with their shirts full of shells, and from now on the children go down to the shallows on hot afternoons.`);
+}
+function wadeTask(w, p) {
+  const Wd = w.wade, bx = Wd.b % MAP, by = (Wd.b - bx) / MAP, spots = [];
+  for (const i of w.shore) { const x = i % MAP, y = (i - x) / MAP; if (d2(x, y, bx, by) <= WADE_SPREAD) spots.push(i); }
+  if (!spots.length) return null;
+  const i = spots[ri(w, spots.length)], x = i % MAP, y = (i - x) / MAP, sd = seaSide(w, x, y);
+  if (!sd || !lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) return null;
+  return { k: 'wade', x, y, dx: sd[0], dy: sd[1], h: 2 + ri(w, 2) };
+}
+function wadeDone(w, p, c, pop) {
+  const Wd = w.wade;
+  if (!Wd) return;
+  Wd.n++;
+  if (Wd.c >= 1 && rnd(w) < WADE_DIG) {
+    const got = Math.min(Wd.c, 1 + ri(w, 3));
+    Wd.c -= got; Wd.g += got; Wd.y += got; w.food += got;
+    pop('+' + got + ' cockles', 'fish');
+  }
+  if (c.year - Wd.sy < WADE_GAP || rnd(w) >= WADE_SCARE) return;
+  // the sea takes a child out: the nearest grown islander who is up and about goes in after them
+  let who = null, bd = 1e9;
+  for (const o of w.people) {
+    if (o.dead || o.asleep || o.sick || o.hurt || (o.task && o.task.sea)) continue;
+    const a = ageY(w, o);
+    if (a < 14 || a >= 65) continue;
+    const dd = d2(o.x, o.y, p.x, p.y);
+    if (dd < bd) { bd = dd; who = o; }
+  }
+  Wd.sy = c.year; Wd.s++; Wd.sn = who ? who.id : null;
+  const them = p.sex === 'f' ? 'her' : 'him';
+  const kin = who && (who.id === p.mother || who.id === p.father) ? `, ${p.name}'s ${who.sex === 'f' ? 'mother' : 'father'},` : '';
+  const how = [
+    `wades out after a cockle, steps off the edge of the sand bar and is pulled away by the sea`,
+    `is knocked flat by a big wave and dragged out with the backwash`,
+    `swims out on a dare to the dark water past the breakers and cannot get back`,
+  ][Wd.s === 1 ? 0 : ri(w, 3)];
+  const after = Wd.s === 1 ? ' Nobody goes past the knee for the rest of the summer.' : [' The children are kept on the sand for a week.', ' That night the children are told the sea is not their friend.', ''][ri(w, 3)];
+  const text = who
+    ? `${p.name} ${how}. The other children scream from the beach. ${who.name}${kin} comes running, goes in to the chest, gets hold of ${them} by the hair and drags ${them} back, coughing and blue.${after}`
+    : `${p.name} ${how}. The other children scream, but there is nobody grown on the beach; at last ${p.name} kicks free of the current and crawls back up the sand, coughing and blue.`;
+  if (Wd.s === 1) milestone(w, text); else log(w, text, 'bad');
+}
+function wadeDay(w, c) {
+  if (!w.wade) { learnWade(w, c); return; }
+  if (c.season < 3) w.wade.c = Math.min(WADE_BED, w.wade.c + WADE_REFILL);
 }
 
 // ---------- the whale ----------
@@ -4482,6 +4575,10 @@ const MIGRATIONS = {
   35: (w) => {
     if (w.frost === undefined) w.frost = null;
   },
+  // v36 -> v37: the shallows. Nobody has gone wading yet; the first heatwave of a summer sends the children to the beach.
+  36: (w) => {
+    if (w.wade === undefined) w.wade = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4542,6 +4639,8 @@ export function summary(w) {
     whaleCutting: w.whale && w.whale.cur ? w.people.filter((p) => p.task && p.task.k === 'whale').length : 0,
     frosts: w.frost ? w.frost.n : 0, frostKilled: w.frost ? w.frost.k : 0, frostYear: w.frost ? w.frost.y : 0,
     frostBlack: w.fields.filter((f) => f.fr != null).length,
+    wading: !!w.wade, waders: w.wade ? w.people.filter((p) => p.task && p.task.k === 'wade').length : 0,
+    cockles: w.wade ? w.wade.g : 0, cocklesYear: w.wade ? w.wade.y : 0, cockleBed: w.wade ? w.wade.c : 0, wadeScares: w.wade ? w.wade.s : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
