@@ -105,6 +105,10 @@ function doing(p) {
   if (p.task && p.task.k === 'shape') return 'coiling a jar by the kiln';
   if (p.task && p.task.k === 'fire') return 'firing the kiln';
   if (p.task && p.task.k === 'lost') return 'lost in the fog';
+  if (p.task && p.task.k === 'snow') {
+    const m = p.task.o != null && w.snow && w.snow.men.find((o) => o.id === p.task.o);
+    return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
+  }
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
   if (p.task && p.task.k === 'tale') {
     if (w.tale && w.tale.id === p.id) return 'telling a tale on the longest night';
@@ -270,6 +274,7 @@ function drawTerrain() {
   drawYard(pal);
   drawPen(pal);
   drawKiln(pal);
+  drawSnowmen();
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -422,6 +427,34 @@ function drawKiln(pal) {
   if (pal.snow) px(tc, X + 2, Y, '#eef3f7', 4, 1);
   const wet = Math.min(4, P.wet); // shaped jars set out to stiffen beside the kiln
   for (let k = 0; k < wet; k++) { const jx = X + 8 + (k % 2) * 3, jy = Y + 2 + ((k / 2) | 0) * 4; px(tc, jx, jy, JAR_WET, 2, 3); px(tc, jx, jy, '#d4c4aa', 1, 1); }
+}
+// snowmen on the green: three stacked balls with pebble eyes, a carrot-brown stick nose and twig arms;
+// one named after a hunter holds a spear, after the wolf-slayer wears a cloak of bracken. In spring
+// they lean, lose their heads and shrink into a dark wet patch.
+const SNOW_W = '#eef3f7', SNOW_SH = '#c4cdd6', TWIG = '#6e4a2a';
+function drawSnowmen() {
+  if (!w.snow) return;
+  for (const m of w.snow.men) {
+    if (m.s < 1) continue;
+    const X = m.x * TILE, Y = m.y * TILE, lean = m.m ? 1 : 0;
+    if (m.m) px(tc, X, Y + 7, '#5d6a74', 7, 1); // meltwater
+    px(tc, X + 2, Y + 5, SNOW_W, 3, 1); px(tc, X + 1, Y + 6, SNOW_W, 5, 1); px(tc, X + 2, Y + 7, SNOW_SH, 3, 1);
+    if (m.s >= 2) {
+      px(tc, X + 2 + lean, Y + 3, SNOW_W, 3, 2); px(tc, X + 4 + lean, Y + 4, SNOW_SH);
+      if (!m.m) { px(tc, X + 1, Y + 3, TWIG); px(tc, X, Y + 2, TWIG); px(tc, X + 5, Y + 3, TWIG); px(tc, X + 6, Y + 2, TWIG); }
+      if (m.nm && m.nm.endsWith('Wolf-slayer')) px(tc, X + 2 + lean, Y + 3, '#7a6a4a', 3, 1);
+    }
+    if (m.s >= 3) {
+      px(tc, X + 3 + lean * 2, Y + 1, SNOW_W, 2, 2);
+      px(tc, X + 3 + lean * 2, Y + 1, '#2a2a2a'); px(tc, X + 5 + lean * 2, Y + 2, '#c8743a');
+      if (m.nm && /Hunter|Finder/.test(m.nm)) px(tc, X + 6, Y, m.nm.endsWith('Finder') ? '#5a3a22' : '#8a6a44', 1, 6);
+      if (m.nm && m.nm.endsWith('Reaper')) px(tc, X + 3, Y, '#d2b25a', 2, 1);
+    }
+  }
+}
+function snowmanAt(mx, my) {
+  if (!w.snow) return null;
+  return w.snow.men.find((m) => m.s >= 1 && mx >= m.x && mx < m.x + 1 && my >= m.y && my < m.y + 1) || null;
 }
 function graveAt(mx, my) {
   if (!w.yard) return null;
@@ -632,6 +665,14 @@ function frame() {
     }
     if (age < 14) {
       px(sc, X + 1, Y + 1, '#f1c9a5'); px(sc, X, Y + 2, col, 3, 1); px(sc, X + step, Y + 3, '#555', 1, 1); px(sc, X + 2 - step, Y + 3, '#555', 1, 1);
+      if (p.task && p.task.k === 'snow' && !moving) {
+        if (p.task.o != null) { if (Math.floor(now / 400 + p.id) % 2) px(sc, X + ((p.id & 1) ? -1 : 3), Y + 2, SNOW_W); } // patting snow onto the snowman
+        else { // a snowball lobbed across the green
+          const k = ((now / 1100 + p.id * 0.37) % 1.6), dir = (p.id & 2) ? 1 : -1;
+          if (k < 1) px(sc, Math.round(X + 1 + dir * k * 14), Math.round(Y + 1 - Math.sin(Math.PI * k) * 5), SNOW_W);
+          else if (k < 1.12) px(sc, Math.round(X + 1 + dir * 14) - 1, Y + 3, SNOW_SH, 3, 1); // splat
+        }
+      }
     } else {
       px(sc, X + 1, Y, '#f1c9a5'); px(sc, X, Y + 1, col, 3, 2); px(sc, X + step * 2, Y + 3, '#3a3a3a', 1, 1); px(sc, X + 2 - step * 2, Y + 3, '#3a3a3a', 1, 1);
       if (p.task && !moving && ['chop', 'harvest', 'build', 'clear'].includes(p.task.k) && Math.floor(now / 300 + p.id) % 2) px(sc, X + 3, Y + 1, '#ddd', 1, 1);
@@ -809,6 +850,10 @@ function frame() {
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       const by = S.byname(p);
       tip.innerHTML = `<b>${p.name}</b>${by ? ` <span class="by">${by}</span>` : ''}<br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = snowmanAt(mx, my))) {
+      const b = known.get(best.by) || w.people.find((q) => q.id === best.by);
+      tip.innerHTML = `<b>${best.nm ? esc(best.nm) : 'Snowman'}</b><br>${best.m ? 'melting into the mud' : best.s < 3 ? 'half rolled' : 'standing by the hearth'}<br><span class="m">${best.nm ? 'a snowman · ' : ''}${b ? `begun by ${esc(b.name)}` : 'rolled by the children'}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
@@ -1231,7 +1276,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

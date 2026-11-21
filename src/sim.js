@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 28;
+export const SIM_VERSION = 29;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -55,6 +55,7 @@ export const TECHS = {
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   pottery:  { name: 'Pottery', added: '2026-11-21T00:12Z', desc: 'Clay dug from the bank above the beach, coiled into big-bellied jars and fired in a domed kiln of turf and clay. One potter digs, shapes a jar a day in dry weather and fires them in batches; some crack in the fire. Grain sealed in a jar under a lid of clay is out of reach of the rats. Jars break with use and must be made again.', req: ['granary', 'fire'] },
   watch:    { name: 'Beach watch', added: '2026-11-21T02:39Z', desc: 'Robbed twice by the far isle, the village keeps watch. On autumn and early-winter nights one islander in turn sits up by a driftwood fire on the beach below the granary and watches the sea. A dugout seen coming in is shouted at with a burning branch and turns back before it lands. The fire keeps the wolves off; the watcher sleeps late the next morning.', req: ['fire', 'farisle'] },
+  snowmen:  { name: 'Snowmen', added: '2026-11-21T04:41Z', desc: 'When the snow lies deep the children are sent out of the smoke and onto the green by the hearth. They roll it into balls, stack three, and give each figure pebble eyes, a stick nose and a name: often the name of someone the island tells of. Up to three stand at once, the rest of the snow goes in fights. They keep all winter and slump into the mud in the first warm days of spring.', req: ['fire'] },
   gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
@@ -404,7 +405,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null,
   };
   // name the island
   let nm = '';
@@ -598,7 +599,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -622,6 +623,7 @@ function daily(w, c, fx) {
   weather(w, c);
   festDay(w, c);
   taleDay(w, c);
+  snowDay(w, c);
   const wx = w.wx.k;
   if (w.raid) raidNight(w, c, wx);
   if (w.raid && !w.watch && w.raid.n >= WATCH_RAIDS && raidSeason(c)) learnWatch(w);
@@ -3405,6 +3407,7 @@ function act(w, p, c, fx) {
   if (!p.task && p.haul && !p.hurt) p.task = { k: 'haul', x: w.fire.x, y: w.fire.y - 1, h: 1, q: p.haul };
   if (!p.task) {
     if (a < 5) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 3);
+    else if (a < 14 && w.snow && snowOk(w, c) && (p.id + c.day) % 3 < SNOW_PLAY) p.task = snowTask(w, p, c) || wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a < 14) p.task = wander(w, p, w.fire.x, w.fire.y, 6, 2);
     else if (a >= 65 || p.hurt) p.task = wander(w, p, homeOf(w, p).x, homeOf(w, p).y, 2, 4);
     else reserve(w, p, pickTask(w, p, c));
@@ -3499,6 +3502,8 @@ function finish(w, p, t, c, fx) {
     if (!w.pot) return;
     const ok = fireKiln(w, p);
     if (ok) pop('+' + ok + ' jars', 'pot');
+  } else if (t.k === 'snow') {
+    snowDone(w, p, t);
   } else if (t.k === 'forage') {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
@@ -3515,6 +3520,93 @@ function finish(w, p, t, c, fx) {
     deed(w, p, 'f', got);
     if (got > 0) pop('+' + got, 'fish');
   }
+}
+
+// ---------- snowmen ----------
+// In winter the children play in the snow on the green near the hearth. They roll a snowman (three balls,
+// one per spell of rolling), name it, and once three stand the rest of the play goes in snowball fights.
+// Snowmen last all winter and melt in spring. Children do no other work, so this is for the eye only.
+// w.snow { k next id, n built ever, y built this year, men [{ id, x, y, s balls 1..3, m melting, nm name, by builder }] }.
+const SNOW_MAX = 3;          // standing at once
+const SNOW_PLAY = 2;         // of every 3 children, this many go out on a winter day
+const SNOW_MELT = { clear: 0.45, rain: 0.7, heat: 1, fog: 0.3, storm: 0.6, cold: 0.05, snow: 0 }; // daily chance a melting snowman loses a ball
+const SNOW_PROP = [ // what the children give a snowman named after someone, by byname
+  ['Wolf-slayer', 'with a wolf pelt of dead bracken over its shoulders'], ['Hunter', 'with an ash stick for a spear'],
+  ['Finder', 'with a burnt stick held up like a torch'], ['Builder', 'with a stone axe stuck in its belly'],
+  ['Fisher', 'with a dried fish for a nose'], ['Reaper', 'with a crown of straw'], ['', 'with a beard of dry grass'],
+];
+const snowOk = (w, c) => c.season === 3 && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'fog';
+function learnSnow(w, c) {
+  if (w.snow || c.season !== 3 || !w.wx || w.wx.k !== 'snow' || !w.techs.includes('fire')) return;
+  const kids = w.people.filter((p) => !p.dead && ageY(w, p) >= 4 && ageY(w, p) < 14);
+  if (kids.length < 2) return;
+  w.snow = { k: 0, n: 0, y: 0, men: [] };
+  w.techs.push('snowmen');
+  const a = kids[0], b = kids[1];
+  milestone(w, `The snow lies knee-deep and the houses are full of smoke and squabbling, so the children are sent out to the green. ` +
+    `${a.name} and ${b.name} pack a snowball, roll it until it will not move, and heave a second one on top. By dusk a white figure stands by the hearth with pebble eyes and a stick for a nose, and the children of ${w.name} build snowmen every winter from now on.`);
+}
+function snowSite(w) {
+  const S = w.snow;
+  for (let tries = 0; tries < 14; tries++) {
+    const x = w.fire.x + ri(w, 13) - 6, y = w.fire.y + ri(w, 13) - 6;
+    const tt = tile(w, x, y);
+    if (tt !== T.GRASS && tt !== T.SAND) continue;
+    if (d2(x, y, w.fire.x, w.fire.y) < 5) continue;
+    if (S.men.some((m) => d2(m.x, m.y, x, y) < 5)) continue;
+    if (tile(w, x, y + 1) === T.BUILD || tile(w, x, y - 1) === T.BUILD) continue;
+    return [x, y];
+  }
+  return null;
+}
+// the snowman's name: someone with a byname first, otherwise the eldest, otherwise none
+function snowName(w) {
+  if (rnd(w) < 0.4) return null;
+  const named = w.people.filter((p) => !p.dead && byname(p) && ageY(w, p) >= 14);
+  if (named.length && rnd(w) < 0.7) { const p = named[ri(w, named.length)]; return `${p.name} ${byname(p)}`; }
+  const g = (w.graves || []).filter((o) => o.by);
+  if (g.length && rnd(w) < 0.5) { const o = g[ri(w, g.length)]; return `${o.n} ${o.by}`; }
+  const e = elder(w);
+  return e ? e.name : null;
+}
+function snowTask(w, p, c) {
+  const S = w.snow, side = (p.id & 1) ? 1 : -1;
+  let m = S.men.find((o) => o.s < SNOW_MAX && !o.m);
+  if (!m && S.men.length < SNOW_MAX) {
+    const at = snowSite(w);
+    if (at) { m = { id: S.k++, x: at[0], y: at[1], s: 0, m: 0, nm: null, by: p.id }; S.men.push(m); }
+  }
+  if (m && m.s < 3) return { k: 'snow', x: m.x + side, y: m.y, h: 2 + ri(w, 2), o: m.id };
+  const x = w.fire.x + ri(w, 11) - 5, y = w.fire.y + ri(w, 11) - 5; // a snowball fight on the green
+  return tile(w, x, y) !== T.WATER && lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5) ? { k: 'snow', x, y, h: 3 + ri(w, 2) } : null;
+}
+function snowDone(w, p, t) {
+  const S = w.snow, m = S && t.o != null && S.men.find((o) => o.id === t.o);
+  if (!m || m.m || m.s >= 3) return;
+  m.s++;
+  if (m.s < 3) return;
+  S.n++; S.y++;
+  m.nm = snowName(w);
+  const who = aliveId(w, m.by), two = who && who !== p, by = two ? `${who.name} and ${p.name} finish` : `${p.name} finishes`;
+  if (S.y === 1 || m.nm) log(w, m.nm
+    ? `${by} a snowman by the hearth ${SNOW_PROP.find(([k]) => m.nm.endsWith(k))[1]}. The children call it ${m.nm}.`
+    : `${by} ${S.y === 1 ? 'the first snowman of the winter' : 'a snowman'} by the hearth, with pebble eyes and a stick nose.`, 'good');
+}
+function snowDay(w, c) {
+  if (!w.snow) { learnSnow(w, c); return; }
+  const S = w.snow;
+  if (c.doy === 0) S.y = 0;
+  for (const m of S.men) {
+    const tt = tile(w, m.x, m.y);
+    if (tt !== T.GRASS && tt !== T.SAND) { m.s = 0; m.m = 1; }
+    else if (c.season !== 3 && m.s > 0) { // spring: they slump, lean and shrink into the mud
+      if (!m.m) m.m = 1;
+      if (rnd(w) < (SNOW_MELT[w.wx.k] ?? 0.4)) m.s--;
+    }
+  }
+  const had = S.men.length;
+  S.men = S.men.filter((m) => m.s > 0 || (c.season === 3 && !m.m));
+  if (had && !S.men.length && c.season !== 3) log(w, `The last snowman by the hearth slumps into the mud. Spring has come to ${w.name}.`, 'info');
 }
 
 // ---------- upgrades ----------
@@ -3706,6 +3798,10 @@ const MIGRATIONS = {
   27: (w) => {
     if (w.raid) { w.raid.peace ||= 0; w.raid.pg ||= 0; w.raid.yv ||= 0; w.raid.gift ||= 0; }
   },
+  // v28 -> v29: snowmen. None yet; the first winter day of deep snow sends the children out to the green.
+  28: (w) => {
+    if (w.snow === undefined) w.snow = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3753,6 +3849,7 @@ export function summary(w) {
     gifts: (w.raid && w.raid.peace) || 0, giftGrain: (w.raid && w.raid.pg) || 0, gifted: !!(w.raid && w.raid.gift === c.year),
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
+    snowmen: w.snow ? w.snow.men.filter((m) => m.s >= 3).length : 0, snowmenEver: w.snow ? w.snow.n : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

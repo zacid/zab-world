@@ -284,3 +284,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Grudges: someone hurt in a raid refuses to give, and the eldest overrules them (a family feud seed for later visits).
   - Sending grain over unasked: once there are boats, the islanders could row a gift across in a lean year that the guests did not come.
   - `scripts/_giftprobe.mjs [years] [seed]` prints raids and gifts per 20 years.
+- Snowmen are done (SIM_VERSION 29; w.snow {k, n, y, men [{id, x, y, s 0..3, m melting, nm, by}]}; snowDay/snowTask/snowDone in sim.js,
+  drawSnowmen()/snowmanAt() in render.js; `scripts/_snowprobe.mjs` runs the live world 3 years). Only 3 stand at once, so they
+  are all built in the first days of snow. Answers it invites:
+  - Summer play to match: children paddle in the shallows on heatwave days, or race at midsummer (winner named in the chronicle).
+  - Sledging on a hide down a slope; a child going through thin ice once there are ponds.
+  - A storm or a dog knocks a snowman down; the children rebuild it on the next snow day.
+  - Children who played together pair up more often later (a "friends" link per person).
+  - Snow depth as state (builds on snow days, melts on warm ones) would let snow slow walking and show bare patches in a mild winter.
