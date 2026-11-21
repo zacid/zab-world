@@ -183,6 +183,16 @@ function mentions(name, n) {
 }
 
 // ---------- terrain ----------
+// Smooth motion (render-only). The scene is drawn SUB_K times finer than the art, so sprites can sit between art
+// pixels and glide instead of hopping a whole art pixel at a time.
+let SUB_K = 1;
+const sub = (v) => Math.round(v * SUB_K) / SUB_K;
+// Walkers keep a steady pace: a short last leg is walked at that pace and they then stand, instead of
+// creeping across the whole hour. ref = tiles per hour.
+function fw(o, frac, ref = 3) {
+  const d = Math.hypot(o.x - o.px, o.y - o.py);
+  return d > 0 && d < ref ? Math.min(1, (frac * ref) / d) : frac;
+}
 function px(c, x, y, col, wdt = 1, hgt = 1) { c.fillStyle = col; c.fillRect(x, y, wdt, hgt); }
 function sprite(c, rows, ox, oy, map) {
   for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) {
@@ -866,6 +876,10 @@ function frame() {
   }
 
   // scene at native resolution
+  const k = view.s >= 2 ? Math.min(4, Math.floor(view.s)) : 1;
+  if (scene.width !== PX * k) { SUB_K = k; scene.width = scene.height = PX * k; }
+  sc.setTransform(SUB_K, 0, 0, SUB_K, 0, 0);
+  sc.imageSmoothingEnabled = false;
   sc.clearRect(0, 0, PX, PX);
   sc.drawImage(terr, 0, 0);
   ambience(c, hf, now, 'below');
@@ -923,8 +937,8 @@ function frame() {
   const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
   for (const p of w.people) {
     if (p.asleep) continue;
-    let x = p.px + (p.x - p.px) * frac, y = p.py + (p.y - p.py) * frac;
-    const moving = p.x !== p.px || p.y !== p.py;
+    let x = p.px + (p.x - p.px) * fw(p, frac), y = p.py + (p.y - p.py) * fw(p, frac);
+    const moving = (p.x !== p.px || p.y !== p.py) && fw(p, frac) < 1;
     const dancing = fest && p.task && p.task.k === 'fest' && !moving;
     let hop = 0;
     if (dancing) { // the ring turns around the bonfire, each ring the other way, everyone skipping
@@ -933,7 +947,7 @@ function frame() {
       x = fcx + Math.cos(a) * r; y = fcy + Math.sin(a) * r;
       hop = Math.floor(now / 240 + p.id) % 2;
     }
-    const X = Math.round(x * TILE) - 1, Y = Math.round(y * TILE) - 3 - hop;
+    const X = sub(x * TILE) - 1, Y = sub(y * TILE) - 3 - hop;
     const age = S.ageY(w, p);
     const step = moving || dancing ? Math.floor(now / 180 + p.id) % 2 : 0;
     if (p.sick && !moving) { // lying in the doorway under a blanket, a pale face, now and then a shiver
@@ -944,7 +958,7 @@ function frame() {
       continue;
     }
     if (p.task && p.task.sea) { // out in the dugout: head and shoulders over the gunwale, paddle dipping, or a line over the side
-      const BX = Math.round(x * TILE) - 4, BY = Math.round(y * TILE) - 1;
+      const BX = sub(x * TILE) - 4, BY = sub(y * TILE) - 1;
       if (moving) px(sc, BX + (p.x < p.px ? 9 : -2), BY + 1, 'rgba(200,220,240,0.35)', 2, 1); // the wake
       sprite(sc, DUGOUT, BX, BY, OWN_DCOLS);
       px(sc, BX + 4, BY - 2, '#f1c9a5'); px(sc, BX + 4, BY - 1, ROLE.fish);
@@ -971,7 +985,7 @@ function frame() {
       if (g === 2 || g === 3) px(sc, X + 3, Y - 1, '#f1c9a5', 1, 2);
     }
     if (age < 14 && p.task && p.task.k === 'wade' && !moving) { // knee-deep in the surf, a ring of foam round the legs, now and then a splash
-      const WX = Math.round((x + p.task.dx * 0.55) * TILE) - 1, WY = Math.round((y + p.task.dy * 0.55) * TILE) - 3;
+      const WX = sub((x + p.task.dx * 0.55) * TILE) - 1, WY = sub((y + p.task.dy * 0.55) * TILE) - 3;
       const g = Math.floor(now / 330 + p.id * 3) % 6, bend = g === 4; // bent double over a cockle
       px(sc, WX + 1, WY + 1 + (bend ? 1 : 0), '#f1c9a5'); px(sc, WX, WY + 2, '#f4f4f4', 3, 1);
       px(sc, WX - 1, WY + 3, 'rgba(235,245,255,0.75)', 5, 1); // foam round the knees
@@ -1277,7 +1291,7 @@ function drawIsle(frac, now, fest) {
   const out = [], B = w.isle && w.isle.boat;
   if (!B) return out;
   const bx = B.px + (B.x - B.px) * frac, by = B.py + (B.y - B.py) * frac, going = B.x !== B.px || B.y !== B.py;
-  const X = Math.round(bx * TILE) - 4, Y = Math.round(by * TILE) - 1;
+  const X = sub(bx * TILE) - 4, Y = sub(by * TILE) - 1;
   if (going) px(sc, X - 2, Y + 1, 'rgba(200,220,240,0.35)', 1, 1); // a little wake
   sprite(sc, DUGOUT, X, Y, DCOLS);
   const aboard = B.gs.filter((g) => g.k === 'boat');
@@ -1291,10 +1305,10 @@ function drawIsle(frac, now, fest) {
   const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
   for (const g of B.gs) {
     if (g.k === 'boat') continue;
-    let x = g.px + (g.x - g.px) * frac, y = g.py + (g.y - g.py) * frac;
-    const moving = g.x !== g.px || g.y !== g.py, h = S.hash(g.nm.length, g.a, 7) * 10;
+    let x = g.px + (g.x - g.px) * fw(g, frac, 4), y = g.py + (g.y - g.py) * fw(g, frac, 4);
+    const moving = (g.x !== g.px || g.y !== g.py) && fw(g, frac, 4) < 1, h = S.hash(g.nm.length, g.a, 7) * 10;
     if (g.k === 'sleep' && !moving) { // rolled in a cloak by the embers
-      const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE);
+      const GX = sub(x * TILE) - 1, GY = sub(y * TILE);
       px(sc, GX - 1, GY, '#f1c9a5'); px(sc, GX, GY, GUEST, 4, 1); px(sc, GX + 1, GY - 1, '#4f7fa0', 2, 1);
       if (g.s) px(sc, GX + 4, GY - 1, SACK, 2, 2); // the gift sack at their feet
       out.push({ g, x, y });
@@ -1307,7 +1321,7 @@ function drawIsle(frac, now, fest) {
       x = fcx + Math.cos(a) * r; y = fcy + Math.sin(a) * r;
       hop = Math.floor(now / 240 + h) % 2;
     }
-    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3 - hop;
+    const GX = sub(x * TILE) - 1, GY = sub(y * TILE) - 3 - hop;
     const step = moving || hop ? Math.floor(now / 180 + h) % 2 : 0;
     px(sc, GX + 1, GY, '#f1c9a5'); px(sc, GX, GY + 1, GUEST, 3, 2); px(sc, GX + 1, GY + 1, '#4f7fa0', 1, 1); // a shell bead on the breast
     px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
@@ -1325,7 +1339,7 @@ function drawRaid(frac, now) {
   const out = [], C = w.raid && w.raid.cur;
   if (!C || C.st === 'gone') return out;
   const bx = C.px + (C.x - C.px) * frac, by = C.py + (C.y - C.py) * frac, going = C.x !== C.px || C.y !== C.py;
-  const X = Math.round(bx * TILE) - 4, Y = Math.round(by * TILE) - 1;
+  const X = sub(bx * TILE) - 4, Y = sub(by * TILE) - 1;
   sprite(sc, DUGOUT, X, Y, DCOLS);
   const aboard = C.rs.filter((r) => r.k === 'boat');
   aboard.forEach((r, i) => {
@@ -1337,8 +1351,8 @@ function drawRaid(frac, now) {
   out.push({ g: {}, boat: true, raid: true, n: aboard.length, x: bx, y: by });
   C.rs.forEach((r, i) => {
     if (r.k === 'boat') return;
-    const x = r.px + (r.x - r.px) * frac, y = r.py + (r.y - r.py) * frac, moving = r.x !== r.px || r.y !== r.py;
-    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3;
+    const x = r.px + (r.x - r.px) * fw(r, frac, 5), y = r.py + (r.y - r.py) * fw(r, frac, 5), moving = (r.x !== r.px || r.y !== r.py) && fw(r, frac, 5) < 1;
+    const GX = sub(x * TILE) - 1, GY = sub(y * TILE) - 3;
     const step = moving ? Math.floor(now / (r.k === 'run' ? 110 : 200) + i) % 2 : 0;
     if (r.k === 'wait' && !moving) { // crouched at the door, a hand at the bar
       px(sc, GX + 1, GY + 1, RAIDER_HI); px(sc, GX, GY + 2, RAIDER, 3, 2);
@@ -1351,8 +1365,8 @@ function drawRaid(frac, now) {
     out.push({ g: r, raid: true, x, y });
   });
   for (const o of C.ch) { // islanders with brands from the hearth
-    const x = o.px + (o.x - o.px) * frac, y = o.py + (o.y - o.py) * frac, moving = o.x !== o.px || o.y !== o.py;
-    const GX = Math.round(x * TILE) - 1, GY = Math.round(y * TILE) - 3, step = moving ? Math.floor(now / 120 + o.id) % 2 : 0;
+    const x = o.px + (o.x - o.px) * fw(o, frac), y = o.py + (o.y - o.py) * fw(o, frac), moving = (o.x !== o.px || o.y !== o.py) && fw(o, frac) < 1;
+    const GX = sub(x * TILE) - 1, GY = sub(y * TILE) - 3, step = moving ? Math.floor(now / 120 + o.id) % 2 : 0;
     const fl = Math.floor(now / 140 + o.id) % 3;
     px(sc, GX + 1, GY, '#f1c9a5'); px(sc, GX, GY + 1, '#d9d9d9', 3, 2);
     px(sc, GX + step * 2, GY + 3, '#3a3a3a', 1, 1); px(sc, GX + 2 - step * 2, GY + 3, '#3a3a3a', 1, 1);
@@ -1470,12 +1484,12 @@ function drawBeasts(frac, now) {
   const out = [];
   for (const b of w.beasts || []) {
     if (!b.out) continue;
-    const x = b.px + (b.x - b.px) * frac, y = b.py + (b.y - b.py) * frac;
-    const dx = b.x - b.px, moving = dx !== 0 || b.y !== b.py;
+    const x = b.px + (b.x - b.px) * fw(b, frac), y = b.py + (b.y - b.py) * fw(b, frac);
+    const dx = b.x - b.px, moving = (dx !== 0 || b.y !== b.py) && fw(b, frac) < 1;
     let face = facing.get(b.id) || 1;
     if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
     facing.set(b.id, face);
-    const X = Math.round(x * TILE) - 3, Y = Math.round(y * TILE) - 3;
+    const X = sub(x * TILE) - 3, Y = sub(y * TILE) - 3;
     const stepF = Math.floor(now / 160 + b.id) % 2;
     let rows;
     if (b.k === 'wolf') rows = moving && stepF ? WOLF_RUN : WOLF;
@@ -1506,8 +1520,8 @@ function drawGoats(frac, now) {
   const out = [];
   if (!w.goats) return out;
   for (const g of w.goats.herd) {
-    const x = g.px + (g.x - g.px) * frac, y = g.py + (g.y - g.py) * frac;
-    const dx = g.x - g.px, moving = dx !== 0 || g.y !== g.py;
+    const x = g.px + (g.x - g.px) * fw(g, frac), y = g.py + (g.y - g.py) * fw(g, frac);
+    const dx = g.x - g.px, moving = (dx !== 0 || g.y !== g.py) && fw(g, frac) < 1;
     let face = facing.get(g.id) || ((g.id & 1) ? 1 : -1);
     if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
     facing.set(g.id, face);
@@ -1518,7 +1532,7 @@ function drawGoats(frac, now) {
     const coat = kid ? GCOATS[0] : GCOATS[g.id % 3];
     const map = { w: coat.w, H: coat.H, h: '#6e665c', t: coat.w, l: '#2e2a26' };
     const hop = kid && moving && step ? 1 : 0; // kids skip
-    const n = rows[0].length, X = Math.round(x * TILE) - (n >> 1), Y = Math.round(y * TILE) - rows.length + 1 - hop;
+    const n = rows[0].length, X = sub(x * TILE) - (n >> 1), Y = sub(y * TILE) - rows.length + 1 - hop;
     for (let r = 0; r < rows.length; r++) for (let k = 0; k < n; k++) {
       const ch = rows[r][k];
       if (ch !== '.') px(sc, face > 0 ? X + k : X + n - 1 - k, Y + r, map[ch]);
@@ -1540,8 +1554,8 @@ function drawDogs(frac, now) {
   const out = [];
   if (!w.dogs) return out;
   for (const d of w.dogs.d) {
-    const x = d.px + (d.x - d.px) * frac, y = d.py + (d.y - d.py) * frac;
-    const dx = d.x - d.px, moving = dx !== 0 || d.y !== d.py;
+    const x = d.px + (d.x - d.px) * fw(d, frac), y = d.py + (d.y - d.py) * fw(d, frac);
+    const dx = d.x - d.px, moving = (dx !== 0 || d.y !== d.py) && fw(d, frac) < 1;
     let face = facing.get(d.id) || ((d.id & 1) ? -1 : 1);
     if (dx > 0.01) face = 1; else if (dx < -0.01) face = -1;
     facing.set(d.id, face);
@@ -1551,7 +1565,7 @@ function drawDogs(frac, now) {
     const coat = DCOATS[d.id % 3];
     const map = { b: coat.b, h: coat.h, t: coat.b, e: '#2e2a26', l: '#2e2a26' };
     const hop = pup && moving && step ? 1 : 0;
-    const n = rows[0].length, X = Math.round(x * TILE) - (n >> 1), Y = Math.round(y * TILE) - rows.length + 1 - hop;
+    const n = rows[0].length, X = sub(x * TILE) - (n >> 1), Y = sub(y * TILE) - rows.length + 1 - hop;
     for (let r = 0; r < rows.length; r++) for (let k = 0; k < n; k++) {
       const ch = rows[r][k];
       if (ch !== '.') px(sc, face > 0 ? X + k : X + n - 1 - k, Y + r, map[ch]);
