@@ -208,5 +208,10 @@
   "at": "2026-11-21T13:04:39.360Z",
   "title": "Add the moon: raiders row in only on dark nights",
   "body": "- SIM_VERSION 39 (w.moon {s, nm, at}; moonAge/moonLight/moonDark/moonName and MOON_* in sim.js; tech 'moon'): a 30-day moon, 12 a year, worked out from the day number alone\n- The far isle's dugout now comes only on dark-moon nights (13 of 30) or in fog. RAID_NIGHT goes from 0.03 to 0.05 on those nights, so raids are about as common as before\n- Moon lore: once the watch has sat up 20 nights, at the next full moon of raid season the watcher sees the pattern. From then on the beach fire is lit only on dark or foggy nights, which saves timber and sleep\n- Visible: a pixel moon with its phase in the night sky, lighter moonlit nights, silver glints on the sea, the phase in the top line after dusk, a Moon row in the panel\n- Watch: Hais learns moon lore at the full moon around Y7 autumn day 76. About 8 bright nights a season go unwatched"
+ },
+ {
+  "at": "2026-11-21T13:46:48.319Z",
+  "title": "Add grain rust that spreads between fields in wet summers",
+  "body": "- SIM_VERSION 40 (w.rust {n, k, g, y, yr, last, cur}; f.ru spotted tick, f.rl share lost; RUST_* in sim.js; tech 'rust'; yearly `rusted`): from Y3, after 3+ days of rain or fog between mid-spring and the end of summer, rust can come up on one growing field (at most once a year)\n- Wet and windy days spread it to the fields beside it (4 sides) and each wet day takes up to 3% of a rusted field's yield, at most 60%. Heat stops it; harvest or the autumn frost ends it. Packed blocks of fields lose the most\n- Visible: orange flecks on rusted grain that thicken as it spreads, hover text, a Rust row in the panel, a History line\n- Test seeds: ~35 outbreaks a century, most 1-20 fields, a big one (40-125 fields, 4-9k grain) every decade or so late game. Nothing stops it yet\n- Watch: Hais can see its first rust in the wet springs of Y8-9; expect a few hundred grain lost, more as the fields grow together"
  }
 ]

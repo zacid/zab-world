@@ -391,3 +391,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Wolves at the full moon: a ring of pale eyes at the treeline, bolder pen raids; full-moon deer hunts.
   - Sowing by the moon (weather lore against late frost), midsummer set by a full moon, the moon count shown as a "month" in the top line.
   - A lunar eclipse once in decades: a red moon, a frightened village, the eldest tells of the last one.
+- Grain rust is done, as a problem only (SIM_VERSION 40; w.rust {n, k, g grain lost, y, yr, last, cur {at, n, g, d}}, f.ru / f.rl;
+  rustDay/rustBegins/rustCut/rustEnds in sim.js, RUST_* constants; yearly `rusted`; rustAt() and orange flecks in render.js;
+  `scripts/_rustprobe.mjs [years] [seed|live]`). Spreads only to 4-side neighbour fields, so the big late-game blocks suffer most.
+  Nobody has an answer yet. Answers it invites:
+  - Rogueing: after the first big outbreak, the healer or the eldest walks the rows and pulls up spotted plants on the first day
+    (stops spread from that field at the cost of some of its yield).
+  - Hedges as breaks: rust does not cross a grown hawthorn hedge; field blocks broken up by hedges or grass strips lose less.
+  - A second crop (beans, or a rust-proof barley off the far isle's boat) sown in alternate fields: a rotation that breaks the chain.
+  - Burning the rusted stubble in autumn (the islanders notice that ash fields come up clean), tying in with slash-and-burn.
+  - Storm tides were tried this visit and dropped: every field on all test seeds and the live world lies 10+ tiles from the sea,
+    because fields grow out from the hearth. A coastal hazard would need to hit the beach things (dugout, watch fire, whale, kiln clay bank).
+- Housekeeping: scripts/_surgeprobe.mjs is a dead stub and scripts/_coastprobe.mjs (field distance to the sea) is a one-off; both can go.

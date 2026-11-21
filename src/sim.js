@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 39;
+export const SIM_VERSION = 40;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -65,6 +65,7 @@ export const TECHS = {
   smudge:   { name: 'Smudge fires', added: '2026-11-21T11:57Z', desc: 'Twice blackened by a late frost, the village fights back. When a spring cold snap settles in and the evenings turn clear and still, the young and strong carry damp straw and green wood out between the rows at dusk and keep small fires smouldering till dawn. The smoke lies low over the young grain like a blanket and the frost mostly cannot settle under it. It costs firewood and a night\'s sleep; the smudgers lie in late the next morning.', req: ['fire', 'farming'] },
   frost:    { name: 'Late frost', added: '2026-11-21T10:44Z', desc: 'Some springs the cold comes back after the sowing. On a still, clear night the frost settles on the fields, and by morning the young green shoots have gone black and limp. Grain killed while it is still short has to be dug over and sown again; grain already knee-high only has its leaf tips burnt. Nobody on the island yet knows how to read a frost coming.', req: ['farming'] },
   moon:     { name: 'Moon lore', added: '2026-11-21T12:31Z', desc: 'The moon fills and empties every thirty days, twelve times a year. Sitting up night after night by the beach fire, the watchers learn what the far isle already knew: a dugout only comes in when the moon is dark, or under a fog. A notch is cut in the doorpost of the granary for each night, and on bright nights the beach fire is left unlit and the watcher sleeps in a bed. Fog still keeps somebody down by the water.', req: ['watch'] },
+  rust:     { name: 'Grain rust', added: '2026-11-21T13:07Z', desc: 'In a warm, wet summer orange flecks come up on the leaves of the grain, like rust on a blade. Wet days and wind carry it from a spotted field to the fields beside it, and wherever it sits the ears fill thin and light. Hot dry weather stops it; the harvest or the autumn frost ends it for the year. Fields packed side by side lose the most. Nobody on the island yet knows how to stop it spreading.', req: ['farming'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -433,7 +434,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -629,14 +630,14 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; delete f.ru; delete f.rl; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.rats) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
@@ -648,6 +649,7 @@ function daily(w, c, fx) {
     if (w.wade) w.wade.y = 0;
     if (w.smudge) w.smudge.y = 0;
     w.stats.yfr = 0;
+    if (w.rust) { w.rust.y = 0; w.rust.cur = null; }
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -671,6 +673,7 @@ function daily(w, c, fx) {
     let rot = 0;
     for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; delete f.lost; rot++; }
     if (rot) log(w, `Frost takes ${rot} unharvested field${rot > 1 ? 's' : ''}.`, 'bad');
+    if (w.rust && w.rust.cur) rustEnds(w);
   }
   // a cold snap after the sowing: frost on the young shoots
   if (w.frost !== undefined && c.season === 0 && wx === 'cold' && c.year >= FROST_YEAR) frostNight(w);
@@ -681,6 +684,7 @@ function daily(w, c, fx) {
       f.growth = Math.min(1, Math.round((f.growth + g) * 10000) / 10000);
       if (f.growth >= 1) f.stage = 'ripe';
     }
+    if (w.rust !== undefined) rustDay(w, c, wx);
     w.wild = Math.min(WILD_CAP, w.wild + (wx === 'heat' ? WILD_REGEN / 2 : wx === 'rain' ? WILD_REGEN + 2 : WILD_REGEN));
   }
   // a storm churns the shallows; snow and ice slow the fish
@@ -896,6 +900,85 @@ function frostTold(w, s) {
   }
   if (s.fs) smudgeTold(w, s);
   if (w.smudge === null && F.n >= SMUDGE_LEARN) learnSmudge(w);
+}
+
+// ---------- grain rust ----------
+// After a few wet days in late spring or summer, rust can come up on one field of growing grain and spread to the
+// fields beside it (4 sides) on wet and windy days. A rusted field loses part of its yield each day it is wet
+// (f.lost, which the harvest already counts); heat stops it. It ends for the year when no rusted grain is left in
+// the ground. Nothing stops it yet; packed blocks of fields lose the most.
+// f.ru tick a field was spotted, f.rl share of its yield the rust has taken (both cleared at harvest / new year).
+// w.rust { n outbreaks, k fields spotted ever, g grain lost ever, y fields this year, yr year of the last outbreak,
+// last tick, cur { at, n fields, g grain lost, d days } or null }.
+const RUST_YEAR = 3;         // the first summer it can come
+const RUST_FROM = 45;        // day of the year (mid-spring) from which it can come
+const RUST_WET = 3;          // days into a rain or fog spell before it shows
+const RUST_ODDS = 0.05;      // chance per such day, once a year at most
+const RUST_SPREAD = { rain: 0.3, storm: 0.38, fog: 0.2, clear: 0.08, cold: 0.02, heat: 0, snow: 0 };
+const RUST_EAT = { rain: 0.03, storm: 0.03, fog: 0.024, clear: 0.014, cold: 0.005, heat: 0, snow: 0 };
+const RUST_MAX = 0.6;        // the most of a field's yield it can take
+const growing = (f) => f.stage === 'planted' || f.stage === 'ripe';
+function rustDay(w, c, wx) {
+  const R = w.rust;
+  if (!R || !R.cur) {
+    if (c.year < RUST_YEAR || c.doy < RUST_FROM || c.season > 1 || (wx !== 'rain' && wx !== 'fog') || w.wx.n < RUST_WET) return;
+    if (R && R.yr === c.year) return;
+    const can = w.fields.filter((f) => f.stage === 'planted' && f.growth >= 0.25);
+    if (!can.length || rnd(w) >= RUST_ODDS) return;
+    rustBegins(w, c, can[ri(w, can.length)]);
+    return;
+  }
+  const C = R.cur;
+  C.d++;
+  const at = new Map();
+  for (const f of w.fields) at.set(f.y * MAP + f.x, f);
+  const fresh = [], sp = RUST_SPREAD[wx] || 0, eat = RUST_EAT[wx] || 0;
+  let left = 0;
+  for (const f of w.fields) {
+    if (f.ru == null || !growing(f)) continue;
+    left++;
+    if (eat && (f.rl || 0) < RUST_MAX) {
+      const e = Math.min(eat, RUST_MAX - (f.rl || 0));
+      f.rl = Math.round(((f.rl || 0) + e) * 1000) / 1000;
+      f.lost = Math.min(0.8, Math.round(((f.lost || 0) + e) * 1000) / 1000);
+    }
+    if (!sp) continue;
+    for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const o = at.get((f.y + b) * MAP + f.x + a);
+      if (o && o.ru == null && growing(o) && !fresh.includes(o) && rnd(w) < sp) fresh.push(o);
+    }
+  }
+  for (const f of fresh) { f.ru = w.t; C.n++; R.k++; R.y++; }
+  if (!left) rustEnds(w);
+}
+function rustBegins(w, c, f) {
+  const first = !w.rust;
+  if (first) { w.rust = { n: 0, k: 0, g: 0, y: 0, yr: 0, last: 0, cur: null }; if (!w.techs.includes('rust')) w.techs.push('rust'); }
+  const R = w.rust;
+  R.n++; R.k++; R.y++; R.yr = c.year; R.last = w.t;
+  R.cur = { at: w.t, n: 1, g: 0, d: 0 };
+  f.ru = w.t;
+  const who = elder(w);
+  if (first) milestone(w, `After ${spellLen(w.wx.n).toLowerCase()} of ${w.wx.k === 'fog' ? 'warm, dripping fog' : 'warm rain'}, ${who ? who.name : 'one of the old ones'} pulls a stalk from a field of young grain and holds it up: the leaves are flecked with orange, like a blade left out in the wet, and the dust of it comes off on the fingers. ` +
+    `Nobody on ${w.name} has seen it before. Nobody knows that the wind and the rain will carry it to the fields beside it.`);
+  else log(w, 'Orange flecks on the leaves of the grain again. The rust is back in the fields.', 'bad');
+}
+// a rusted field is cut: count what the rust took from it
+function rustCut(w, f, y) {
+  if (f.ru == null) return;
+  const lost = f.rl ? Math.round((y / Math.max(0.2, 1 - (f.lost || 0))) * f.rl) : 0;
+  if (w.rust) { w.rust.g += lost; if (w.rust.cur) w.rust.cur.g += lost; }
+  delete f.ru; delete f.rl;
+}
+function rustEnds(w) {
+  const R = w.rust, C = R.cur;
+  R.cur = null;
+  if (C.n <= 1 && C.g < 50) { log(w, 'The rust stayed in a single field this year and went no further.', 'info'); return; }
+  const text = `The rust has run its course. It spread to ${plural(C.n, 'field', 'fields')} over ${plural(C.d, 'day', 'days')}` +
+    (C.g ? `, and about ${C.g} grain that should have been harvested came in as thin, light ears or not at all.` : '.');
+  if (C.n >= Math.max(10, w.fields.length >> 2) && R.n <= 1) milestone(w, text + ` The fields at the heart of the village, packed side by side, were the worst.`);
+  else if (C.n >= Math.max(10, w.fields.length >> 2)) milestone(w, text);
+  else log(w, text, 'bad');
 }
 
 // ---------- smudge fires ----------
@@ -3881,14 +3964,14 @@ function finish(w, p, t, c, fx) {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (!f || f.stage !== 'ripe') return;
     const y = Math.round(FIELD_YIELD * w.harvest * (1 - (f.lost || 0)));
-    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; delete f.lost;
+    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); delete f.lost;
     deed(w, p, 'g', y);
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (f && f.stage === 'fallow') {
       const fr = f.fr != null;
-      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; pop(fr ? 'sown again' : 'sown', 'muted');
+      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; delete f.ru; delete f.rl; pop(fr ? 'sown again' : 'sown', 'muted');
       if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
     }
   } else if (t.k === 'build') {
@@ -4712,6 +4795,10 @@ const MIGRATIONS = {
   38: (w) => {
     if (w.moon === undefined) w.moon = null;
   },
+  // v39 -> v40: grain rust. A wet spell in late spring or summer can bring rust to the growing grain.
+  39: (w) => {
+    if (w.rust === undefined) w.rust = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4777,6 +4864,8 @@ export function summary(w) {
     cockles: w.wade ? w.wade.g : 0, cocklesYear: w.wade ? w.wade.y : 0, cockleBed: w.wade ? w.wade.c : 0, wadeScares: w.wade ? w.wade.s : 0,
     smudge: !!w.smudge, smudgeFires: w.smudge ? w.smudge.on.length : 0, smudgeNights: w.smudge ? w.smudge.n : 0,
     smudgeSaved: w.smudge ? w.smudge.s : 0, smudgeYear: w.smudge ? w.smudge.y : 0,
+    rusts: w.rust ? w.rust.n : 0, rustOn: !!(w.rust && w.rust.cur), rusted: w.fields.filter((f) => f.ru != null && growing(f)).length,
+    rustEver: w.rust ? w.rust.k : 0, rustYear: w.rust ? w.rust.y : 0, rustGrain: w.rust ? w.rust.g : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
