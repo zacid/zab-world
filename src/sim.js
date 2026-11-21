@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 26;
+export const SIM_VERSION = 27;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -54,6 +54,7 @@ export const TECHS = {
   tales:    { name: 'Winter tales', added: '2026-11-18T01:02Z', desc: 'On the longest night of the year the whole island sits close round the hearth, children in front, and the eldest tells a tale from the island\'s own past: the landing, the dead in the burying ground and what they did, how the named got their names, what the fog can do. A new tale each winter. Once the fog has been told of, the children keep close to the houses when it comes in.', req: ['fire', 'burial'] },
   dogs:     { name: 'Dogs', added: '2026-11-18T00:21Z', desc: 'A wolf cub raised by the hearth that never went back to the woods. Each grown dog keeps at the heels of one islander and sleeps across their doorway. It flies at a wolf that springs on its owner, barks the village awake when the pen is raided, keeps the goats from straying, follows a scent through the fog and snaps up rats. A litter most springs, as many as the scraps can feed.', req: ['hunting'] },
   pottery:  { name: 'Pottery', added: '2026-11-21T00:12Z', desc: 'Clay dug from the bank above the beach, coiled into big-bellied jars and fired in a domed kiln of turf and clay. One potter digs, shapes a jar a day in dry weather and fires them in batches; some crack in the fire. Grain sealed in a jar under a lid of clay is out of reach of the rats. Jars break with use and must be made again.', req: ['granary', 'fire'] },
+  watch:    { name: 'Beach watch', added: '2026-11-21T02:39Z', desc: 'Robbed twice by the far isle, the village keeps watch. On autumn and early-winter nights one islander in turn sits up by a driftwood fire on the beach below the granary and watches the sea. A dugout seen coming in is shouted at with a burning branch and turns back before it lands. The fire keeps the wolves off; the watcher sleeps late the next morning.', req: ['fire', 'farisle'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -224,6 +225,14 @@ const RAID_NEAR = 100;       // a house this close (squared) to the granary is c
 const RAID_WAKE = 0.15;      // chance per hour they are at the granary door that someone close by wakes (x3 with a dog by the granary)
 const RAID_HURT = 0.25;      // chance the first one out is struck down in the scuffle
 const RAID_CHASE = 3;        // islanders who run after them with brands
+const WATCH_RAIDS = 2;       // raids it takes before the village sets a watch on the beach
+const WATCH_FROM = 19;       // hour the watcher goes down to the beach fire
+const WATCH_TO = 6;          // and comes home at first light
+const WATCH_REST = 11;       // sleeping until this hour the morning after
+const WATCH_WOOD = 1;        // timber burnt on the beach each night
+const WATCH_SEE = 0.8;       // chance the watcher sees a dugout come in on a clear night
+const WATCH_DIM = { fog: 0.25, rain: 0.5, cold: 0.9 }; // and in worse weather
+const WATCH_AT = 4;          // (squared) the watcher must be this close to the fire to see anything
 export const PEN_W = 2;      // tiles inside the goat pen's wattle
 export const PEN_H = 2;
 const GOAT_COME = 0.05;      // daily chance in spring and summer (year 2 on) that the drifting raft finds the beach
@@ -389,7 +398,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null,
   };
   // name the island
   let nm = '';
@@ -530,6 +539,7 @@ export function step(w, fx) {
   for (const p of w.people) { p.px = p.x; p.py = p.y; }
   if (c.hour === 0) daily(w, c, fx);
   hornHour(w, c);
+  if (w.watch) watchHour(w, c);
   if (c.hour === 19) supper(w);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
@@ -608,6 +618,7 @@ function daily(w, c, fx) {
   taleDay(w, c);
   const wx = w.wx.k;
   if (w.raid) raidNight(w, c, wx);
+  if (w.raid && !w.watch && w.raid.n >= WATCH_RAIDS && raidSeason(c)) learnWatch(w);
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
@@ -1009,6 +1020,7 @@ function lone(w, b) {
     const dd = d2(p.x, p.y, b.x, b.y);
     if (dd >= bd || (ageY(w, p) < 14 && !isLost(w, p)) || !wild(w, p)) continue;
     if (heard(w, p) && !isLost(w, p)) continue; // they can call back to the horn: not alone
+    if (w.watch && w.watch.hid === p.id) continue; // no wolf comes near the beach fire
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
     bd = dd; best = p;
   }
@@ -1555,7 +1567,7 @@ function raidTarget(w) {
 function raidNight(w, c, wx) {
   const R = w.raid;
   if (R.lean !== c.year || R.cur || R.on != null || R.y === c.year) return;
-  if (c.season < 2 || c.doy >= DAYS_PER_SEASON * 3 + 45 || wx === 'storm' || wx === 'snow') return;
+  if (!raidSeason(c) || wx === 'storm' || wx === 'snow') return;
   if (w.food < RAID_RICH || (w.isle && w.isle.boat) || !raidTarget(w)) return;
   if (rnd(w) < RAID_NIGHT * (wx === 'fog' ? RAID_FOG : 1)) { R.on = c.day; R.y = c.year; }
 }
@@ -1576,6 +1588,7 @@ function raidHour(w, c) {
   for (const r of C.rs) { r.px = r.x; r.py = r.y; }
   for (const o of C.ch) { o.px = o.x; o.py = o.y; }
   if (C.st === 'in') {
+    if (watchSees(w, C)) return;
     if (moveToward(C, C.lx + 0.5, C.ly + 0.5, RAID_ROW)) {
       C.st = 'ashore';
       C.rs.forEach((r, k) => { // up the beach in a file, to crouch along the granary's front
@@ -1667,6 +1680,68 @@ function raidTold(w, C) {
   }
   if (R.n === 1) milestone(w, `${text} The far isle has had a thin year, and its people have not forgotten the granaries they saw at midsummer. Next summer nobody on ${w.name} will look for their boat.`);
   else log(w, text, 'bad');
+}
+
+// ---------- the beach watch ----------
+// Robbed twice, the village stops trusting to luck. On autumn and early-winter nights, the season the raiders
+// come in, one islander in turn sits up by a driftwood fire on the beach below the granary nearest the sea.
+// A dugout seen creeping in is shouted at and turns back before it lands; nothing is taken and no feud follows.
+// w.watch: hid tonight's watcher, last the one sleeping it off, x/y the beach, n nights kept, s boats turned back,
+// k turn (whose night it is next).
+const raidSeason = (c) => c.season >= 2 && c.doy < DAYS_PER_SEASON * 3 + 45;
+export const watchOn = (w) => !!(w.watch && w.watch.hid != null);
+function watchable(w, p) {
+  if (p.dead || p.sick || p.hurt || isLost(w, p) || p.home == null) return false;
+  const a = ageY(w, p);
+  if (a < 16 || a >= 56) return false;
+  if ((w.goats && w.goats.hid === p.id) || (w.heal && w.heal.id === p.id) || (w.horn && w.horn.hid === p.id)) return false;
+  return !(p.haul || (p.task && (p.task.k === 'hunt' || p.task.k === 'haul')));
+}
+function learnWatch(w) {
+  const g = raidTarget(w), L = g && landAt(w, g.x, g.y, RAID_OUT);
+  const who = elder(w);
+  if (!L || !who) return;
+  w.techs.push('watch');
+  w.watch = { hid: null, last: null, x: L.bx, y: L.by, n: 0, s: 0, k: 0 };
+  milestone(w, `${w.raid.n === 2 ? 'Twice' : 'Again and again'} now raiders from the far isle have come for the granary in the night. ${who.name} walks down to the beach where their dugout ran ashore, ` +
+    `piles up driftwood above the tide line and says that from now on, from the harvest to midwinter, somebody will sit up there by a fire and watch the sea. ${w.name} keeps a beach watch.`);
+}
+function watchHour(w, c) {
+  const W = w.watch, h = c.hour;
+  if (h === WATCH_TO && W.hid != null) { W.last = W.hid; W.hid = null; }
+  if (h === WATCH_REST) W.last = null;
+  if (W.hid != null) {
+    const p = aliveId(w, W.hid);
+    if (!p || p.sick || p.hurt || isLost(w, p)) { if (p && p.task && p.task.k === 'watch') release(w, p); W.hid = null; }
+  }
+  if (h !== WATCH_FROM || !raidSeason(c)) return;
+  const wx = w.wx && w.wx.k;
+  if (wx === 'storm' || wx === 'snow' || w.timber < WATCH_WOOD || (w.tale && w.tale.on === c.day)) return;
+  const g = raidTarget(w), L = g && landAt(w, g.x, g.y, RAID_OUT);
+  if (!L) return;
+  const can = w.people.filter((p) => p.id !== W.last && watchable(w, p));
+  if (!can.length) return;
+  can.sort((a, b) => a.id - b.id);
+  const p = can[W.k % can.length];
+  W.k = (W.k + 1) % 9973;
+  W.x = L.bx; W.y = L.by; W.hid = p.id; W.n++;
+  w.timber = Math.round((w.timber - WATCH_WOOD) * 100) / 100;
+}
+// the dugout creeps in toward the beach: does the one at the fire see it?
+function watchSees(w, C) {
+  const W = w.watch;
+  if (!W || W.hid == null || C.bx !== W.x || C.by !== W.y) return false;
+  const p = aliveId(w, W.hid);
+  if (!p || d2(p.x, p.y, W.x + 0.5, W.y + 0.5) >= WATCH_AT) return false;
+  if (rnd(w) >= WATCH_SEE * (WATCH_DIM[w.wx && w.wx.k] || 1)) return false;
+  C.st = 'out'; C.ch = []; C.seen = p.id;
+  W.s++;
+  const fog = w.wx && w.wx.k === 'fog';
+  const text = `${fog ? 'Through the fog' : 'Out of the dark'} ${p.name}, sitting up by the beach fire, sees a dugout creeping in, low in the water and full of hooded shapes. ` +
+    `${p.name} snatches a burning branch from the fire, runs down to the water's edge and shouts. The paddles stop; the boat swings round and slides back into the night. Not a grain is lost.`;
+  if (W.s === 1) milestone(w, `${text} The far isle knows now that ${w.name} is watching.`);
+  else log(w, text, 'good');
+  return true;
 }
 
 // ---------- fences ----------
@@ -2310,7 +2385,7 @@ function penWaker(w) {
 function waker(w, mx, my, near, skip) {
   let best = null, bd = near;
   for (const p of w.people) {
-    if (p.dead || p.sick || p.hurt || p.home == null || isLost(w, p) || (skip && skip.includes(p.id))) continue;
+    if (p.dead || p.sick || p.hurt || p.home == null || isLost(w, p) || (skip && skip.includes(p.id)) || (w.watch && w.watch.hid === p.id)) continue;
     const a = ageY(w, p);
     if (a < 14 || a >= 65) continue;
     const h = w.buildings.find((b) => b.id === p.home);
@@ -3233,9 +3308,15 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
+  if (w.watch && w.watch.hid === p.id && !taleNow(w, c)) { // sitting up by the fire on the beach
+    p.asleep = false;
+    if (!p.task || p.task.k !== 'watch') { release(w, p); p.task = { k: 'watch', x: w.watch.x, y: w.watch.y, h: 99 }; }
+    walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
+    return;
+  }
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
-  const night = h >= 21 || h < (afraid ? 7 : 6);
+  const night = h >= 21 || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST); // the night's watcher sleeps late
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
   if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
@@ -3283,7 +3364,7 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -3591,6 +3672,10 @@ const MIGRATIONS = {
   25: (w) => {
     if (w.pot === undefined) w.pot = null;
   },
+  // v26 -> v27: the beach watch. Not set yet; once twice raided, it is learned when the raiding season opens.
+  26: (w) => {
+    if (w.watch === undefined) w.watch = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -3634,6 +3719,7 @@ export function summary(w) {
     dogs: w.dogs ? w.dogs.d.length : 0, dogsCame: !!w.dogs, dogsTurned: w.dogs ? w.dogs.k : 0, dogsFound: w.dogs ? w.dogs.f : 0, dogsRats: w.dogs ? w.dogs.r : 0,
     tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
     raids: w.raid ? w.raid.n : 0, raidGrain: w.raid ? w.raid.g : 0, raidsDriven: w.raid ? w.raid.d : 0, raidLean: !!(w.raid && w.raid.lean === c.year),
+    watch: !!w.watch, watcher: (watchOn(w) && (aliveId(w, w.watch.hid) || {}).name) || null, watchNights: w.watch ? w.watch.n : 0, watchTurned: w.watch ? w.watch.s : 0,
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,

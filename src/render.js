@@ -99,6 +99,7 @@ function doing(p) {
   }
   if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
+  if (p.task && p.task.k === 'watch') return p.x === p.px && p.y === p.py ? 'keeping watch on the beach by a driftwood fire' : 'going down to keep the beach watch';
   if (p.task && p.task.k === 'herd') return 'minding the goats';
   if (p.task && p.task.k === 'clay') return 'digging clay at the bank';
   if (p.task && p.task.k === 'shape') return 'coiling a jar by the kiln';
@@ -581,6 +582,14 @@ function frame() {
       kiln = { x: KX + 4, y: KY + 5, firing };
     }
   }
+  // the beach watch: a small driftwood fire above the tide line, banked low
+  const wat = S.watchOn(w) ? { x: w.watch.x * TILE + 6, y: w.watch.y * TILE + 3 } : null;
+  if (wat) {
+    const f2 = Math.floor(now / 170 + 1) % 3;
+    px(sc, wat.x - 1, wat.y + 3, '#8a7a62', 4, 1); // bleached driftwood
+    px(sc, wat.x, wat.y + 1, '#e0521f', 2, 2); px(sc, wat.x + (f2 === 1 ? 1 : 0), wat.y - (f2 === 2 ? 1 : 0), '#ffc23d', 1, 2);
+    if (f2 === 0) px(sc, wat.x + 1, wat.y - 1, '#ffe48a');
+  }
   // people
   const shown = [];
   let horner = null;
@@ -709,6 +718,7 @@ function frame() {
     glow(sc, fx0 + 4, fy0 + 4, (fest ? 44 : tale ? 32 : 22) + Math.sin(now / 200) * (fest ? 3 : 1.5), `rgba(255,140,50,${(dark * (fest ? 0.75 : tale ? 0.65 : 0.55)).toFixed(3)})`);
     if (fest) glow(sc, fx0 + 4, fy0, 14, `rgba(255,220,120,${(dark * 0.6).toFixed(3)})`);
     if (kiln) glow(sc, kiln.x, kiln.y, kiln.firing ? 10 + Math.sin(now / 170) : 5, `rgba(255,120,40,${(dark * (kiln.firing ? 0.6 : 0.3)).toFixed(3)})`);
+    if (wat) glow(sc, wat.x + 1, wat.y + 2, 13 + Math.sin(now / 230) * 1.2, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
       const ex = o.X + (o.face > 0 ? 5 : 0), ey = o.Y + 1;
@@ -1148,6 +1158,7 @@ function updatePanels() {
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off</span>`]] : []),
+    ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),

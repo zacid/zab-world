@@ -268,3 +268,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Beakers and decorated ware: each potter's mark on the sherds; graves get a pot (a visible offering in the burying ground).
   - A named potter (deed 'the Potter' after 200 jars) and an apprentice child who learns the coils.
   - Salt fish in sealed jars: preserved catch for winter once food is tight.
+- The beach watch is done (SIM_VERSION 27; tech 'watch', w.watch {hid, last, x, y beach tile, n nights, s turned back, k rotation}; WATCH_* in sim.js;
+  learnWatch/watchHour/watchSees/watchable; watchOn() exported; task kind 'watch'). About 110 watch nights a year for roughly one raid a decade,
+  so it costs far more mornings than the grain it saves; fog raids (3x likelier) still get through most of the time. Answers it invites:
+  - The watch grows lax: after 5+ quiet years the village could stop keeping it (or keep it only in fog), and the next raid hits hard.
+  - A watcher who sees the boat could blow the fog horn or light a beacon so the whole village runs down (a fight on the beach).
+  - Peace instead of watching: grain sent back with the midsummer boat in a lean year, or a wedding that ends raids for a generation.
+  - Raiders who are turned back might try a second beach, out of sight of the fire (raidTarget picks the next-nearest granary).
+  - The watcher is safe from wolves by the fire; if the driftwood runs out on a hungry winter fog night, that could change.
