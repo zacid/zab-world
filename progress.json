@@ -213,5 +213,10 @@
   "at": "2026-11-21T13:46:48.319Z",
   "title": "Add grain rust that spreads between fields in wet summers",
   "body": "- SIM_VERSION 40 (w.rust {n, k, g, y, yr, last, cur}; f.ru spotted tick, f.rl share lost; RUST_* in sim.js; tech 'rust'; yearly `rusted`): from Y3, after 3+ days of rain or fog between mid-spring and the end of summer, rust can come up on one growing field (at most once a year)\n- Wet and windy days spread it to the fields beside it (4 sides) and each wet day takes up to 3% of a rusted field's yield, at most 60%. Heat stops it; harvest or the autumn frost ends it. Packed blocks of fields lose the most\n- Visible: orange flecks on rusted grain that thicken as it spreads, hover text, a Rust row in the panel, a History line\n- Test seeds: ~35 outbreaks a century, most 1-20 fields, a big one (40-125 fields, 4-9k grain) every decade or so late game. Nothing stops it yet\n- Watch: Hais can see its first rust in the wet springs of Y8-9; expect a few hundred grain lost, more as the fields grow together"
+ },
+ {
+  "at": "2026-11-21T15:20:25.148Z",
+  "title": "Add rogueing: pull rusted plants before rust spreads",
+  "body": "- SIM_VERSION 41 (w.rogue {n, y, k, nm, at, told}; f.rg; ROGUE_* in sim.js; tech 'rogue'; task kind 'rogue', key r<fieldId>; yearly `rogued`): learned when a rust outbreak has reached 6+ fields. The healer teaches it (sick grain is kept apart like the fevered), or the eldest if there is no healer\n- 2 days after a field is spotted, idle adults walk its rows and pull the spotted plants (3 hours, 8% of the field's yield). A pulled field loses no more to rust and does not pass it on. When every spotted field still standing is pulled, the outbreak ends\n- Visible: gaps in the rows and a heap of pulled grain at the edge of the field, smoking for a day; hover text, a Rogueing row in the panel, a History line\n- Test seeds learn it in Y3-7; after that most outbreaks stop at 1-14 fields. Seed 4242 lost 2.3k grain to rust in 100 years\n- Watch: Hais should learn it after a 10-field outbreak around Y15, with Seran teaching it, then stop most outbreaks within a few fields"
  }
 ]

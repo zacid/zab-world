@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 40;
+export const SIM_VERSION = 41;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -66,6 +66,7 @@ export const TECHS = {
   frost:    { name: 'Late frost', added: '2026-11-21T10:44Z', desc: 'Some springs the cold comes back after the sowing. On a still, clear night the frost settles on the fields, and by morning the young green shoots have gone black and limp. Grain killed while it is still short has to be dug over and sown again; grain already knee-high only has its leaf tips burnt. Nobody on the island yet knows how to read a frost coming.', req: ['farming'] },
   moon:     { name: 'Moon lore', added: '2026-11-21T12:31Z', desc: 'The moon fills and empties every thirty days, twelve times a year. Sitting up night after night by the beach fire, the watchers learn what the far isle already knew: a dugout only comes in when the moon is dark, or under a fog. A notch is cut in the doorpost of the granary for each night, and on bright nights the beach fire is left unlit and the watcher sleeps in a bed. Fog still keeps somebody down by the water.', req: ['watch'] },
   rust:     { name: 'Grain rust', added: '2026-11-21T13:07Z', desc: 'In a warm, wet summer orange flecks come up on the leaves of the grain, like rust on a blade. Wet days and wind carry it from a spotted field to the fields beside it, and wherever it sits the ears fill thin and light. Hot dry weather stops it; the harvest or the autumn frost ends it for the year. Fields packed side by side lose the most. Nobody on the island yet knows how to stop it spreading.', req: ['farming'] },
+  rogue:    { name: 'Rogueing', added: '2026-11-21T14:42Z', desc: 'After a bad rust year the islanders treat sick grain the way the healer treats a fever: keep it apart from the well. A day or two after orange flecks are seen in a field, idle hands walk its rows, pull every spotted plant up by the roots and carry the armfuls off to burn. The field gives a little less, but the rust goes no further from it. Once every spotted field is pulled clean, the outbreak is over. The faster the rows are walked, the fewer fields it reaches.', req: ['rust'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -434,7 +435,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -630,14 +631,14 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; delete f.ru; delete f.rl; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; delete f.ru; delete f.rl; delete f.rg; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.rats) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
@@ -650,6 +651,7 @@ function daily(w, c, fx) {
     if (w.smudge) w.smudge.y = 0;
     w.stats.yfr = 0;
     if (w.rust) { w.rust.y = 0; w.rust.cur = null; }
+    if (w.rogue) w.rogue.y = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -933,9 +935,10 @@ function rustDay(w, c, wx) {
   const at = new Map();
   for (const f of w.fields) at.set(f.y * MAP + f.x, f);
   const fresh = [], sp = RUST_SPREAD[wx] || 0, eat = RUST_EAT[wx] || 0;
-  let left = 0;
+  let left = 0, pulled = 0;
   for (const f of w.fields) {
     if (f.ru == null || !growing(f)) continue;
+    if (f.rg != null) { pulled++; continue; } // a field pulled clean neither loses more nor passes it on
     left++;
     if (eat && (f.rl || 0) < RUST_MAX) {
       const e = Math.min(eat, RUST_MAX - (f.rl || 0));
@@ -949,7 +952,7 @@ function rustDay(w, c, wx) {
     }
   }
   for (const f of fresh) { f.ru = w.t; C.n++; R.k++; R.y++; }
-  if (!left) rustEnds(w);
+  if (!left && !fresh.length) rustEnds(w, pulled > 0);
 }
 function rustBegins(w, c, f) {
   const first = !w.rust;
@@ -968,17 +971,65 @@ function rustCut(w, f, y) {
   if (f.ru == null) return;
   const lost = f.rl ? Math.round((y / Math.max(0.2, 1 - (f.lost || 0))) * f.rl) : 0;
   if (w.rust) { w.rust.g += lost; if (w.rust.cur) w.rust.cur.g += lost; }
-  delete f.ru; delete f.rl;
+  delete f.ru; delete f.rl; delete f.rg;
 }
-function rustEnds(w) {
+function rustEnds(w, stopped) {
   const R = w.rust, C = R.cur;
   R.cur = null;
+  if (!w.rogue && C.n >= ROGUE_LEARN) { rustSummary(w, R, C); learnRogue(w); return; }
+  if (stopped && w.rogue) { // every spotted field still standing has been pulled clean
+    w.rogue.k++;
+    const text = `The last spotted field is pulled clean and the armfuls burnt. The rust reached ${plural(C.n, 'field', 'fields')} this year and went no further.`;
+    if (!w.rogue.told && C.n >= 3) { w.rogue.told = 1; milestone(w, text + ` ${w.rogue.nm ? w.rogue.nm + ' was right' : 'The rogueing works'}: a little grain given up early saved the rest.`); }
+    else log(w, text, 'good');
+    return;
+  }
+  rustSummary(w, R, C);
+}
+function rustSummary(w, R, C) {
   if (C.n <= 1 && C.g < 50) { log(w, 'The rust stayed in a single field this year and went no further.', 'info'); return; }
   const text = `The rust has run its course. It spread to ${plural(C.n, 'field', 'fields')} over ${plural(C.d, 'day', 'days')}` +
     (C.g ? `, and about ${C.g} grain that should have been harvested came in as thin, light ears or not at all.` : '.');
   if (C.n >= Math.max(10, w.fields.length >> 2) && R.n <= 1) milestone(w, text + ` The fields at the heart of the village, packed side by side, were the worst.`);
   else if (C.n >= Math.max(10, w.fields.length >> 2)) milestone(w, text);
   else log(w, text, 'bad');
+}
+
+// ---------- rogueing ----------
+// After a rust year that reached ROGUE_LEARN fields, the healer (or the eldest) says sick grain must be kept apart
+// from the well, as the fevered are. From then on, once a rusted field has been noticed (ROGUE_SEEN days after it
+// was spotted), an idle adult walks its rows and pulls the spotted plants (ROGUE_WORK hours, ROGUE_COST of its
+// yield). A pulled field loses no more to rust and passes it to nobody; when every spotted field still standing
+// is pulled, the outbreak is over. f.rg tick pulled (cleared with f.ru).
+// w.rogue { n fields pulled ever, y this year, k outbreaks stopped, nm who taught it, at, told first big one stopped }.
+const ROGUE_LEARN = 6;      // fields one outbreak must reach before anyone thinks of it
+export const ROGUE_SEEN = 2 * TICKS_PER_DAY; // the flecks are noticed this long after the field was spotted
+const ROGUE_WORK = 3;       // hours to walk a field and carry the pulled plants off
+const ROGUE_COST = 0.08;    // share of the field's yield pulled up with the sick plants
+function learnRogue(w) {
+  const healer = w.heal && aliveId(w, w.heal.id), who = healer || elder(w);
+  w.rogue = { n: 0, y: 0, k: 0, nm: who ? who.name : null, at: w.t };
+  if (!w.techs.includes('rogue')) w.techs.push('rogue');
+  milestone(w, healer
+    ? `${healer.name} walks through the thin, rust-red stubble and says it is the fever over again: one field takes it, and it goes to the fields beside it the way a fever goes through a crowded house. The sick are kept apart from the well, and so must the grain be. ` +
+      `Next time the flecks show, the spotted plants will be pulled up by the roots before the rust can travel, and the armfuls carried off and burnt. ${w.name} learns to rogue the fields.`
+    : `${who ? who.name : 'The eldest'} walks through the thin, rust-red stubble and says the rust must not be left to travel. Next time the flecks show, the spotted plants will be pulled up by the roots and carried off to burn. ${w.name} learns to rogue the fields.`);
+}
+function rogueTask(w, p) {
+  if (!w.rogue || !w.rust || !w.rust.cur) return null;
+  const f = nearest(w.fields, p, (o) => o.ru != null && o.rg == null && growing(o) && w.t - o.ru >= ROGUE_SEEN && w.res['r' + o.id] == null);
+  return f && { k: 'rogue', key: 'r' + f.id, x: f.x, y: f.y, h: ROGUE_WORK };
+}
+function rogueDone(w, p, t, pop) {
+  const f = w.fields.find((o) => 'r' + o.id === t.key);
+  if (!f || f.ru == null || f.rg != null || !growing(f) || !w.rogue) return;
+  f.rg = w.t;
+  f.lost = Math.min(0.8, Math.round(((f.lost || 0) + ROGUE_COST) * 1000) / 1000);
+  w.rogue.n++; w.rogue.y++;
+  if (w.rust.cur) w.rust.cur.r = (w.rust.cur.r || 0) + 1;
+  pop('pulled', 'muted');
+  if (w.rogue.n === 1) milestone(w, `${p.name} wades into the rusted field with a basket and works down the rows, pulling every flecked plant up by the roots, until the orange dust coats both arms to the elbow. ` +
+    `When it is done the field looks gap-toothed, and the heap of sick grain at its edge is smoking. The first field is rogued on ${w.name}.`);
 }
 
 // ---------- smudge fires ----------
@@ -3452,6 +3503,9 @@ function pickTask(w, p, c) {
     f = nearestFree(w, L.fallow, p, 'fallow', 'f');
     if (f) return { k: 'plant', key: 'f' + f.id, x: f.x, y: f.y, h: 3 };
   }
+  // rust in the grain: pull the spotted plants before it travels
+  const rk = rogueTask(w, p);
+  if (rk) return rk;
   // a whale on the beach: knives out before it turns
   const wk = whaleTask(w, p);
   if (wk) return wk;
@@ -3971,7 +4025,7 @@ function finish(w, p, t, c, fx) {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (f && f.stage === 'fallow') {
       const fr = f.fr != null;
-      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; delete f.ru; delete f.rl; pop(fr ? 'sown again' : 'sown', 'muted');
+      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; delete f.ru; delete f.rl; delete f.rg; pop(fr ? 'sown again' : 'sown', 'muted');
       if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
     }
   } else if (t.k === 'build') {
@@ -4022,6 +4076,8 @@ function finish(w, p, t, c, fx) {
     w.fauna.fences = (w.fauna.fences || 0) + 1;
     pop('fenced', 'wood');
     if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
+  } else if (t.k === 'rogue') {
+    rogueDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
     const f = w.fields.find((o) => 'q' + o.id === t.key);
     if (!f || f.hg != null || !w.hedge) return;
@@ -4799,6 +4855,10 @@ const MIGRATIONS = {
   39: (w) => {
     if (w.rust === undefined) w.rust = null;
   },
+  // v40 -> v41: rogueing. Learned after a rust outbreak reaches 6 fields; pulled fields carry f.rg.
+  40: (w) => {
+    if (w.rogue === undefined) w.rogue = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4864,8 +4924,11 @@ export function summary(w) {
     cockles: w.wade ? w.wade.g : 0, cocklesYear: w.wade ? w.wade.y : 0, cockleBed: w.wade ? w.wade.c : 0, wadeScares: w.wade ? w.wade.s : 0,
     smudge: !!w.smudge, smudgeFires: w.smudge ? w.smudge.on.length : 0, smudgeNights: w.smudge ? w.smudge.n : 0,
     smudgeSaved: w.smudge ? w.smudge.s : 0, smudgeYear: w.smudge ? w.smudge.y : 0,
-    rusts: w.rust ? w.rust.n : 0, rustOn: !!(w.rust && w.rust.cur), rusted: w.fields.filter((f) => f.ru != null && growing(f)).length,
+    rusts: w.rust ? w.rust.n : 0, rustOn: !!(w.rust && w.rust.cur), rusted: w.fields.filter((f) => f.ru != null && f.rg == null && growing(f)).length,
     rustEver: w.rust ? w.rust.k : 0, rustYear: w.rust ? w.rust.y : 0, rustGrain: w.rust ? w.rust.g : 0,
+    rogue: !!w.rogue, rogueEver: w.rogue ? w.rogue.n : 0, rogueStopped: w.rogue ? w.rogue.k : 0,
+    rogued: w.fields.filter((f) => f.rg != null && growing(f)).length,
+    rogueing: w.rogue && w.rust && w.rust.cur ? w.people.filter((p) => p.task && p.task.k === 'rogue').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

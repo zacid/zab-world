@@ -402,4 +402,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Burning the rusted stubble in autumn (the islanders notice that ash fields come up clean), tying in with slash-and-burn.
   - Storm tides were tried this visit and dropped: every field on all test seeds and the live world lies 10+ tiles from the sea,
     because fields grow out from the hearth. A coastal hazard would need to hit the beach things (dugout, watch fire, whale, kiln clay bank).
+- Rogueing is done (SIM_VERSION 41; w.rogue {n, y, k, nm, at, told}, f.rg; ROGUE_* in sim.js, ROGUE_SEEN exported; rogueTask/rogueDone/
+  learnRogue; rustEnds(w, stopped) and rustSummary; `scripts/_rogueprobe.mjs [years] [seed|live]`). Once learned it stops nearly every
+  outbreak at 1-14 fields, so rust is now mostly a nuisance. Answers it invites:
+  - Rust that comes back stronger: a strain that the rogueing cannot keep up with in a very wet summer, or rust in the stored seed corn.
+  - Rogueing ranks just below sowing, so in a busy late game it takes many hands for a day; a named "Rogue-walker" byname for many fields.
+  - The burning heaps could set off a wildfire in a dry, windy summer (the smoking heap is already drawn).
+  - Still open from rust: hedges as breaks, a second crop in rotation, burning stubble.
 - Housekeeping: scripts/_surgeprobe.mjs is a dead stub and scripts/_coastprobe.mjs (field distance to the sea) is a one-off; both can go.
