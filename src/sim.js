@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 30;
+export const SIM_VERSION = 31;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -57,6 +57,7 @@ export const TECHS = {
   watch:    { name: 'Beach watch', added: '2026-11-21T02:39Z', desc: 'Robbed twice by the far isle, the village keeps watch. On autumn and early-winter nights one islander in turn sits up by a driftwood fire on the beach below the granary and watches the sea. A dugout seen coming in is shouted at with a burning branch and turns back before it lands. The fire keeps the wolves off; the watcher sleeps late the next morning.', req: ['fire', 'farisle'] },
   snowmen:  { name: 'Snowmen', added: '2026-11-21T04:41Z', desc: 'When the snow lies deep the children are sent out of the smoke and onto the green by the hearth. They roll it into balls, stack three, and give each figure pebble eyes, a stick nose and a name: often the name of someone the island tells of. Up to three stand at once, the rest of the snow goes in fights. They keep all winter and slump into the mud in the first warm days of spring.', req: ['fire'] },
   gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
+  canoe:    { name: 'Dugout', added: '2026-11-21T06:13Z', desc: 'A tall oak felled above the beach, its back burnt out with small fires and scraped hollow with shell adzes, a little each dry day. Pushed into the sea it carries one islander past the surf to the deep water, where the shore fishers cannot reach and the big fish are. Out on calm days from spring to autumn, home by mid-afternoon. A storm can drag it off the sand and smash it, and in time the sun splits it, and a new oak must be felled.', req: ['fishing', 'farisle', 'woodcut'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -405,7 +406,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null,
   };
   // name the island
   let nm = '';
@@ -600,7 +601,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -670,6 +671,7 @@ function daily(w, c, fx) {
 
   if (w.rats !== undefined) rats(w, c);
   if (w.pot !== undefined) potDay(w, c);
+  if (w.canoe !== undefined) canoeDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
@@ -1032,6 +1034,7 @@ function lone(w, b) {
     if (dd >= bd || (ageY(w, p) < 14 && !isLost(w, p)) || !wild(w, p)) continue;
     if (heard(w, p) && !isLost(w, p)) continue; // they can call back to the horn: not alone
     if (w.watch && w.watch.hid === p.id) continue; // no wolf comes near the beach fire
+    if (p.task && p.task.sea) continue; // out on the water in the dugout
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
     bd = dd; best = p;
   }
@@ -2641,6 +2644,7 @@ function dogHour(w, c) {
     const o = aliveId(w, d.own), k = (d.id % 5) * 0.25 - 0.5;
     let tx, ty;
     if (!o) { tx = w.fire.x + 0.5 + k; ty = w.fire.y + 1.6; d.lie = 1; }
+    else if (o.task && o.task.sea && w.canoe) { tx = w.canoe.bx + 0.5 + k * 0.6; ty = w.canoe.by + 0.4; d.lie = 1; } // waits on the sand for the dugout to come in
     else if (o.asleep) {
       if (C.hb !== w.buildings.length) { C.hb = w.buildings.length; C.byId = new Map(); for (const b of w.buildings) C.byId.set(b.id, b); }
       const h = (o.home != null && C.byId.get(o.home)) || { x: w.fire.x, y: w.fire.y };
@@ -3087,6 +3091,9 @@ function needFields(w) {
 }
 
 function release(w, p) {
+  if (p.task && p.task.sea && w.canoe) { // called in off the water: back on the beach at once
+    p.x = w.canoe.bx + 0.5; p.y = w.canoe.by + 0.5; w.canoe.at = null;
+  }
   if (p.task && p.task.key) {
     delete w.res[p.task.key];
     if (p.task.h > 0 && p.task.k === 'clear') w.prog[p.task.key] = p.task.h;
@@ -3186,6 +3193,9 @@ function pickTask(w, p, c) {
     const bt = nearestTimber(w, p);
     if (bt) return { k: 'chop', key: 't' + bt.i, x: bt.x, y: bt.y, h: 3 };
   }
+  // the dugout: hollowing a new one, or out to the deep water, once the woodpile is seen to
+  const uk = canoeTask(w, p, c);
+  if (uk) return uk;
   // new fields
   if (c.season <= 1 && needFields(w)) {
     const s = findFieldSite(w);
@@ -3291,6 +3301,131 @@ function fish(w, p) {
   return { k: 'fish', key: 's' + best.i, x: best.x, y: best.y, h: 4 };
 }
 
+// ---------- the dugout ----------
+// After watching the far isle's dugout come in a few summers, the island's best fisher fells an oak above
+// the landing beach and burns and scrapes it hollow, one spell of work a dry day. Once afloat, one islander
+// at a time paddles it out past the surf on calm mornings from spring to autumn, fishes the deep water and
+// is back on the sand by mid-afternoon. The deep water is a stock of its own, apart from the shallows.
+// A storm can drag the boat off the beach and smash it, and the sun splits it in time; then, once there is
+// timber to spare, another oak is felled.
+// w.canoe { hid maker id, nm maker name, bx, by beach, lx, ly water off it, wk hours of hollowing done (-1: no boat
+//   being made), dd last day dug, ok afloat, n boats made, lost boats lost, d fish in the deep, t trips, f fish ever,
+//   y fish this year, at id of whoever is out in it, sp tick the last boat was finished }
+const CANOE_SEEN = 2;        // far-isle visits before anyone thinks to copy their boat
+const CANOE_SPARK = 0.04;    // daily chance in spring and summer, once seen and timber to spare
+const CANOE_WOOD = 24;       // timber: the oak itself
+const CANOE_WORK = 40;       // hours of burning and scraping, at most one 4-hour spell a day
+const CANOE_OUT = 7;         // tiles out past the surf to the fishing grounds, at most
+const CANOE_HOURS = 7;       // hours from pushing off to landing again
+const CANOE_BACK = 3;        // turn for home with this many hours left
+const CANOE_ROW = 3;         // tiles per hour at the paddle
+const DEEP_CAP = 220;        // fish in the deep water off the landing
+const DEEP_REGEN = 4;        // per day, spring to autumn (1 in winter)
+const CANOE_STORM = 0.008;   // chance per storm day that the boat is dragged off the sand and smashed
+const CANOE_SPLIT = 0.05;    // chance each new year that the old wood has split past mending
+function canoeMaker(w) { // the best fisher who has the years and the time for it
+  let best = null, bs = -1;
+  const busy = [w.heal && w.heal.id, w.goats && w.goats.hid, w.horn && w.horn.hid, w.pot && w.pot.id];
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || a < 16 || a > 50 || p.sick || p.hurt || busy.includes(p.id)) continue;
+    const sc = (p.dd && p.dd.f) || 0;
+    if (sc > bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+function learnCanoe(w, c) {
+  if (c.season > 1 || !w.isle || w.isle.n < CANOE_SEEN || !w.techs.includes('farisle') || w.timber < CANOE_WOOD + HOUSE_COST || rnd(w) >= CANOE_SPARK) return;
+  const L = landAt(w, w.fire.x, w.fire.y, 0), who = canoeMaker(w);
+  if (!L || !who) return;
+  w.timber = Math.round((w.timber - CANOE_WOOD) * 100) / 100;
+  w.canoe = { hid: who.id, nm: who.name, bx: L.bx, by: L.by, lx: L.lx, ly: L.ly, wk: 0, dd: -1, ok: 0, n: 0, lost: 0, d: DEEP_CAP, t: 0, f: 0, y: 0, at: null, sp: -1 };
+  w.techs.push('canoe');
+  const P = pron(who), Pc = P[0].toUpperCase() + P.slice(1);
+  const n = w.isle.n, nw = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'][n] || n;
+  milestone(w, `${who.name} has stood on the beach ${nw} summers now and watched the far isle's dugout come in over the swell. This spring ${P} fells a tall straight oak above the landing, lights small fires along its back and scrapes out the charcoal with a shell, a little every dry day. ${Pc} means to fish where the big ones are, out past the surf. ${w.name} learns to hollow a dugout.`);
+}
+function canoeDay(w, c) {
+  const K = w.canoe;
+  if (!K) { learnCanoe(w, c); return; }
+  if (c.doy === 0) K.y = 0; // last year's catch is already in the history
+  K.d = Math.min(DEEP_CAP, K.d + (c.season < 3 ? DEEP_REGEN : 1));
+  if (K.ok && K.at == null) {
+    const storm = w.wx && w.wx.k === 'storm' && rnd(w) < CANOE_STORM;
+    const split = !storm && c.doy === 0 && w.t - K.sp > TICKS_PER_YEAR && rnd(w) < CANOE_SPLIT;
+    if (storm || split) {
+      K.ok = 0; K.wk = -1; K.lost++;
+      const yrs = Math.max(1, Math.floor((w.t - K.sp) / TICKS_PER_YEAR));
+      if (split) w.timber = Math.round((w.timber + 4) * 100) / 100;
+      log(w, storm
+        ? `In the night the storm drags the dugout off the sand. In the morning its halves lie on the rocks below the landing.`
+        : `The dugout has split along the grain after ${plural(yrs, 'year', 'years')} of sun and salt, too far to mend. It is broken up for the fire.`, 'bad');
+    }
+  }
+  if (!K.ok && K.wk < 0 && c.season <= 1 && w.timber >= CANOE_WOOD + HOUSE_COST * 2 && !needHouse(w)) {
+    w.timber = Math.round((w.timber - CANOE_WOOD) * 100) / 100;
+    K.wk = 0;
+    log(w, 'An oak is felled above the landing beach for a new dugout.', 'info');
+  }
+}
+// a spot on the deep water for the day, reached in a straight line from the landing over open sea
+function canoeGround(w, K) {
+  const ox = K.lx - K.bx, oy = K.ly - K.by;
+  for (let k = 0; k < 6; k++) {
+    const r = 2 + ri(w, CANOE_OUT - 1), s = ri(w, 7) - 3;
+    const x = K.lx + ox * r + oy * s, y = K.ly + oy * r + ox * s;
+    if (inMap(x, y) && seaLine(w, K.lx + 0.5, K.ly + 0.5, x + 0.5, y + 0.5)) return { x, y };
+  }
+  return { x: K.lx, y: K.ly };
+}
+function seaLine(w, x0, y0, x1, y1) {
+  const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2);
+  for (let i = 0; i <= n; i++) if (tile(w, Math.floor(x0 + ((x1 - x0) * i) / n), Math.floor(y0 + ((y1 - y0) * i) / n)) !== T.WATER) return false;
+  return true;
+}
+function canoeTask(w, p, c) {
+  const K = w.canoe;
+  if (!K || c.season === 3 || w.res.u != null || p.hurt) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'fog' || wx === 'storm' || wx === 'snow') return null;
+  if (!K.ok) {
+    if (K.wk < 0 || K.dd === c.day || c.hour > 13 || wx === 'rain') return null; // the fires along its back will not burn in the wet
+    if (!lineOfLand(w, p.x, p.y, K.bx + 0.5, K.by + 0.5)) return null;
+    return { k: 'dig', key: 'u', x: K.bx, y: K.by, h: 4 };
+  }
+  if (c.hour > 8 || K.d < 12 || (w.fauna && w.fauna.fear > w.t) || (w.fest && w.fest.on === c.day)) return null;
+  if (!lineOfLand(w, p.x, p.y, K.bx + 0.5, K.by + 0.5)) return null;
+  const g = canoeGround(w, K);
+  return { k: 'paddle', key: 'u', x: K.bx, y: K.by, h: CANOE_HOURS, gx: g.x, gy: g.y };
+}
+function canoeDig(w, p, c) {
+  const K = w.canoe;
+  if (!K || K.ok || K.wk < 0) return null;
+  K.wk = Math.min(CANOE_WORK, K.wk + 4); K.dd = c.day;
+  if (K.wk < CANOE_WORK) return Math.round((K.wk / CANOE_WORK) * 100) + '%';
+  K.ok = 1; K.n++; K.sp = w.t;
+  if (K.n === 1) milestone(w, `${p.name === K.nm ? `${K.nm} and a crowd of helpers` : `${p.name} and ${K.nm}`} roll the hollowed oak down the sand on logs and push it out into the surf. It wallows, rights itself and floats. ${w.name} has a boat of its own, and the deep water past the breakers is no longer out of reach.`);
+  else log(w, `A new dugout is rolled down the sand and floats. ${w.name} can fish the deep water again.`, 'good');
+  return 'afloat';
+}
+// the trip: out to the day's ground, fish there, turn for home with CANOE_BACK hours left
+function paddle(w, p, t, c, fx) {
+  const K = w.canoe;
+  p.asleep = false;
+  if (!K || !K.ok) { release(w, p); return; }
+  t.h--;
+  if (t.h > CANOE_BACK) { moveToward(p, t.gx + 0.5, t.gy + 0.5, CANOE_ROW); return; }
+  if (!moveToward(p, K.bx + 0.5, K.by + 0.5, CANOE_ROW)) return;
+  const got = Math.min(K.d, 12 + ri(w, 10));
+  K.d -= got; K.f += got; K.y += got; K.t++;
+  w.food += got;
+  deed(w, p, 'f', got);
+  if (fx && got) fx.push({ x: K.bx + 0.5, y: K.by, text: '+' + got, color: 'fish' });
+  t.sea = 0; K.at = null;
+  release(w, p);
+  if (K.t === 1) milestone(w, `${p.name} comes in through the surf in the dugout with ${got} fish in the bottom of it, fat ones the size of a forearm that never come near the beach. The children run down the sand to see.`);
+}
+
 function forage(w, p) {
   for (let tries = 0; tries < 6; tries++) {
     const x = w.fire.x + ri(w, 25) - 12, y = w.fire.y + ri(w, 25) - 12;
@@ -3328,6 +3463,7 @@ function moveToward(p, tx, ty, sp = SPEED) {
 
 function act(w, p, c, fx) {
   const a = ageY(w, p), h = c.hour;
+  if (p.task && p.task.sea) { paddle(w, p, p.task, c, fx); return; } // out past the surf, nothing on land can call them
   if (w.lost && w.lost.cur) { // someone is out in the fog: they wander, and everyone able goes looking
     const L = w.lost.cur;
     if (p.id === L.id) { lostWander(w, p, L); return; }
@@ -3419,6 +3555,7 @@ function act(w, p, c, fx) {
   }
   const t = p.task;
   if (!walk(w, p, t.x + 0.5, t.y + 0.5)) return;
+  if (t.k === 'paddle') { t.sea = 1; w.canoe.at = p.id; return; } // down at the boat: push off
   t.h--;
   if (t.h > 0) return;
   finish(w, p, t, c, fx);
@@ -3509,6 +3646,9 @@ function finish(w, p, t, c, fx) {
     if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'snow') {
     snowDone(w, p, t);
+  } else if (t.k === 'dig') {
+    const got = canoeDig(w, p, c);
+    if (got) pop(got, 'build');
   } else if (t.k === 'forage') {
     const got = Math.min(w.wild, 3 + ri(w, 3));
     w.wild -= got; w.food += got;
@@ -4025,6 +4165,10 @@ const MIGRATIONS = {
   29: (w) => {
     if (w.blaze === undefined) w.blaze = null;
   },
+  // v30 -> v31: the dugout. No boat yet; once the far isle's has been seen often enough, the best fisher fells an oak for one.
+  30: (w) => {
+    if (w.canoe === undefined) w.canoe = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4075,6 +4219,9 @@ export function summary(w) {
     snowmen: w.snow ? w.snow.men.filter((m) => m.s >= 3).length : 0, snowmenEver: w.snow ? w.snow.n : 0,
     blaze: blazeOn(w), blazeAlight: blazeOn(w) ? w.blaze.cur.b.length : 0, blazeFires: w.blaze ? w.blaze.n : 0, blazeBurnt: w.blaze ? w.blaze.burnt : 0,
     blazeFighting: blazeOn(w) ? w.people.filter((p) => p.task && p.task.k === 'blaze').length : 0,
+    canoe: !!w.canoe, canoeOk: !!(w.canoe && w.canoe.ok), canoeDug: w.canoe && !w.canoe.ok && w.canoe.wk >= 0 ? Math.round((w.canoe.wk / CANOE_WORK) * 100) : null,
+    canoeOut: (w.canoe && w.canoe.at != null && (aliveId(w, w.canoe.at) || {}).name) || null, canoeTrips: w.canoe ? w.canoe.t : 0,
+    canoeFish: w.canoe ? w.canoe.f : 0, canoeYear: w.canoe ? w.canoe.y : 0, canoeDeep: w.canoe ? w.canoe.d : 0, canoeLost: w.canoe ? w.canoe.lost : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

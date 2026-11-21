@@ -163,5 +163,10 @@
   "at": "2026-11-21T06:09:16.714Z",
   "title": "Add summer wildfires that the village beats back",
   "body": "- SIM_VERSION 30 (w.blaze; BLAZE_*/ASH_* in sim.js; task kind 'blaze'; yearly `burnt`): from Y2, a long heatwave or a dry storm after heat can set a tall tree alight\n- Fire spreads tree to tree with a wind, through dry grass, standing grain and thatch; rain and night dew damp it. Every able adult goes out with green branches to the flames nearest the houses; beaten-out trees stand scorched, burnt ones turn to ash\n- Burnt woods lie black for a season, then open grass with fireweed, then saplings; the woods refill in about 3 years\n- Visible: flames and drifting smoke on burning tiles, a brown haze and night glow, beaters swinging branches, black ash, a Fire row, hover tips, History\n- Watch: the live island should see a small first fire in summer Y8 and two 70-100 acre fires in Y10; test seeds get 20-40 fires a century, a few over 100 acres"
+ },
+ {
+  "at": "2026-11-21T06:50:32.748Z",
+  "title": "Add a dugout canoe that fishes the deep water",
+  "body": "- SIM_VERSION 31 (w.canoe; CANOE_*/DEEP_* in sim.js; task kinds 'dig' and 'paddle'; tech 'canoe'; yearly `deep`): after two far-isle visits, the best fisher fells an oak (24 timber) above the landing beach and burns it hollow, one 4-hour spell per dry day (40 hours)\n- On calm mornings from spring to autumn, one islander paddles out 2-7 tiles past the surf, fishes, and lands 12-21 fish by mid-afternoon. The deep water is a separate stock (220, +4 a day), so the shore fishers keep their shallows. Trips rank below chopping wood, so the boat never takes workers off the woodpile\n- A storm can smash the boat on the beach (0.8% per storm day) and the wood can split at the new year (5%). Once there is timber to spare, another oak is felled\n- Visible: a log with a smoking hollow while it is dug, the boat pulled up on the sand, the islander paddling with a wake or fishing over the side, a dog waiting on the beach, a Dugout row, tooltips, catch in History\n- Watch: Hais should learn it in spring Y8 (Vidor) and land ~1,150 fish a year. Expect a lost boat every few years"
  }
 ]

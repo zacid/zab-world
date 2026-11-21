@@ -306,3 +306,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Beasts flee the smoke: wolves and boars driven out of the burning wood into the open, deer onto the beach; a scorched den moves.
   - A fire-beater byname for whoever puts out the most tiles; the great fire as a winter tale with a lesson (stack wood away from the trees).
   - The kiln, the bonfire or the beach watch fire as a human cause of a fire in a dry summer.
+- The dugout is done (SIM_VERSION 31; tech 'canoe', w.canoe {hid, nm, bx/by beach, lx/ly water, wk hours dug or -1, dd, ok, n, lost, d deep stock,
+  t trips, f, y, at paddler id, sp}; CANOE_* / DEEP_* in sim.js; learnCanoe/canoeDay/canoeTask/canoeDig/paddle/canoeGround/seaLine; task kinds
+  'dig' and 'paddle' (p.task.sea while afloat; act() hands it to paddle() before anything else, release() snaps them back to the beach);
+  drawCanoe() and the afloat sprite in render.js; yearly `deep`; `scripts/_canoeprobe.mjs [years] [seed|live]`, `scripts/_canoebench.mjs`).
+  Deep catch is capped by the regrowth (~1,150 fish a year), tiny next to late-game grain. Trips rank below chopping, so late-game islands with
+  no timber hardly use the boat. Answers it invites:
+  - A second or third boat as the village grows (one per 40 people), each a reserved key 'u0'..'u2'; two boats out together could go farther.
+  - Caught out: a storm that blows up in the afternoon (weather is daily now; an hourly squall chance) and a search along the shore at dusk.
+  - Rowing to the far isle: a gift sent over in a lean year without waiting for midsummer, a visit to kin married away, or revenge after a raid.
+  - Smoked or salted deep-water fish in jars for winter (pottery), and a drying rack on the beach.
+  - Seals or a whale washed up after a storm; a "Boatwright" byname once someone has hollowed two boats.
+  - The paddler could spot the far isle's dugout coming in by night and warn the beach watch.
