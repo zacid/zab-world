@@ -421,3 +421,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A wet summer (many rain days) starves the hives as well as rusting the grain: honey and harvest fail in the same year.
   - Bears or martens at the logs, or the boars knocking one over; wolves are no threat to bees.
   - Fields of clover or beans (a second crop) would feed the bees and the soil: ties into crop rotation.
+- The lone wolf is done (SIM_VERSION 43; w.lone, beast kind 'lone' in w.beasts, loneDay/loneBed/loneWolf/loneHunt in sim.js, LONE_* constants;
+  bite() and takeGoat() name it; quarry() sends every hunt after it once it has drawn blood; `scripts/_loneprobe.mjs [years] [seed|live]`,
+  `scripts/_lonebench.mjs [seed] [from] [to]` times HEAD against the working copy). Hunters mostly kill it within 2-30 hunts. Answers it invites:
+  - A pit trap or snare on its trail (a craft that catches it without the hunters walking into its bed), or a lure: a staked goat.
+  - Working in pairs: once it has taken someone, woodcutters and far-field farmers go out two by two (fewer lone targets, slower work).
+  - A dog that tracks it to its bed (dogs already follow scents in the fog) would raise the hunters' odds.
+  - Its pelt as a lasting thing: a cloak worn by whoever killed it, shown on the sprite; a winter tale of each one by name.
+  - Lone wolf names repeat over a century (5 names, only the last is skipped); more names, or "the second One-Ear".
+  - While it lives the den is left alone, so the pack grows and the winter pen raids climb: watch whether that is too harsh.

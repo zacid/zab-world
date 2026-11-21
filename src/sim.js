@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 42;
+export const SIM_VERSION = 43;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -68,6 +68,7 @@ export const TECHS = {
   rust:     { name: 'Grain rust', added: '2026-11-21T13:07Z', desc: 'In a warm, wet summer orange flecks come up on the leaves of the grain, like rust on a blade. Wet days and wind carry it from a spotted field to the fields beside it, and wherever it sits the ears fill thin and light. Hot dry weather stops it; the harvest or the autumn frost ends it for the year. Fields packed side by side lose the most. Nobody on the island yet knows how to stop it spreading.', req: ['farming'] },
   rogue:    { name: 'Rogueing', added: '2026-11-21T14:42Z', desc: 'After a bad rust year the islanders treat sick grain the way the healer treats a fever: keep it apart from the well. A day or two after orange flecks are seen in a field, idle hands walk its rows, pull every spotted plant up by the roots and carry the armfuls off to burn. The field gives a little less, but the rust goes no further from it. Once every spotted field is pulled clean, the outbreak is over. The faster the rows are walked, the fewer fields it reaches.', req: ['rust'] },
   bees:     { name: 'Bees', added: '2026-11-21T15:23Z', desc: 'A wild swarm found humming in a hollow tree, the log sawn off and stood up by the houses with a flat stone on top. The bees work the flowers from spring into autumn. When a hive grows crowded in late spring, half of it swarms; caught in time, it fills a new log. In late summer someone takes the honey with a smoking brand and leaves the bees enough to eat through the winter. A poor summer or a long hard winter can starve a hive. Honey dresses wounds, and at midsummer it is poured out as mead.', req: ['woodcut'] },
+  lone:     { name: 'The lone wolf', added: '2026-11-21T16:37Z', desc: 'Years of spears have kept the pack at the den down to two, and a young wolf driven out of it has no pack to run with. It stays near the village, lies up in a thicket by the fields and walks the treeline by day, when the pack sleeps. It takes goats that stray and springs on anyone working alone. While it lives every hunt goes after it, and the pack at the den is left to grow. If nobody kills it, in a few years it moves on.', req: ['hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -118,6 +119,19 @@ const WOLF_KILL = 0.2;      // share of attacks on someone alone that end in dea
 const WOUND_DAYS = 12;
 const FEAR_DAYS = 45;        // after an attack, nobody lingers outside at dusk or dawn
 const BOAR_RAID = 0.08;      // chance per spring/summer night that the boars come for the growing grain
+// ---------- the lone wolf ----------
+// Once the spears have held the pack down for years, a young wolf driven from the den with no pack to
+// join may stay near the village. It lies up in a thicket close to the fields and walks out by day.
+const LONE_KILLS = 3;        // wolves the hunters must have taken before one turns up
+const LONE_DAY = 60;         // the day of the year it may be first seen (spring, after the cubs)
+const LONE_ODDS = 0.5;       // chance that spring, once the pack is held at two
+const LONE_GAP = 8;          // years before another can come after one is gone
+const LONE_STALK = 0.006;   // chance per hour at the treeline that it picks out someone alone or a goat
+const LONE_REST = 5;         // days it lies low after it strikes
+const LONE_YEARS = 3;        // a lone wolf nobody kills moves on after this long
+const LONE_HUNT = 0.1;     // chance the hunters corner it at its bed (a pair; alone it is half that)
+const LONE_NAMES = [['One-Ear', 'one ear torn half away'], ['Greyback', 'a back gone grey as ash'], ['Pale-Eye', 'one eye milky and blind'],
+  ['Longshank', 'legs as long as a deer\'s'], ['Scar-Muzzle', 'an old white scar across its muzzle']];
 
 // ---------- hunting ----------
 const HUNT_GAP = 6;          // days between hunts
@@ -455,7 +469,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -651,7 +665,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -672,6 +686,7 @@ function daily(w, c, fx) {
     w.stats.yfr = 0;
     if (w.rust) { w.rust.y = 0; w.rust.cur = null; }
     if (w.rogue) w.rogue.y = 0;
+    if (w.lone) w.lone.yh = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -1178,7 +1193,7 @@ function findMeadow(w) {
   }
   if (!F.bed) F.bed = { x: mead.x, y: mead.y };
 }
-const beastHome = (w, k) => (k === 'wolf' ? w.fauna.den : k === 'deer' ? w.fauna.bed : w.fauna.lair);
+const beastHome = (w, k) => (k === 'wolf' ? w.fauna.den : k === 'deer' ? w.fauna.bed : k === 'lone' ? (w.lone && w.lone.cur && w.lone.cur.at) : w.fauna.lair);
 function addBeast(w, k) {
   const home = beastHome(w, k) || w.fire;
   const b = { id: w.nextId++, k, x: home.x + 0.5, y: home.y + 0.5, px: 0, py: 0, out: 0, tx: null, ty: null, h: 0, prey: null, f: null, rest: 0 };
@@ -1202,6 +1217,7 @@ function wilds(w, c) {
   if (c.day % 30 === 0 || (F.den && tile(w, F.den.x, F.den.y) !== T.FOREST) || (F.lair && tile(w, F.lair.x, F.lair.y) !== T.FOREST)) findLairs(w);
   else if (!F.mead || tile(w, F.mead.x, F.mead.y) !== T.GRASS) findMeadow(w);
   deerDay(w, c);
+  if (w.lone !== undefined) loneDay(w, c);
   if (c.doy !== 45 && c.doy !== 300) return;
   let forest = 0;
   for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] === T.FOREST) forest++;
@@ -1277,6 +1293,7 @@ function prowl(w, c) {
   for (const b of w.beasts) {
     b.px = b.x; b.py = b.y;
     if (b.k === 'wolf') wolf(w, b, wolfOut && b.rest <= w.t);
+    else if (b.k === 'lone') loneWolf(w, b, !storm && h >= 6 && h < 19 && b.rest <= w.t);
     else if (b.k === 'deer') deer(w, b, deerOut);
     else boar(w, b, boarOut);
   }
@@ -1372,28 +1389,37 @@ function lone(w, b) {
 function bite(w, b, p) {
   const F = w.fauna;
   b.prey = null; b.rest = w.t + 48; // the wolf slinks off and lies low for two days
+  const L = b.k === 'lone' && w.lone.cur, A = L ? L.nm : 'A wolf';
+  if (L) { b.rest = w.t + LONE_REST * TICKS_PER_DAY; L.b++; w.lone.yh = (w.lone.yh || 0) + 1; }
   w.stats.yw = (w.stats.yw || 0) + 1;
   const first = !F.att;
   F.att++;
   const wasAfraid = F.fear > w.t;
   F.fear = w.t + FEAR_DAYS * TICKS_PER_DAY;
-  const after = wasAfraid ? '' : ' For weeks after, nobody stays out past dusk.';
+  const after = wasAfraid ? '' : L ? ' For weeks after, nobody goes out to the woodpile alone.' : ' For weeks after, nobody stays out past dusk.';
   const helper = w.people.find((o) => o !== p && !o.dead && !o.asleep && ageY(w, o) >= 14 && d2(o.x, o.y, p.x, p.y) < 9);
   const fog = w.wx && w.wx.k === 'fog';
   if (fog) { w.wx.b = (w.wx.b || 0) + 1; F.fa = (F.fa || 0) + 1; }
   const where = fog ? 'out of the fog' : 'at the edge of the trees';
   let text;
   const dog = !helper && dogBy(w, p);
-  if (helper) text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
+  if (helper) text = `${A} springs at ${p.name}${fog ? ' out of the fog' : ''}; ${helper.name} runs over and together they drive it off with sticks and stones.`;
   else if (dog) { // the dog flies at it: half wolf itself, and fighting for its own pack
     const D = w.dogs, him = dog.sex === 'f' ? 'her' : 'him';
     D.k++;
     if (rnd(w) < DOG_DIES) {
       D.d = D.d.filter((o) => o !== dog); D.dead++;
-      text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}. ${dog.nm} flies at it, and the two roll snarling over and over in the ${fog ? 'grey' : 'grass'} until the wolf breaks away and runs. ${dog.nm} does not get up. ${p.name} carries ${him} home.`;
-    } else text = `A wolf springs at ${p.name}${fog ? ' out of the fog' : ''}; ${p.name}'s dog ${dog.nm} flies at its throat, and the wolf breaks off and runs for the trees.`;
+      text = `${A} springs at ${p.name}${fog ? ' out of the fog' : ''}. ${dog.nm} flies at it, and the two roll snarling over and over in the ${fog ? 'grey' : 'grass'} until the wolf breaks away and runs. ${dog.nm} does not get up. ${p.name} carries ${him} home.`;
+    } else text = `${A} springs at ${p.name}${fog ? ' out of the fog' : ''}; ${p.name}'s dog ${dog.nm} flies at its throat, and the wolf breaks off and runs for the trees.`;
     if (D.k === 1) { milestone(w, `${text} That night ${w.name} ${D.dead ? `buries ${dog.nm} by the door` : `gives ${dog.nm} the best bone in the pot`}. A wolf the village raised has turned on its own kind for them.`); return; }
   } else if (rnd(w) < WOLF_KILL) {
+    if (L) { // in broad day, with the village in earshot and nobody near enough to help
+      die(w, p, `was dragged down by the lone wolf ${L.nm}`);
+      L.k++; F.kills = (F.kills || 0) + 1;
+      milestone(w, `${L.nm} takes ${p.name} ${fog ? 'out of the fog' : 'in broad daylight, a stone\'s throw from the fields'}. By the time the others come running there is only a trail of blood into the trees. Nobody on ${w.name} works alone now if they can help it.`);
+      learnHunting(w);
+      return;
+    }
     die(w, p, fog ? 'was dragged down by wolves in the fog' : 'was dragged down by wolves');
     text = fog ? `Wolves take ${p.name} in the fog. Nobody saw them come.` : `Wolves take ${p.name} at the edge of the trees.`;
     if (fog) w.wx.x = (w.wx.x || 0) + 1;
@@ -1402,11 +1428,135 @@ function bite(w, b, p) {
   } else {
     p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
     release(w, p);
-    text = `A wolf leaps on ${p.name} ${where}. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`;
+    text = L ? `${A} leaps on ${p.name} ${fog ? where : 'in broad daylight'}. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`
+      : `A wolf leaps on ${p.name} ${where}. ${p.sex === 'f' ? 'She' : 'He'} limps home, badly bitten.`;
   }
   if (first) milestone(w, text + after);
   else log(w, text + after, 'bad');
   learnHunting(w);
+}
+
+// ---------- the lone wolf ----------
+// w.lone = { n arrivals, y year the last one came or went, dead killed by hunters, gone moved on, yh attacks this year,
+// cur: { id beast, nm, at {x, y} bed, t came, g goats, b bitten, k killed, h hunts } | null, last: { nm, how, by } }
+const loneOut = (w) => !!(w.lone && w.lone.cur);
+// a thicket close to the fields, 10-20 tiles from the hearth, not the den
+function loneBed(w) {
+  const { x: fx, y: fy } = w.fire, den = w.fauna.den;
+  let best = null, bs = -1e9;
+  for (let y = fy - 20; y <= fy + 20; y++) for (let x = fx - 20; x <= fx + 20; x++) {
+    if (!inMap(x, y) || w.tiles[idx(x, y)] !== T.FOREST) continue;
+    const dd = d2(x, y, fx, fy);
+    if (dd < 100 || dd > 400 || (den && d2(x, y, den.x, den.y) < 25)) continue;
+    const n = thicket(w, x, y);
+    if (n < 10) continue;
+    const s = n * 0.4 - Math.sqrt(dd) + hash(x, y, w.seed + 61) * 3;
+    if (s > bs && lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) { bs = s; best = { x, y }; }
+  }
+  return best;
+}
+// once a day: it may come in spring, keeps a bed near the fields, and in time moves on
+function loneDay(w, c) {
+  const F = w.fauna;
+  if (loneOut(w)) {
+    const L = w.lone.cur, b = w.beasts.find((o) => o.id === L.id);
+    if (!b) { w.lone.cur = null; return; }
+    if (!L.at || tile(w, L.at.x, L.at.y) !== T.FOREST) L.at = loneBed(w);
+    if (!L.at) L.at = F.den ? { x: F.den.x, y: F.den.y } : null;
+    if (c.doy === 300 && w.t - L.t >= LONE_YEARS * TICKS_PER_YEAR) {
+      w.beasts = w.beasts.filter((o) => o !== b);
+      w.lone.gone++; w.lone.y = c.year; w.lone.last = { nm: L.nm, how: 'gone' };
+      w.lone.cur = null;
+      milestone(w, `The tracks of ${L.nm} go down onto the sand at low tide, out along the bar towards the far isle, and the sea fills them in. Nobody sees ${L.nm} again. ${w.name} lets the children out to the woodpile on their own again.`);
+    }
+    return;
+  }
+  if (c.doy !== LONE_DAY || !F.den || !w.techs.includes('hunting') || (F.sw || 0) < LONE_KILLS) return;
+  if (w.lone && c.year < w.lone.y + LONE_GAP) return;
+  let pack = 0;
+  for (const b of w.beasts) if (b.k === 'wolf') pack++;
+  if (pack > 2 || rnd(w) >= LONE_ODDS) return;
+  const at = loneBed(w);
+  if (!at) return;
+  const who = w.people.filter((p) => !p.dead && ageY(w, p) >= 14);
+  if (!who.length) return;
+  const p = who[ri(w, who.length)];
+  const L0 = w.lone || (w.lone = { n: 0, y: 0, dead: 0, gone: 0, yh: 0, cur: null, last: null });
+  const used = L0.last ? L0.last.nm : '';
+  let k = ri(w, LONE_NAMES.length);
+  if (LONE_NAMES[k][0] === used) k = (k + 1) % LONE_NAMES.length;
+  const [nm, look] = LONE_NAMES[k];
+  const b = addBeast(w, 'lone');
+  b.x = b.px = at.x + 0.5; b.y = b.py = at.y + 0.5;
+  L0.n++; L0.y = c.year;
+  L0.cur = { id: b.id, nm, at, t: w.t, g: 0, b: 0, k: 0, h: 0 };
+  const first = !w.techs.includes('lone');
+  if (first) w.techs.push('lone');
+  milestone(w, first
+    ? `${p.name} comes in from the woodpile white in the face. A wolf stood at the edge of the trees at midday and watched ${p.sex === 'f' ? 'her' : 'him'}, alone and bold as a dog, with ${look}. The spears have kept the pack at the den small for years, and a young wolf driven out of it has nowhere to go but here. It walks by day, when the others sleep. The islanders call it ${nm}.`
+    : `${p.name} sees a lone wolf with ${look} watching the fields at midday. The den has driven out another one with nowhere to go. The islanders call it ${nm}.`);
+}
+function loneWolf(w, b, active) {
+  const L = w.lone.cur, home = L.at || { x: Math.floor(b.x), y: Math.floor(b.y) };
+  if (!active) {
+    b.prey = null; b.goat = null;
+    if (b.out && moveBeast(b, home.x + 0.5, home.y + 0.5, WOLF_SPEED)) b.out = 0;
+    return;
+  }
+  if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; edge(w, b); }
+  if (b.goat != null) {
+    const g = w.goats && w.goats.herd.find((o) => o.id === b.goat);
+    if (!g || !goatOpen(w, g)) { b.goat = null; edge(w, b); }
+    else {
+      if (moveBeast(b, g.x, g.y, WOLF_SPEED) || d2(b.x, b.y, g.x, g.y) < 1.5) takeGoat(w, b, g);
+      return;
+    }
+  }
+  if (b.prey != null) {
+    const p = w.people.find((o) => o.id === b.prey);
+    if (!p || p.dead || p.asleep || !wild(w, p)) { b.prey = null; edge(w, b); }
+    else {
+      if (moveBeast(b, p.x, p.y, WOLF_SPEED) || d2(b.x, b.y, p.x, p.y) < 1.5) bite(w, b, p);
+      return;
+    }
+  }
+  if (!moveBeast(b, b.tx + 0.5, b.ty + 0.5, WOLF_SPEED)) return;
+  if (rnd(w) < LONE_STALK) {
+    const p = lone(w, b);
+    if (p) { b.prey = p.id; return; }
+    const g = w.goats && strayGoat(w, b);
+    if (g) { b.goat = g.id; return; }
+  }
+  if (--b.h <= 0) edge(w, b);
+}
+// the hunters' hours at its bed are up: cornered, gone, or it turns on them
+function loneHunt(w, p) {
+  const L = w.lone.cur, F = w.fauna;
+  const b = L && w.beasts.find((o) => o.id === L.id);
+  if (!b) return;
+  L.h++;
+  const mate = w.people.find((o) => o !== p && !o.dead && o.task && o.task.key === 'h1' && d2(o.x, o.y, p.x, p.y) < 9);
+  const who = mate ? `${p.name} and ${mate.name}` : p.name, r = rnd(w);
+  const odds = LONE_HUNT * (mate ? 1 : 0.5), harm = 0.04 * (mate ? 1 : 2);
+  if (r < odds) {
+    w.beasts = w.beasts.filter((o) => o !== b);
+    w.hides = (w.hides || 0) + 1;
+    w.stats.yk = (w.stats.yk || 0) + 1;
+    F.sw = (F.sw || 0) + 1;
+    p.haul = 'wolf';
+    const yrs = Math.floor((w.t - L.t) / TICKS_PER_YEAR);
+    w.lone.dead++; w.lone.y = clock(w.t).year; w.lone.last = { nm: L.nm, how: 'killed', by: who };
+    w.lone.cur = null;
+    milestone(w, `${who} ${mate ? 'come' : 'comes'} on ${L.nm} asleep in the bracken after ${L.h === 1 ? 'one hunt' : `${L.h} hunts`}${yrs ? ` and ${plural(yrs, 'year', 'years')} of it walking the treeline` : ''}, and ${mate ? 'put' : 'puts'} a spear through it before it is up. The pelt, paler and bigger than any from the den, is pegged out by the hearth, and that night everybody stays up late round the fire.`);
+    deed(w, p, 'w'); deed(w, mate, 'w');
+  } else if (r < odds + harm) {
+    const fatal = rnd(w) < (mate ? 0.1 : 0.3);
+    if (fatal) die(w, p, `was killed hunting the lone wolf ${L.nm}`);
+    else p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+    log(w, fatal
+      ? `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${mate ? mate.name + ' brings the body home.' : 'Nobody was there to help.'}`
+      : `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${p.sex === 'f' ? 'She' : 'He'} comes home bitten.`, 'bad');
+  } else if (L.h % 3 === 1) log(w, `${who} ${mate ? 'find' : 'finds'} the bed where ${L.nm} lies up, the bracken still warm, but the wolf is gone.`, 'info');
 }
 
 function edge(w, b) {
@@ -2194,7 +2344,9 @@ function learnHunting(w) {
 function quarry(w, c) {
   const F = w.fauna;
   let wolves = 0, boars = 0, deer = 0;
-  for (const b of w.beasts) if (b.k === 'wolf') wolves++; else if (b.k === 'deer') deer++; else boars++;
+  for (const b of w.beasts) if (b.k === 'wolf') wolves++; else if (b.k === 'deer') deer++; else if (b.k === 'boar') boars++;
+  const L = loneOut(w) && w.lone.cur;
+  if (L && L.at && (L.g || L.b || L.k)) return 'lone'; // once it has drawn blood, every hunt goes after the lone wolf
   if (F.den && wolves >= HUNT_KEEP && (c.season === 3 || F.fear > w.t)) return 'wolf';
   if (F.lair && boars >= HUNT_KEEP) return 'boar';
   if (F.mead && deer >= DEER_KEEP && c.season === 2 && !(F.dy && F.dy[0] === c.year && F.dy[1] >= DEER_YEAR)) return 'deer'; // the autumn deer hunt, when they are fat from summer grass
@@ -2217,7 +2369,7 @@ function hunt(w, p, c) {
   if ((F.hunt || 0) > w.t || (w.wx && w.wx.k === 'fog')) return null; // no trail can be followed in fog
   const q = quarry(w, c);
   if (!q) return null;
-  const at = q === 'wolf' ? F.den : q === 'deer' ? F.mead : F.lair;
+  const at = q === 'lone' ? w.lone.cur.at : q === 'wolf' ? F.den : q === 'deer' ? F.mead : F.lair;
   if (d2(at.x, at.y, w.fire.x, w.fire.y) > HUNT_REACH || !inDaylight(w, p, c, at.x, at.y) || !lineOfLand(w, p.x, p.y, at.x + 0.5, at.y + 0.5)) return null;
   F.hunt = w.t + HUNT_GAP * TICKS_PER_DAY;
   return { k: 'hunt', key: 'h0', x: at.x, y: at.y, h: HUNT_WORK, q };
@@ -2225,6 +2377,7 @@ function hunt(w, p, c) {
 // the leader's hours at the lair are up: the beast is taken, gets away, or fights back
 function strike(w, p, t) {
   const F = w.fauna, q = t.q;
+  if (q === 'lone') return loneHunt(w, p);
   const herd = w.beasts.filter((b) => b.k === q);
   if (herd.length < (q === 'deer' ? DEER_KEEP : HUNT_KEEP)) return;
   const mate = w.people.find((o) => o !== p && !o.dead && o.task && o.task.key === 'h1' && d2(o.x, o.y, p.x, p.y) < 9);
@@ -2914,6 +3067,13 @@ function takeGoat(w, b, g) {
   G.herd = G.herd.filter((o) => o !== g);
   G.lost++; G.yl++;
   b.rest = w.t + 48;
+  const L = b.k === 'lone' && w.lone.cur;
+  if (L) {
+    b.rest = w.t + LONE_REST * TICKS_PER_DAY; L.g++; w.lone.yh = (w.lone.yh || 0) + 1;
+    const t2 = `${L.nm} trots out of the trees in the middle of the day, takes a goat by the neck and is gone before anyone can shout.`;
+    if (L.g === 1) milestone(w, `${t2} It does not even run.`); else log(w, t2, 'bad');
+    return;
+  }
   const text = w.wx && w.wx.k === 'fog'
     ? 'A wolf comes out of the fog and carries off a goat. Its bleating stops somewhere in the grey.'
     : 'A wolf darts out of the trees and drags off a goat that wandered from the herd.';
@@ -5052,6 +5212,10 @@ const MIGRATIONS = {
   41: (w) => {
     if (w.bees === undefined) w.bees = null;
   },
+  // v42 -> v43: the lone wolf. None yet; one may come in spring once the hunters have taken 3 wolves and the pack is held at two.
+  42: (w) => {
+    if (w.lone === undefined) w.lone = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5125,6 +5289,9 @@ export function summary(w) {
     bees: !!w.bees, hives: beesAlive(w), hiveLogs: w.bees ? w.bees.h.length : 0, honey: w.bees ? w.bees.hy : 0, honeyYear: w.bees ? w.bees.y : 0,
     honeyEver: w.bees ? w.bees.g : 0, swarms: w.bees ? w.bees.sw : 0, swarmsLost: w.bees ? w.bees.sl : 0, hivesDied: w.bees ? w.bees.d : 0,
     meads: w.bees ? w.bees.m : 0, honeyWounds: w.bees ? w.bees.mw : 0, honeyTaking: w.bees ? w.people.filter((p) => p.task && p.task.k === 'honey').length : 0,
+    lone: (w.lone && w.lone.cur && w.lone.cur.nm) || null, loneCame: w.lone ? w.lone.n : 0, loneGoats: (w.lone && w.lone.cur && w.lone.cur.g) || 0,
+    loneBit: (w.lone && w.lone.cur && w.lone.cur.b) || 0, loneHunts: (w.lone && w.lone.cur && w.lone.cur.h) || 0,
+    loneKilled: w.lone ? w.lone.dead : 0, loneLast: (w.lone && w.lone.last) || null,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
