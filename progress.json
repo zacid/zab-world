@@ -203,5 +203,10 @@
   "at": "2026-11-21T12:29:46.750Z",
   "title": "Add smudge fires that keep late frost off the grain",
   "body": "- SIM_VERSION 38 (w.smudge {n, f, s, y, nm, at, on [{x, y, id}], last, k}; tech 'smudge'; task kind 'smudge'; SMUDGE_* in sim.js; yearly `smudged`): learned once a second late frost has killed young grain\n- From the second evening of a spring cold snap, up to 12 able adults go out at 20:00 and tend smoky straw fires among the young fields (0.5 timber each a night). Each fire covers the fields within ~3 tiles, nearest the hearth first; under the smoke 80% of kills and nips are stopped. Smudgers sleep until 10:00 and wolves leave them alone\n- Visible: small smouldering heaps with pale smoke drifting over the rows and a red glow at night, hover text, a Smudge row in the panel, a History line\n- Watch: on Hais the first frost is due around Y9 and smudging around Y10; about half of the fields a frost would kill are saved. A small village cannot cover all its fields, so big frosts still bite"
+ },
+ {
+  "at": "2026-11-21T13:04:39.360Z",
+  "title": "Add the moon: raiders row in only on dark nights",
+  "body": "- SIM_VERSION 39 (w.moon {s, nm, at}; moonAge/moonLight/moonDark/moonName and MOON_* in sim.js; tech 'moon'): a 30-day moon, 12 a year, worked out from the day number alone\n- The far isle's dugout now comes only on dark-moon nights (13 of 30) or in fog. RAID_NIGHT goes from 0.03 to 0.05 on those nights, so raids are about as common as before\n- Moon lore: once the watch has sat up 20 nights, at the next full moon of raid season the watcher sees the pattern. From then on the beach fire is lit only on dark or foggy nights, which saves timber and sleep\n- Visible: a pixel moon with its phase in the night sky, lighter moonlit nights, silver glints on the sea, the phase in the top line after dusk, a Moon row in the panel\n- Watch: Hais learns moon lore at the full moon around Y7 autumn day 76. About 8 bright nights a season go unwatched"
  }
 ]

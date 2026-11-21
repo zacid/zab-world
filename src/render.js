@@ -777,15 +777,21 @@ function frame() {
   const c = S.clock(Math.max(0, w.t - 1));
   const hf = c.hour + frac;
   const dark = darkness(hf);
+  // the moon by night: how much light it gives (0..1) when the sky is open
+  const nightDay = hf < 12 ? c.day - 1 : c.day; // after midnight it is still the evening's moon
+  const skyOpen = { clear: 1, heat: 1, cold: 1 }[wxNow()] || 0;
+  const moonL = dark > 0 ? (S.moonLight(Math.max(0, nightDay)) / 15) * skyOpen : 0;
 
-  // background sea: near-black with drifting glints
+  // background sea: near-black with drifting glints; silver under a bright moon
   ctx.fillStyle = '#04070d'; ctx.fillRect(0, 0, cv.width, cv.height);
   const fogged = wxNow() === 'fog';
   if (fogged) { ctx.fillStyle = `rgba(120,130,138,${(0.16 * (1 - dark * 0.7)).toFixed(3)})`; ctx.fillRect(0, 0, cv.width, cv.height); }
+  const silver = moonL * Math.min(1, dark * 2);
   for (const s of sparks) {
     if (fogged && s.s < 0.8) continue; // fog swallows all but the brightest glints
     const a = 0.25 + 0.75 * Math.max(0, Math.sin(now / 1400 + s.p));
-    ctx.fillStyle = `rgba(150,180,220,${(a * (0.25 + s.s * 0.5)).toFixed(3)})`;
+    ctx.fillStyle = silver > 0.05 ? `rgba(${Math.round(150 + 80 * silver)},${Math.round(180 + 50 * silver)},${Math.round(220 + 15 * silver)},${Math.min(1, a * (0.25 + s.s * 0.5) * (1 + silver * 0.7)).toFixed(3)})`
+      : `rgba(150,180,220,${(a * (0.25 + s.s * 0.5)).toFixed(3)})`;
     const sz = s.s > 0.85 ? 2 : 1;
     ctx.fillRect(Math.floor(s.x * cv.width), Math.floor(s.y * cv.height), sz * dpr, sz * dpr);
   }
@@ -995,7 +1001,8 @@ function frame() {
   if (horner) hornRings(horner, now);
   // night
   if (dark > 0) {
-    sc.fillStyle = `rgba(6,10,28,${dark.toFixed(3)})`; sc.fillRect(0, 0, PX, PX);
+    sc.fillStyle = moonL > 0 ? `rgba(${Math.round(6 + 10 * moonL)},${Math.round(10 + 12 * moonL)},${Math.round(28 + 14 * moonL)},${(dark * (1 - 0.3 * moonL)).toFixed(3)})` : `rgba(6,10,28,${dark.toFixed(3)})`;
+    sc.fillRect(0, 0, PX, PX);
     sc.globalCompositeOperation = 'lighter';
     for (const b of w.buildings) if (b.progress >= 1 && w.people.some((p) => p.home === b.id)) {
       const lit = S.hash(b.id, Math.floor(w.t / 6), 1) < 0.85;
@@ -1031,6 +1038,7 @@ function frame() {
   skyFx(wx, now, dark);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(scene, view.ox, view.oy, PX * view.s, PX * view.s);
+  if (dark > 0.12 && skyOpen) drawMoon(Math.max(0, nightDay), Math.min(1, (dark - 0.12) * 3));
   if (fpos) { // thin white corner brackets around whoever is followed; dashed round the house while they sleep
     const sx = view.ox + fpos.x * view.s, sy = view.oy + fpos.y * view.s;
     const r = Math.max(7 * dpr, (fpos.awake ? 4 : 6) * view.s), l = r * 0.45 + Math.sin(now / 300) * dpr;
@@ -1290,6 +1298,30 @@ function bonfire(X, Y, now) {
     if (t < 0.85) px(sc, sx | 0, sy | 0, t < 0.4 ? '#ffe48a' : '#f59a2e');
   }
 }
+// the moon in the top corner of the night sky: a pixel disc, lit from the right while it waxes and from the
+// left as it wanes, the dark part a faint grey, so even a new moon shows as a ghost.
+function drawMoon(day, a) {
+  const age = S.moonAge(day), R = 6, u = Math.max(2, Math.round(2 * dpr));
+  const gr = $('graph'), gw = gr && !gr.hidden ? (gr.offsetWidth + 24) * dpr : 12 * dpr; // just left of the graph panel
+  const X0 = Math.round(cv.width - gw - (R * 2 + 4) * u), Y0 = Math.round(14 * dpr);
+  const k = Math.cos((age / S.MOON_DAYS) * Math.PI * 2), wax = age <= 15;
+  for (let j = -R; j < R; j++) {
+    const yy = (j + 0.5) / R, s = Math.sqrt(Math.max(0, 1 - yy * yy));
+    for (let i = -R; i < R; i++) {
+      const xx = (i + 0.5) / R;
+      if (xx * xx + yy * yy > 1) continue;
+      const lit = wax ? xx >= k * s : xx <= -k * s;
+      const pit = lit && S.hash(i + 20, j + 20, 13) < 0.12; // a few grey seas on the face
+      ctx.fillStyle = lit ? `rgba(${pit ? '196,200,204' : '236,236,228'},${(a * 0.95).toFixed(3)})` : `rgba(120,130,150,${(a * 0.14).toFixed(3)})`;
+      ctx.fillRect(X0 + (i + R) * u, Y0 + (j + R) * u, u, u);
+    }
+  }
+  if (S.moonLight(day) >= 12) { // a soft halo round a near-full moon
+    const g = ctx.createRadialGradient(X0 + R * u, Y0 + R * u, R * u, X0 + R * u, Y0 + R * u, R * u * 2.6);
+    g.addColorStop(0, `rgba(220,226,240,${(a * 0.16).toFixed(3)})`); g.addColorStop(1, 'rgba(220,226,240,0)');
+    ctx.fillStyle = g; ctx.fillRect(X0 - R * u * 2, Y0 - R * u * 2, R * u * 6, R * u * 6);
+  }
+}
 // rain, snow and lightning over the scene, at native pixel size so they stay crisp
 const drops = Array.from({ length: 900 }, (_, i) => ({ x: S.hash(i, 1, 31), y: S.hash(i, 2, 31), s: S.hash(i, 3, 31) }));
 function skyFx(wx, now, dark = 0) {
@@ -1502,7 +1534,7 @@ function updatePanels() {
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
-  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
+  $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = [
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
@@ -1524,7 +1556,8 @@ function updatePanels() {
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
-    ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back</span>`]] : []),
+    ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back${s.moonLore ? ` · ${s.moonRested} bright ${s.moonRested === 1 ? 'night' : 'nights'} slept` : ''}</span>`]] : []),
+    ...(s.moonLore ? [['moon', 'Moon', `<span class="m">${S.moonName(c.day)} · ${S.moonDark(c.day) ? 'dark enough for a boat to creep in' : 'too bright to row in unseen'} · counted since ${esc(w.moon.nm)} saw it ${when(w.moon.at)}</span>`]] : []),
     ...(s.wading ? [['wade', 'Shallows', `${s.waders ? `<span class="fest">${s.waders} ${s.waders === 1 ? 'child' : 'children'} paddling</span> · ` : ''}<span class="m">${s.cocklesYear.toLocaleString()} cockles this year · ${s.cockles.toLocaleString()} in all${s.wadeScares ? ` · ${s.wadeScares} pulled out of the sea` : ''}</span>`]] : []),
     ...(s.whales ? [['whale', 'Whales', `${s.whaleLeft != null ? `<span class="fest">a whale on the beach · ${s.whaleCutting} cutting</span> · ` : ''}<span class="m">${s.whales} stranded · ${s.whaleMeat.toLocaleString()} meat cut${w.whale.last ? ` · last ${when(w.whale.last)}` : ''}</span>`]] : []),
     ...(s.blazeFires ? [['blaze', 'Fire', `${s.blaze ? `<span class="bad">the woods are burning · ${s.blazeAlight} alight · ${s.blazeFighting} beating</span> · ` : ''}<span class="m">${s.blazeFires} ${s.blazeFires === 1 ? 'fire' : 'fires'} · ${s.blazeBurnt.toLocaleString()} acres burnt${!s.blaze && w.blaze.last >= 0 ? ` · last ${when(w.blaze.last)}` : ''}</span>`]] : []),

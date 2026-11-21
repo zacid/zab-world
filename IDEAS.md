@@ -382,3 +382,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Smudging burns timber in spring; in a year the woodpile is bare there are no fires at all. Coppice poles could be kept for it.
   - A smudger who sits out every frost night could catch a chill (fever chance) or earn a byname ("the Smoker").
   - Weather lore is still open: reading a clear, still evening and lighting the fires on the first night instead of the second.
+- The moon is done (SIM_VERSION 39; moonAge/moonLight/moonDark/moonName exported, MOON_DAYS 30, MOON_DARK 6, day 0 is a new moon, nothing
+  saved for the phase; w.moon {s bright nights the watch slept, nm, at}; learnMoon in sim.js; drawMoon() in render.js). Raids come only on
+  dark-moon (13 of 30) or fog nights, at RAID_NIGHT 0.05. Moon lore is learned at the first full moon of raid season after 20 watch nights.
+  Answers it invites:
+  - Fog is now the raiders' best chance under a bright moon. The fog horn or a second watcher on fog nights would close that gap.
+  - Spring tides at new and full moon: the cockle bed refills faster, or a very low tide uncovers a wreck or a causeway.
+  - Wolves at the full moon: a ring of pale eyes at the treeline, bolder pen raids; full-moon deer hunts.
+  - Sowing by the moon (weather lore against late frost), midsummer set by a full moon, the moon count shown as a "month" in the top line.
+  - A lunar eclipse once in decades: a red moon, a frightened village, the eldest tells of the last one.

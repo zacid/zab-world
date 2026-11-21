@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 38;
+export const SIM_VERSION = 39;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -64,6 +64,7 @@ export const TECHS = {
   whale:    { name: 'Whales', added: '2026-11-21T10:08Z', desc: 'Once in a few years a long storm drives a whale onto the sand. The morning after, everyone who can hold a flint knife goes down to the beach and cuts: strips of meat for the stores, blubber for the fires. In three days it begins to stink and the gulls and the tide take what is left; the great ribs stay on the beach for good.', req: ['fishing'] },
   smudge:   { name: 'Smudge fires', added: '2026-11-21T11:57Z', desc: 'Twice blackened by a late frost, the village fights back. When a spring cold snap settles in and the evenings turn clear and still, the young and strong carry damp straw and green wood out between the rows at dusk and keep small fires smouldering till dawn. The smoke lies low over the young grain like a blanket and the frost mostly cannot settle under it. It costs firewood and a night\'s sleep; the smudgers lie in late the next morning.', req: ['fire', 'farming'] },
   frost:    { name: 'Late frost', added: '2026-11-21T10:44Z', desc: 'Some springs the cold comes back after the sowing. On a still, clear night the frost settles on the fields, and by morning the young green shoots have gone black and limp. Grain killed while it is still short has to be dug over and sown again; grain already knee-high only has its leaf tips burnt. Nobody on the island yet knows how to read a frost coming.', req: ['farming'] },
+  moon:     { name: 'Moon lore', added: '2026-11-21T12:31Z', desc: 'The moon fills and empties every thirty days, twelve times a year. Sitting up night after night by the beach fire, the watchers learn what the far isle already knew: a dugout only comes in when the moon is dark, or under a fog. A notch is cut in the doorpost of the granary for each night, and on bright nights the beach fire is left unlit and the watcher sleeps in a bed. Fog still keeps somebody down by the water.', req: ['watch'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -226,7 +227,7 @@ const ISLE_TRADE = 300;      // grain the guests take home, if the stores can sp
 const ISLE_FEVER = 0.08;     // chance the guests leave a fever behind
 // raiders: in a thin year on the far isle the dugout comes back by night after the harvest, for the granaries
 const RAID_LEAN = 0.25;      // chance each year, once they have seen the island, that the far isle goes hungry (less with kin on both shores)
-const RAID_NIGHT = 0.03;     // chance per autumn or early-winter night of a thin year that they come
+const RAID_NIGHT = 0.05;     // chance per dark-moon (or fog) autumn or early-winter night of a thin year that they come
 const RAID_FOG = 3;          // x this on a fog day: nobody will see the boat come in
 const RAID_RICH = 2000;      // grain in store before the crossing seems worth the risk
 const RAID_CARRY = 70;       // grain each raider carries off in a sack
@@ -250,6 +251,9 @@ const WATCH_WOOD = 1;        // timber burnt on the beach each night
 const WATCH_SEE = 0.8;       // chance the watcher sees a dugout come in on a clear night
 const WATCH_DIM = { fog: 0.25, rain: 0.5, cold: 0.9 }; // and in worse weather
 const WATCH_AT = 4;          // (squared) the watcher must be this close to the fire to see anything
+export const MOON_DAYS = 30;    // new moon to new moon; day 0 of the world was a new moon
+export const MOON_DARK = 6;     // a night with this much light or less (0 new .. 15 full) is dark enough to row in unseen
+const MOON_WATCH = 20;          // nights at the beach fire before the watchers see the pattern
 // peace gifts: once robbed, the islanders send hungry guests home with grain, and the raid does not come
 const GIFT_SACK = 60;        // grain in each guest's sack
 const GIFT_SHARE = 0.1;      // never more than this share of the stores
@@ -355,6 +359,15 @@ export function clock(t) {
     dos: (doy % DAYS_PER_SEASON) + 1,
   };
 }
+// the moon: 0 new .. 15 full .. back to 0, integer, from the day alone (nothing saved)
+export const moonAge = (day) => day % MOON_DAYS;
+export const moonLight = (day) => { const a = day % MOON_DAYS; return a <= 15 ? a : MOON_DAYS - a; };
+export const moonDark = (day) => moonLight(day) <= MOON_DARK;
+export function moonName(day) {
+  const a = day % MOON_DAYS;
+  return a <= 1 || a === 29 ? 'new moon' : a < 7 ? 'waxing crescent' : a < 9 ? 'first quarter' : a < 14 ? 'waxing gibbous'
+    : a <= 16 ? 'full moon' : a < 22 ? 'waning gibbous' : a < 24 ? 'last quarter' : 'waning crescent';
+}
 export const tickAt = (w, ms) => Math.max(0, Math.floor((ms - w.epoch) / TICK_MS));
 export const ageY = (w, p) => (w.t - p.born) / TICKS_PER_YEAR;
 const stamp = (w) => { const c = clock(w.t); return `Y${c.year} ${SEASONS[c.season]}`; };
@@ -420,7 +433,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -652,6 +665,7 @@ function daily(w, c, fx) {
   const wx = w.wx.k;
   if (w.raid) raidNight(w, c, wx);
   if (w.raid && !w.watch && w.raid.n >= WATCH_RAIDS && raidSeason(c)) learnWatch(w);
+  if (w.watch && !w.moon && w.watch.n >= MOON_WATCH && raidSeason(c) && moonLight(c.day) === 15) learnMoon(w, c);
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
@@ -1766,6 +1780,7 @@ function raidNight(w, c, wx) {
   const R = w.raid;
   if (R.lean !== c.year || R.gift === c.year || R.cur || R.on != null || R.y === c.year) return;
   if (!raidSeason(c) || wx === 'storm' || wx === 'snow') return;
+  if (wx !== 'fog' && !moonDark(c.day)) return; // under a bright moon a boat is seen a mile off
   if (w.food < RAID_RICH || (w.isle && w.isle.boat) || !raidTarget(w)) return;
   if (rnd(w) < RAID_NIGHT * (wx === 'fog' ? RAID_FOG : 1)) { R.on = c.day; R.y = c.year; }
 }
@@ -1917,6 +1932,7 @@ function watchHour(w, c) {
   if (wx === 'storm' || wx === 'snow' || w.timber < WATCH_WOOD || (w.tale && w.tale.on === c.day)) return;
   const g = raidTarget(w), L = g && landAt(w, g.x, g.y, RAID_OUT);
   if (!L) return;
+  if (w.moon && wx !== 'fog' && !moonDark(c.day)) { w.moon.s++; return; } // a bright moon keeps the watch: everyone sleeps
   const can = w.people.filter((p) => p.id !== W.last && watchable(w, p));
   if (!can.length) return;
   can.sort((a, b) => a.id - b.id);
@@ -1925,6 +1941,21 @@ function watchHour(w, c) {
   W.x = L.bx; W.y = L.by; W.hid = p.id; W.n++;
   w.timber = Math.round((w.timber - WATCH_WOOD) * 100) / 100;
 }
+// ---------- moon lore ----------
+// Twenty nights and more at the beach fire, and the watchers see what the far isle has always known: a dugout
+// only comes in under a dark moon, or a fog. From the next full moon the beach fire is lit only on dark or
+// foggy nights. w.moon: s bright nights the watch was let off, nm who saw it, at when.
+function learnMoon(w, c) {
+  const who = aliveId(w, w.watch.hid) || elder(w);
+  if (!who) return;
+  w.techs.push('moon');
+  w.moon = { s: 0, nm: who.name, at: w.t };
+  const n = w.watch.n, by = w.raid ? w.raid.n + w.watch.s : 0;
+  milestone(w, `${who.name} sits up by the beach fire under a moon as round as a jar lid, after ${n} nights of watching, and the sea lies bright and empty all the way to the far isle. ` +
+    `Counting back on ${poss(who)} fingers, ${pron(who)} sees it: ${by === 2 ? 'both boats' : by > 2 ? `all ${by} boats` : 'the boats'} came in the dark of the moon, or under a fog. ` +
+    `${who.name} cuts a notch in the granary doorpost for this night and says they will cut one for every night after, and light the beach fire only when the moon is thin. ${w.name} learns to count the moon.`);
+}
+
 // the dugout creeps in toward the beach: does the one at the fire see it?
 function watchSees(w, C) {
   const W = w.watch;
@@ -4677,6 +4708,10 @@ const MIGRATIONS = {
   37: (w) => {
     if (w.smudge === undefined) w.smudge = null;
   },
+  // v38 -> v39: the moon. Raiders row in only on dark-moon or foggy nights; the watchers learn it at a full moon.
+  38: (w) => {
+    if (w.moon === undefined) w.moon = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4722,6 +4757,7 @@ export function summary(w) {
     tales: (w.tale && w.tale.n) || 0, teller: (taleNow(w, c) && (aliveId(w, w.tale.id) || {}).name) || null,
     raids: w.raid ? w.raid.n : 0, raidGrain: w.raid ? w.raid.g : 0, raidsDriven: w.raid ? w.raid.d : 0, raidLean: !!(w.raid && w.raid.lean === c.year),
     watch: !!w.watch, watcher: (watchOn(w) && (aliveId(w, w.watch.hid) || {}).name) || null, watchNights: w.watch ? w.watch.n : 0, watchTurned: w.watch ? w.watch.s : 0,
+    moon: moonName(c.day), moonLight: moonLight(c.day), moonLore: !!w.moon, moonRested: w.moon ? w.moon.s : 0,
     gifts: (w.raid && w.raid.peace) || 0, giftGrain: (w.raid && w.raid.pg) || 0, gifted: !!(w.raid && w.raid.gift === c.year),
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
