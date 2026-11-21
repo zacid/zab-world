@@ -198,5 +198,10 @@
   "at": "2026-11-21T11:55:28.640Z",
   "title": "Add children paddling in the summer shallows",
   "body": "- SIM_VERSION 37 (w.wade {b, n, c, g, y, nm, at, s, sy, sn}; WADE_* in sim.js; tech 'wading'; task kind 'wade'; yearly `cockles`): on the first summer heatwave with 2+ children, they find the beach nearest the hearth\n- From then on, on summer afternoons (10:00-18:00), 2 of 3 children go down on heat days and 1 of 3 on clear days. They paddle and dig cockles: 1-3 food a spell from a bed of 60 that refills by 2 a day\n- At most once every 3 summers the sea pulls a child out and the nearest adult goes in after them. Nobody drowns. The first time is a chronicle entry\n- Visible: children knee-deep off the sand with foam round their legs, throwing water at each other or bent over a cockle; hover text, a Shallows row in the panel, a History line\n- Watch: Hais should learn it on the first heatwave of summer Y8, with 5-10 children in the water on hot days and 40-90 cockles a year"
+ },
+ {
+  "at": "2026-11-21T12:29:46.750Z",
+  "title": "Add smudge fires that keep late frost off the grain",
+  "body": "- SIM_VERSION 38 (w.smudge {n, f, s, y, nm, at, on [{x, y, id}], last, k}; tech 'smudge'; task kind 'smudge'; SMUDGE_* in sim.js; yearly `smudged`): learned once a second late frost has killed young grain\n- From the second evening of a spring cold snap, up to 12 able adults go out at 20:00 and tend smoky straw fires among the young fields (0.5 timber each a night). Each fire covers the fields within ~3 tiles, nearest the hearth first; under the smoke 80% of kills and nips are stopped. Smudgers sleep until 10:00 and wolves leave them alone\n- Visible: small smouldering heaps with pale smoke drifting over the rows and a red glow at night, hover text, a Smudge row in the panel, a History line\n- Watch: on Hais the first frost is due around Y9 and smudging around Y10; about half of the fields a frost would kill are saved. A small village cannot cover all its fields, so big frosts still bite"
  }
 ]

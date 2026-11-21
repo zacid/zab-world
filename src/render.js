@@ -100,6 +100,7 @@ function doing(p) {
   if (p.task && p.task.k === 'tend') { const o = w.people.find((q) => q.id === p.task.o); return o ? `tending ${o.name}` : 'tending the sick'; }
   if (p.task && p.task.k === 'herb') return "gathering herbs at the wood's edge";
   if (p.task && p.task.k === 'watch') return p.x === p.px && p.y === p.py ? 'keeping watch on the beach by a driftwood fire' : 'going down to keep the beach watch';
+  if (p.task && p.task.k === 'smudge') return p.x === p.px && p.y === p.py ? 'keeping a smudge fire going between the frosty rows' : 'carrying damp straw out to the young grain';
   if (p.task && p.task.k === 'herd') return 'minding the goats';
   if (p.task && p.task.k === 'paddle') return !p.task.sea ? 'going down to the dugout' : p.x === p.px && p.y === p.py ? 'fishing the deep water from the dugout' : p.task.h > 3 ? 'paddling out past the surf' : 'paddling home with the catch';
   if (p.task && p.task.k === 'dig') return 'burning and scraping out the dugout';
@@ -832,6 +833,13 @@ function frame() {
     px(sc, wat.x, wat.y + 1, '#e0521f', 2, 2); px(sc, wat.x + (f2 === 1 ? 1 : 0), wat.y - (f2 === 2 ? 1 : 0), '#ffc23d', 1, 2);
     if (f2 === 0) px(sc, wat.x + 1, wat.y - 1, '#ffe48a');
   }
+  // smudge fires: a heap of damp straw smouldering between the rows, more smoke than flame
+  const smudges = S.smudgeOn(w) ? w.smudge.on.map((o) => ({ x: o.x * TILE + 3, y: o.y * TILE + 4, id: o.id })) : [];
+  for (const o of smudges) {
+    const f2 = Math.floor(now / 210 + o.id) % 3;
+    px(sc, o.x - 1, o.y + 2, '#6e5a3a', 4, 1); px(sc, o.x, o.y + 1, '#a08a52', 2, 1); // the straw heap
+    px(sc, o.x + (f2 === 1 ? 1 : 0), o.y + 1, f2 ? '#c8461c' : '#ff8a2a');
+  }
   const flames = drawBlaze(now);
   const canoe = drawCanoe(now);
   // people
@@ -1004,6 +1012,7 @@ function frame() {
     if (kiln) glow(sc, kiln.x, kiln.y, kiln.firing ? 10 + Math.sin(now / 170) : 5, `rgba(255,120,40,${(dark * (kiln.firing ? 0.6 : 0.3)).toFixed(3)})`);
     for (let k = 0, st = Math.ceil(flames.length / 60); k < flames.length; k += st) { const o = flames[k]; glow(sc, o.x, o.y, (o.big ? 12 : 7) + Math.sin(now / 150 + o.x) * 1.2, `rgba(255,110,40,${(dark * (o.big ? 0.5 : 0.35)).toFixed(3)})`); }
     if (wat) glow(sc, wat.x + 1, wat.y + 2, 13 + Math.sin(now / 230) * 1.2, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
+    for (const o of smudges) glow(sc, o.x + 1, o.y + 1, 6 + Math.sin(now / 260 + o.id) * 0.8, `rgba(255,120,40,${(dark * 0.4).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
       const ex = o.X + (o.face > 0 ? 5 : 0), ey = o.Y + 1;
@@ -1011,6 +1020,13 @@ function frame() {
       glow(sc, ex + 0.5, ey + 0.5, 3, `rgba(255,220,90,${(dark * 0.7).toFixed(3)})`);
     }
     sc.globalCompositeOperation = 'source-over';
+  }
+  // the smoke from the smudge fires lies low and drifts slowly across the young grain, pale in the moonlight
+  for (const o of smudges) for (let k = 0; k < 7; k++) {
+    const ph = ((now / 5200 + k / 7 + o.id * 0.13) % 1);
+    const sx = o.x + 1 + ph * 15 + Math.sin(ph * 5 + k + o.id) * 1.5, sy = o.y - ph * 3 + (k % 3) - 1;
+    sc.fillStyle = `rgba(200,204,210,${((1 - ph) * 0.32).toFixed(3)})`;
+    sc.fillRect(Math.round(sx), Math.round(sy), ph > 0.3 ? 3 : 2, ph > 0.5 ? 2 : 1);
   }
   skyFx(wx, now, dark);
   ctx.imageSmoothingEnabled = false;
@@ -1494,6 +1510,7 @@ function updatePanels() {
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced${s.hedging ? ` · ${s.hedges} hedged, ${s.hedgesGrown} grown` : ''})</span>` : s.fields],
     ...(s.frosts ? [['frost', 'Frost', `${s.frostBlack ? `<span class="bad">${s.frostBlack} ${s.frostBlack === 1 ? 'field' : 'fields'} frost-black</span> · ` : ''}<span class="m">${s.frosts} late ${s.frosts === 1 ? 'frost' : 'frosts'} · ${s.frostKilled.toLocaleString()} fields killed · last ${when(w.frost.last)}</span>`]] : []),
+    ...(s.smudge ? [['smudge', 'Smudge', `${s.smudgeFires ? `<span class="fest">${s.smudgeFires} ${s.smudgeFires === 1 ? 'fire' : 'fires'} smouldering in the fields</span> · ` : ''}<span class="m">${s.smudgeNights} ${s.smudgeNights === 1 ? 'night' : 'nights'} lit · ${s.smudgeSaved.toLocaleString()} ${s.smudgeSaved === 1 ? 'field' : 'fields'} saved${s.smudgeYear ? ` (${s.smudgeYear} this year)` : ''}</span>`]] : []),
     ['gran', 'Granaries',`${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.copse ? [['copse', 'Coppice', `${s.copseStools} <span class="m">stools · ${s.copseReady} ready to cut · ${s.copseYear.toLocaleString()} timber this year</span>`]] : []),
@@ -1580,7 +1597,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

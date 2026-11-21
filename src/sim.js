@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 37;
+export const SIM_VERSION = 38;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -62,6 +62,7 @@ export const TECHS = {
   coppice:  { name: 'Coppice', added: '2026-11-21T07:01Z', desc: 'A hazel cut low sends up a ring of straight poles from the stump. Trees felled near the village are left as stools instead of grubbed out; the fields and houses go round them and the goats and deer are kept off. A stool grows back to a stand of poles in a year or two, far faster than a wild tree, so there is still wood in reach of the hearth when the fields have eaten the woods.', req: ['woodcut'] },
   hedges:   { name: 'Hedges', added: '2026-11-21T09:42Z', desc: 'Slips of hawthorn dug from the wood\'s edge and set a hand apart along the fields by the trees, in autumn and winter while the thorn sleeps. For three years a hedge is only twigs behind the wattle; then it is a wall of thorn that turns nearly every boar and keeps the goats out of the grain. It costs no timber, does not rot and stands up to storms, so the fence behind it is left to fall. Only fire kills it.', req: ['fencing'] },
   whale:    { name: 'Whales', added: '2026-11-21T10:08Z', desc: 'Once in a few years a long storm drives a whale onto the sand. The morning after, everyone who can hold a flint knife goes down to the beach and cuts: strips of meat for the stores, blubber for the fires. In three days it begins to stink and the gulls and the tide take what is left; the great ribs stay on the beach for good.', req: ['fishing'] },
+  smudge:   { name: 'Smudge fires', added: '2026-11-21T11:57Z', desc: 'Twice blackened by a late frost, the village fights back. When a spring cold snap settles in and the evenings turn clear and still, the young and strong carry damp straw and green wood out between the rows at dusk and keep small fires smouldering till dawn. The smoke lies low over the young grain like a blanket and the frost mostly cannot settle under it. It costs firewood and a night\'s sleep; the smudgers lie in late the next morning.', req: ['fire', 'farming'] },
   frost:    { name: 'Late frost', added: '2026-11-21T10:44Z', desc: 'Some springs the cold comes back after the sowing. On a still, clear night the frost settles on the fields, and by morning the young green shoots have gone black and limp. Grain killed while it is still short has to be dug over and sown again; grain already knee-high only has its leaf tips burnt. Nobody on the island yet knows how to read a frost coming.', req: ['farming'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
@@ -419,7 +420,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -561,6 +562,7 @@ export function step(w, fx) {
   if (c.hour === 0) daily(w, c, fx);
   hornHour(w, c);
   if (w.watch) watchHour(w, c);
+  if (w.smudge) smudgeHour(w, c);
   if (c.hour === 19) supper(w);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
@@ -614,7 +616,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -631,6 +633,7 @@ function daily(w, c, fx) {
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
     if (w.wade) w.wade.y = 0;
+    if (w.smudge) w.smudge.y = 0;
     w.stats.yfr = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
@@ -756,7 +759,7 @@ function weather(w, c) {
   else {
     endSpell(w, s);
     if (s.k === 'storm') whaleStorm(w, c, s.n);
-    if (s.fk) frostTold(w, s);
+    if (s.fk || s.fs) frostTold(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
     if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
@@ -809,7 +812,7 @@ function endSpell(w, s) {
   } else if (s.k === 'heat' && n >= 7) {
     text = `${len} of blazing heat ${v('break')} at last. The grain stood still in the sun.`;
     big = n >= 18 || s.d >= 2;
-  } else if (s.k === 'cold' && n >= 6 && !s.fk) {
+  } else if (s.k === 'cold' && n >= 6 && !s.fk && !s.fs) {
     text = `${len} of bitter cold ${v('lift')}.` + (s.d ? ` ${plural(s.d, 'soul was', 'souls were')} lost to it.` : ' Every hearth was kept burning.');
     big = n >= 15 || s.d >= 2;
   } else if (s.k === 'snow' && n >= 5) {
@@ -843,16 +846,23 @@ const FROST_SET = 0.1;       // growth a nip costs
 function frostNight(w) {
   const s = w.wx;
   if (s.n < FROST_SET_IN) return;
+  const lit = w.smudge ? smudgeLit(w) : null;
   for (const f of w.fields) {
     if (f.stage !== 'planted') continue;
+    const smoked = !!(lit && lit.length && lit.some((o) => d2(o.x, o.y, f.x, f.y) <= SMUDGE_R));
     if (f.growth < FROST_YOUNG) {
-      if (rnd(w) < FROST_KILL) { f.stage = 'fallow'; f.growth = 0; f.fr = w.t; s.fk = (s.fk || 0) + 1; }
+      if (rnd(w) < FROST_KILL) {
+        if (smoked && rnd(w) < SMUDGE_HOLD) { s.fs = (s.fs || 0) + 1; continue; } // the smoke kept the frost off
+        f.stage = 'fallow'; f.growth = 0; f.fr = w.t; s.fk = (s.fk || 0) + 1;
+      }
     } else if (f.growth < 0.7 && rnd(w) < FROST_NIP) {
+      if (smoked && rnd(w) < SMUDGE_HOLD) continue;
       f.growth = Math.max(0, Math.round((f.growth - FROST_SET) * 10000) / 10000); s.fn = (s.fn || 0) + 1;
     }
   }
 }
 function frostTold(w, s) {
+  if (!s.fk) { smudgeTold(w, s); return; }
   const first = !w.frost;
   if (first) { w.frost = { n: 0, k: 0, y: 0, last: 0 }; if (!w.techs.includes('frost')) w.techs.push('frost'); }
   const F = w.frost;
@@ -870,6 +880,80 @@ function frostTold(w, s) {
     if (s.fk >= Math.max(8, w.fields.length >> 2)) milestone(w, `A late frost: ${len} of white dawns ${kill} the young grain in ${plural(s.fk, 'field', 'fields')}.${nip}${after}`);
     else log(w, `A late frost blackens the young grain in ${plural(s.fk, 'field', 'fields')}.${nip}${after}`, 'bad');
   }
+  if (s.fs) smudgeTold(w, s);
+  if (w.smudge === null && F.n >= SMUDGE_LEARN) learnSmudge(w);
+}
+
+// ---------- smudge fires ----------
+// Twice blackened by a late frost, the village fights it. On the second evening of a spring cold snap (the night
+// before the frost can settle) the young and strong go out at dusk with damp straw and green wood and keep small
+// smoky fires going between the rows of young grain till dawn; the smoke keeps most of the frost off the fields
+// round each fire. Each fire costs firewood; the smudgers sleep late the next morning.
+// w.smudge { n nights lit, f fires lit ever, s fields saved ever, y saved this year, nm who first lit them, at,
+// on [{x, y, id}] tonight's fires and their tenders, last [ids] sleeping it off, k turn }.
+const SMUDGE_LEARN = 2;     // killing frosts before the village fights back
+const SMUDGE_FROM = 20;     // hour the smudgers go out
+const SMUDGE_TO = 6;        // and come in at dawn
+const SMUDGE_REST = 10;     // they sleep until
+const SMUDGE_R = 10;        // (squared) the smoke from one fire covers fields this close
+const SMUDGE_CREW = 12;     // most fires lit in a night
+const SMUDGE_WOOD = 0.5;    // timber per fire per night
+const SMUDGE_HOLD = 0.8;    // chance the smoke keeps the frost off a covered field
+const SMUDGE_AT = 4;        // (squared) the tender must be this close to keep a fire going
+// fires that are really burning: their tender is there, awake and well
+function smudgeLit(w) {
+  return w.smudge.on.filter((o) => { const p = aliveId(w, o.id); return p && !p.asleep && d2(p.x, p.y, o.x + 0.5, o.y + 0.5) < SMUDGE_AT; });
+}
+export const smudgeOn = (w) => !!(w.smudge && w.smudge.on.length);
+function learnSmudge(w) {
+  const who = elder(w);
+  if (!who) return;
+  w.smudge = { n: 0, f: 0, s: 0, y: 0, nm: who.name, at: w.t, on: [], last: [], k: 0 };
+  if (!w.techs.includes('smudge')) w.techs.push('smudge');
+  milestone(w, `Twice now the cold has come back after the sowing and blackened the young grain. ${who.name} has seen that the rows downwind of the hearth, where the smoke drifts in the night, came through green. ` +
+    `From now on, when a spring cold snap sets in and the evenings are clear and still, the young will carry damp straw and green wood out to the fields at dusk and keep smoky fires going between the rows till dawn. ${w.name} learns to smudge the fields.`);
+}
+function smudgeHour(w, c) {
+  const S = w.smudge, h = c.hour;
+  if (h === SMUDGE_TO && S.on.length) { S.last = S.on.map((o) => o.id); S.on = []; }
+  if (h === SMUDGE_REST && S.last.length) S.last = [];
+  if (S.on.length) S.on = S.on.filter((o) => {
+    const p = aliveId(w, o.id);
+    if (p && !(p.sick || p.hurt || isLost(w, p))) return true;
+    if (p && p.task && p.task.k === 'smudge') release(w, p);
+    return false;
+  });
+  if (h !== SMUDGE_FROM || c.season !== 0 || c.year < FROST_YEAR || !w.wx || w.wx.k !== 'cold' || w.wx.n < FROST_SET_IN - 1) return;
+  const risk = w.fields.filter((f) => f.stage === 'planted' && f.growth < 0.7);
+  if (!risk.length) return;
+  const fx = w.fire.x, fy = w.fire.y;
+  risk.sort((a, b) => d2(a.x, a.y, fx, fy) - d2(b.x, b.y, fx, fy) || a.id - b.id);
+  const can = w.people.filter((p) => watchable(w, p) && !(w.watch && w.watch.hid === p.id));
+  if (!can.length) return;
+  can.sort((a, b) => a.id - b.id);
+  const crew = Math.min(SMUDGE_CREW, can.length), on = [];
+  let k = S.k % can.length;
+  for (const f of risk) {
+    if (on.length >= crew || w.timber < SMUDGE_WOOD) break;
+    if (on.some((o) => d2(o.x, o.y, f.x, f.y) <= SMUDGE_R)) continue;
+    on.push({ x: f.x, y: f.y, id: can[k].id });
+    k = (k + 1) % can.length;
+    w.timber = Math.round((w.timber - SMUDGE_WOOD) * 100) / 100;
+  }
+  if (!on.length) return;
+  S.k = (S.k + on.length) % 9973;
+  S.on = on; S.n++; S.f += on.length;
+}
+function smudgeTold(w, s) {
+  const S = w.smudge;
+  if (!S || !s.fs) return;
+  const firstSave = !S.s;
+  S.s += s.fs; S.y += s.fs;
+  const len = spellLen(s.n).toLowerCase();
+  if (firstSave) milestone(w, `For ${len} the nights are clear and bitter, and every night the smudge fires smoulder between the rows. At dawn the grass by the houses is white, but under the smoke the young grain stands green: ` +
+    `${plural(s.fs, 'field', 'fields')} the frost would have killed came through.${s.fk ? ` Farther out, past the reach of the smoke, ${plural(s.fk, 'field', 'fields')} went black all the same.` : ''} ${S.nm} walks the rows with smoke-red eyes and says the lost sleep was cheap.`);
+  else if (s.fk) log(w, `The smudge fires kept the frost off ${plural(s.fs, 'more field', 'more fields')}.`, 'good');
+  else log(w, `${spellLen(s.n)} of frost ${len.startsWith('a ') ? 'lifts' : 'lift'}. Under the smudge smoke ${plural(s.fs, 'field', 'fields')} of young grain came through green.`, 'good');
 }
 
 // ---------- the wild ----------
@@ -1108,6 +1192,7 @@ function lone(w, b) {
     if (dd >= bd || (ageY(w, p) < 14 && !isLost(w, p)) || !wild(w, p)) continue;
     if (heard(w, p) && !isLost(w, p)) continue; // they can call back to the horn: not alone
     if (w.watch && w.watch.hid === p.id) continue; // no wolf comes near the beach fire
+    if (p.task && p.task.k === 'smudge') continue; // nor near the smoke in the fields
     if (p.task && p.task.sea) continue; // out on the water in the dugout
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
     bd = dd; best = p;
@@ -3668,11 +3753,20 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
+  if (w.smudge && w.smudge.on.length) { // out among the young grain, keeping a smoky fire going till dawn
+    const o = w.smudge.on.find((q) => q.id === p.id);
+    if (o) {
+      p.asleep = false;
+      if (!p.task || p.task.k !== 'smudge') { release(w, p); p.task = { k: 'smudge', x: o.x, y: o.y, h: 99 }; }
+      walk(w, p, o.x + 0.5, o.y + 0.5);
+      return;
+    }
+  }
   // wildfire: everyone able goes out with green branches, dawn to late evening
   if (w.blaze && w.blaze.cur && w.t - w.blaze.cur.at >= BLAZE_SEEN && a >= 14 && a < 65 && !p.sick && !p.hurt && h >= 5 && h < 23 && blazeFight(w, p, c)) return; // even in a storm
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
-  const night = h >= 21 || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST); // the night's watcher sleeps late
+  const night = h >= 21 || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST) || (w.smudge && h < SMUDGE_REST && w.smudge.last.includes(p.id)); // the night's watcher sleeps late, and so do the smudgers
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
   if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
@@ -3720,7 +3814,7 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -4579,6 +4673,10 @@ const MIGRATIONS = {
   36: (w) => {
     if (w.wade === undefined) w.wade = null;
   },
+  // v37 -> v38: smudge fires. Learned once a second late frost has killed young grain.
+  37: (w) => {
+    if (w.smudge === undefined) w.smudge = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4641,6 +4739,8 @@ export function summary(w) {
     frostBlack: w.fields.filter((f) => f.fr != null).length,
     wading: !!w.wade, waders: w.wade ? w.people.filter((p) => p.task && p.task.k === 'wade').length : 0,
     cockles: w.wade ? w.wade.g : 0, cocklesYear: w.wade ? w.wade.y : 0, cockleBed: w.wade ? w.wade.c : 0, wadeScares: w.wade ? w.wade.s : 0,
+    smudge: !!w.smudge, smudgeFires: w.smudge ? w.smudge.on.length : 0, smudgeNights: w.smudge ? w.smudge.n : 0,
+    smudgeSaved: w.smudge ? w.smudge.s : 0, smudgeYear: w.smudge ? w.smudge.y : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

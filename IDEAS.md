@@ -373,3 +373,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A real danger: a drowning would be a heavy event; only worth it once there is something to answer it (a rule, a watcher on the beach).
   - The cockle bed could run out in a crowded late game, sending the children farther along the beach (or to the far shore).
   - Shell necklaces worn at midsummer (a colour on the dancers' sprites), or shells pressed into the clay of the pots as a pattern.
+- Smudge fires are done (SIM_VERSION 38; w.smudge {n nights, f fires, s saved, y this year, nm, at, on [{x, y, id}], last, k};
+  learnSmudge/smudgeHour/smudgeLit/smudgeTold in sim.js, SMUDGE_* constants; frostNight checks smudgeLit(); smudgeOn() exported;
+  `scripts/_smudgeprobe.mjs [years] [seed|live]`). Learned after the second killing frost; saves about half of what a frost would kill.
+  Answers it invites:
+  - Crew is capped at 12 fires (fields nearest the hearth first), so at 200+ people with 400 fields most outer fields are still bare.
+    A rota by household, or a horn call that wakes the whole village on the worst night, would scale it.
+  - Smudging burns timber in spring; in a year the woodpile is bare there are no fires at all. Coppice poles could be kept for it.
+  - A smudger who sits out every frost night could catch a chill (fever chance) or earn a byname ("the Smoker").
+  - Weather lore is still open: reading a clear, still evening and lighting the fires on the first night instead of the second.
