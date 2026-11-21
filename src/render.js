@@ -194,6 +194,40 @@ function fw(o, frac, ref = 3) {
   const d = Math.hypot(o.x - o.px, o.y - o.py);
   return d > 0 && d < ref ? Math.min(1, (frac * ref) / d) : frac;
 }
+// Work at the spot (render-only): tools swing in a steady rhythm, each islander a little out of step with the next,
+// and chips, seed, clods or dust fly on the beat. X, Y = top-left of an adult standing sprite; tools on the right.
+const WOOD = '#8a5a32', IRON = '#c8c8c8';
+function work(k, id, X, Y, now) {
+  const ph = (n) => Math.floor(now / n + id * 0.37);
+  if (k === 'chop' || k === 'clear') { // an axe (or a mattock for stumps) over the shoulder and down, chips on the blow
+    const f = ph(170) % 4, up = f < 2, clr = k === 'clear';
+    if (up) { px(sc, X + 3, Y - 2, WOOD, 1, 3); px(sc, X + 3, Y - 3, IRON, clr ? 2 : 1, 1); if (!clr) px(sc, X + 4, Y - 2, IRON); }
+    else { px(sc, X + 3, Y + 1, WOOD); px(sc, X + 4, Y + 2, WOOD); px(sc, X + 5, Y + 2 + (f === 3 ? 1 : 0), IRON, 1, clr ? 2 : 1); }
+    if (f === 3) { // the blow lands: chips (or clods) jump
+      const c = clr ? '#6b4a2e' : '#e3b878';
+      px(sc, X + 6, Y + 1, c); px(sc, X + 5 + (ph(170) % 2 ? 2 : 1), Y, c);
+    }
+  } else if (k === 'harvest' || k === 'rogue') { // stooped, a sickle sweeping low; a cut stalk flicks up
+    const f = ph(220) % 3;
+    px(sc, X + 3, Y + 2 + (f === 1 ? 1 : 0), IRON); px(sc, X + 4, Y + 1 + f, IRON);
+    if (f === 2) px(sc, X + 5, Y, k === 'rogue' ? '#b5652e' : '#f2cd4c', 1, 2);
+  } else if (k === 'plant') { // seed scattered from the hand in a little fan, falling to the furrow
+    const t = (now / 900 + id * 0.37) % 1;
+    px(sc, X + 3, Y + 1, '#f1c9a5');
+    if (t < 0.6) { const d = Math.floor(t * 6); px(sc, X + 4 + (d >> 1), Y + 1 + d, '#d9c27a'); px(sc, X + 3 + d, Y + 2 + (d >> 1), '#d9c27a'); }
+  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig') { // a mallet (spade, for digging) rising and falling
+    const f = ph(200) % 3, spade = k === 'dig';
+    if (k !== 'build') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
+    if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
+    else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
+    if (f === 2) px(sc, X + 5 + (ph(200) % 2), Y + 2, spade ? '#6b4a2e' : 'rgba(230,230,230,0.7)'); // dust or a clod
+  } else if (k === 'forage' || k === 'gather') { // a basket on the hip, a hand reaching down and coming up full
+    const f = ph(380) % 4;
+    px(sc, X - 1, Y + 2, WOOD, 1, 2);
+    if (f === 1) px(sc, X + 3, Y + 3, '#f1c9a5');
+    else if (f === 2) { px(sc, X + 3, Y + 2, '#f1c9a5'); px(sc, X + 3, Y + 1, k === 'forage' ? '#c08ae8' : '#9a7a4e'); }
+  }
+}
 function px(c, x, y, col, wdt = 1, hgt = 1) { c.fillStyle = col; c.fillRect(x, y, wdt, hgt); }
 function sprite(c, rows, ox, oy, map) {
   for (let y = 0; y < rows.length; y++) for (let x = 0; x < rows[y].length; x++) {
@@ -1010,7 +1044,7 @@ function frame() {
       }
     } else {
       px(sc, X + 1, Y, '#f1c9a5'); px(sc, X, Y + 1, col, 3, 2); px(sc, X + step * 2, Y + 3, '#3a3a3a', 1, 1); px(sc, X + 2 - step * 2, Y + 3, '#3a3a3a', 1, 1);
-      if (p.task && !moving && ['chop', 'harvest', 'build', 'clear'].includes(p.task.k) && Math.floor(now / 300 + p.id) % 2) px(sc, X + 3, Y + 1, '#ddd', 1, 1);
+      if (p.task && !moving) work(p.task.k, p.id, X, Y, now);
       if (p.task && p.task.k === 'fish' && !moving) { // rod held out toward the water, line bobbing
         const bob = Math.floor(now / 500 + p.id) % 3 === 0 ? 1 : 0;
         px(sc, X + 3, Y, '#8a5a32', 1, 1); px(sc, X + 4, Y - 1, '#8a5a32', 1, 1);
