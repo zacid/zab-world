@@ -327,3 +327,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Field sprawl itself is untouched (needFields ~2 per person, 500 fields at 230 people). Manuring with goat dung or
     rotation would shrink it; houses could also stop being built when the woodpile cannot heat them.
   - Fire through the coppice kills the stools (they drop out of the list); real stools resprout after fire.
+- Families view is done (render.js kinFolk/drawFamilies; w.roll keeps sunk graves and far-isle leavers; graves keep pt).
+  Answers it invites:
+  - Kinship in the sim: mate() only blocks siblings; after 3-4 generations cousins will marry. An elder's rule against
+    it (or a far-isle bride brought home for it) would be a story and a reason for the isle boat.
+  - Family names: the eldest line could take a house name ("of Vidor's hearth") that shows in tales and on graves.
+  - Heirlooms: a byname holder's spear or crook passes to a child, who gets a head start on the same deed.
+  - The tree shows infant deaths plainly († aged 0): a midwife or herb lore for childbirth could cut them.
+  - w.roll grows by ~100 bytes per sunk grave (~60 KB a century at 300 people); drop `why` from roll entries if save
+    size starts to matter.

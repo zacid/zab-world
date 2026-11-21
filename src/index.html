@@ -49,9 +49,30 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #sparkcap { color:var(--muted); font-size:11px; margin-top:4px; }
 .btn { position:absolute; background:var(--panel); border:1px solid var(--line); color:var(--fg); font:inherit; padding:6px 12px; cursor:pointer; }
 .btn:hover, .btn.on { border-color:var(--accent); color:var(--accent); }
-#skybtn { left:12px; top:12px; }
+#nav { position:absolute; left:12px; top:12px; display:flex; gap:6px; }
+#nav .btn { position:static; }
 #logbtn { display:none; }
-#histbtn { left:12px; top:54px; }
+#kin { position:absolute; inset:0; background:#03050a; overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+#kinback { left:12px; top:12px; position:fixed; z-index:2; }
+#kwrap { max-width:760px; margin:0 auto; padding:16px 16px 40px; }
+#khd { text-align:center; font-size:24px; margin-top:4px; }
+#ksub { text-align:center; color:var(--muted); margin:4px 0 14px; }
+#ktree { font-size:13px; }
+#ktree .kl { margin-top:18px; }
+#ktree .kl > .hd { margin-bottom:4px; }
+#ktree .kn { padding:1px 0; white-space:nowrap; }
+#ktree .kc > .kb { position:relative; padding-left:16px; }
+#ktree .kc > .kb::before { content:""; position:absolute; left:4px; top:0; bottom:0; border-left:1px solid rgba(255,255,255,.28); }
+#ktree .kc > .kb:last-child::before { bottom:auto; height:.8em; }
+#ktree .kc > .kb::after { content:""; position:absolute; left:4px; top:.8em; width:9px; border-top:1px solid rgba(255,255,255,.28); }
+#ktree a { color:var(--fg); text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; }
+#ktree a:hover, #ktree a.on { color:var(--accent); }
+#ktree .dead { color:var(--muted); }
+#ktree .m { color:var(--muted); font-size:12px; }
+#ktree .amp { color:var(--love); }
+#ktree .kn.hl { background:rgba(89,240,139,.12); outline:1px solid rgba(89,240,139,.5); }
+#ktree .ended { opacity:.7; }
+#who .tree { color:var(--muted); }
 #hist { position:absolute; inset:0; background:#03050a; overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
 #histback { left:12px; top:12px; position:fixed; z-index:2; }
 #hwrap { max-width:760px; margin:0 auto; padding:16px 16px 40px; }
@@ -100,12 +121,12 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   #title { font-size:22px; } #top { top:8px; }
   #graph { display:none; }
   #res { left:8px; bottom:8px; min-width:0; font-size:13px; padding:8px 10px; }
-  #skybtn { left:8px; top:auto; bottom:8px; right:auto; transform:translateY(-160px); }
+  #nav { left:8px; top:auto; bottom:168px; flex-direction:column-reverse; align-items:flex-start; gap:4px; }
+  #kwrap { padding-top:54px; }
   #logbtn { display:block; right:8px; bottom:8px; }
   #who { left:8px; right:8px; top:64px; width:auto; max-height:34%; font-size:12px; }
   #chron { display:none; right:8px; left:8px; width:auto; bottom:52px; max-height:55%; }
   #app.logopen #chron { display:flex; }
-  #histbtn { left:8px; top:auto; bottom:8px; transform:translateY(-200px); }
   #hwrap { padding-top:54px; }
   .yr .ev .se { width:auto; margin-right:8px; }
   #tl { top:52px; left:8px; right:8px; width:auto; max-height:30%; }
@@ -116,8 +137,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 <div id="app">
   <canvas id="c"></canvas>
   <div id="top"><div id="title">…</div><div id="when"></div><div id="badge" hidden>demo · fast-forwarded world</div></div>
-  <button class="btn" id="skybtn">✦ Sky</button>
-  <button class="btn" id="histbtn">≡ History</button>
+  <div id="nav"><button class="btn" id="skybtn">✦ Sky</button><button class="btn" id="histbtn">≡ History</button><button class="btn" id="kinbtn">⋔ Families</button></div>
   <div class="panel" id="res"></div>
   <div class="panel" id="graph"><canvas id="spark"></canvas><div id="sparkcap"></div></div>
   <div class="panel" id="chron"><div class="hd">Chronicle</div><div id="log"></div></div>
@@ -132,6 +152,14 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
       <div id="hsub"></div>
       <div class="panel" id="hchart"><canvas id="hspark"></canvas><div id="hcap"></div></div>
       <div id="hyears"></div>
+    </div>
+  </div>
+  <div id="kin" hidden>
+    <button class="btn" id="kinback">← Island</button>
+    <div id="kwrap">
+      <div id="khd"></div>
+      <div id="ksub"></div>
+      <div id="ktree"></div>
     </div>
   </div>
   <div id="sky" hidden>

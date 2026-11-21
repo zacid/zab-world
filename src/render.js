@@ -140,6 +140,7 @@ function drawWho() {
     el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div><b>${esc(gone)}</b><div class="m">is no longer among the living.</div>` +
       (g ? `<div class="do">${esc(graveText(g))}; lies in the burying ground since ${when(g.d)}.</div>` : '') +
       (g && g.dd ? `<div class="kin"><span class="m">in life</span> ${esc(g.dd)}</div>` : '') +
+      (g ? `<div class="kin"><a class="tree" data-tree="${g.id}">family tree</a></div>` : '') +
       (last ? `<div class="ev"><span class="when">${last.s}</span>${esc(last.text)}</div>` : '');
     el.hidden = false; return;
   }
@@ -162,7 +163,7 @@ function drawWho() {
     `<b>${esc(p.name)}</b>${by ? ` <span class="by">${esc(by)}</span>` : ''} <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
     (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
     (w.goats && w.goats.hid === p.id ? ' <span class="goat">goatherd</span>' : '') +
-    `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''}</div>` +
+    `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''} · <a class="tree" data-tree="${p.id}">family tree</a></div>` +
     kin.map(([l, v]) => `<div class="kin"><span class="m">${l}</span> ${v}</div>`).join('') +
     ev.map((e) => `<div class="ev"><span class="when">${e.s}</span>${esc(e.text)}</div>`).join('');
   el.hidden = false;
@@ -1481,7 +1482,90 @@ function drawHistChart() {
 }
 function showHistory(on) {
   $('hist').hidden = !on; $('histbtn').classList.toggle('on', on);
-  if (on) { $('sky').hidden = true; $('skybtn').classList.remove('on'); drawHistory(); }
+  if (on) { $('sky').hidden = true; $('skybtn').classList.remove('on'); showFamilies(false); drawHistory(); }
+}
+
+// ---------- families: everyone who has lived on the island, line by line ----------
+// Built from the living, the burying ground and the roll of names (graves that have sunk, islanders who sailed away).
+function kinFolk() {
+  const all = new Map();
+  for (const r of w.roll || []) all.set(r.id, { ...r, live: false });
+  for (const g of w.graves || []) all.set(g.id, { id: g.id, n: g.n, x: g.x, b: g.b, d: g.d, why: g.why, m: g.m, f: g.f, pt: g.pt, by: g.by, live: false });
+  for (const p of w.people) if (!p.dead) all.set(p.id, { id: p.id, n: p.name, x: p.sex, b: p.born, d: null, m: p.mother, f: p.father, pt: p.partner, by: S.byname(p), live: true });
+  const has = (id) => id != null && all.has(id);
+  const mates = new Map(), under = new Map();
+  const add = (m, k, v) => { if (!m.has(k)) m.set(k, []); if (!m.get(k).includes(v)) m.get(k).push(v); };
+  for (const o of all.values()) {
+    if (has(o.pt)) { add(mates, o.id, o.pt); add(mates, o.pt, o.id); }
+    if (has(o.m) && has(o.f)) { add(mates, o.m, o.f); add(mates, o.f, o.m); }
+  }
+  const root = (o) => !has(o.m) && !has(o.f);
+  // a settler (or a bride from the far isle) is shown beside the partner they married, not as a line of their own
+  const host = new Map(), ids = [...all.keys()].sort((a, b) => a - b);
+  for (const id of ids) {
+    const o = all.get(id);
+    if (!root(o)) continue;
+    const ms = (mates.get(id) || []).map((i) => all.get(i));
+    const q = ms.find((q) => !root(q)) || ms.find((q) => root(q) && q.id < id && !host.has(q.id));
+    if (q) host.set(id, q.id);
+  }
+  const isHead = (id) => has(id) && !host.has(id);
+  const kids = [...all.values()].filter((o) => !root(o)).sort((a, b) => a.b - b.b || a.id - b.id);
+  for (const c of kids) {
+    const at = isHead(c.m) ? c.m : isHead(c.f) ? c.f : host.get(c.m) ?? host.get(c.f);
+    if (at != null) add(under, at, c.id);
+  }
+  const roots = ids.filter((id) => root(all.get(id)) && !host.has(id));
+  return { all, mates, under, roots, host };
+}
+function drawFamilies(focus) {
+  if (!w) return;
+  const { all, mates, under, roots, host } = kinFolk(), yr = (t) => S.clock(Math.max(0, t)).year;
+  const age = (o) => Math.floor(((o.live ? w.t : o.d) - o.b) / S.TICKS_PER_YEAR);
+  const name = (o) => o.live ? `<a data-kid="${o.id}"${o.id === follow ? ' class="on"' : ''}>${esc(o.n)}</a>` : `<span class="dead">${esc(o.n)}</span>`;
+  const note = (o) => o.live ? `<span class="m">${age(o)}</span>`
+    : /sailed/.test(o.why || '') ? `<span class="m">sailed to the far isle Y${yr(o.d)}, aged ${age(o)}</span>`
+    : `<span class="m" title="${esc(o.why || '')}">† Y${yr(o.d)}, aged ${age(o)}</span>`;
+  const person = (o) => `${name(o)}${o.by ? ` <span class="by">${esc(o.by)}</span>` : ''} ${note(o)}`;
+  let deep = 0;
+  const live = new Map(); // id -> living people in this branch, partners included
+  const count = (id, seen) => {
+    if (seen.has(id)) return 0; seen.add(id);
+    let n = all.get(id).live ? 1 : 0;
+    for (const m of mates.get(id) || []) if (host.get(m) === id && all.get(m).live) n++;
+    for (const c of under.get(id) || []) n += count(c, seen);
+    live.set(id, n); return n;
+  };
+  const node = (id, d, seen) => {
+    if (seen.has(id)) return ''; seen.add(id);
+    deep = Math.max(deep, d + 1);
+    const o = all.get(id), ms = (mates.get(id) || []).map((i) => all.get(i));
+    const line = `<div class="kn" id="kn${id}">${person(o)}${ms.map((q) => ` <span class="amp">&amp;</span> ${person(q)}`).join('')}</div>`;
+    const cs = (under.get(id) || []).map((c) => node(c, d + 1, seen)).filter(Boolean);
+    return line + (cs.length ? `<div class="kc">${cs.map((h) => `<div class="kb">${h}</div>`).join('')}</div>` : '');
+  };
+  const lines = roots.map((id) => ({ id, n: count(id, new Set()) }));
+  const seen = new Set();
+  const block = (l) => {
+    const o = all.get(l.id), ms = (mates.get(l.id) || []).map((i) => all.get(i).n);
+    const t = `The line of ${[o.n, ...ms].map(esc).join(' &amp; ')}`;
+    return `<div class="kl${l.n ? '' : ' ended'}"><div class="hd">${t}${l.n ? ` · ${l.n} living` : ' · ended'}</div>${node(l.id, 0, seen)}</div>`;
+  };
+  const alive = lines.filter((l) => l.n).sort((a, b) => b.n - a.n || a.id - b.id), gone = lines.filter((l) => !l.n);
+  let html = alive.map(block).join('');
+  if (gone.length) html += `<div class="kl"><div class="hd">Lines that have ended</div></div>` + gone.map(block).join('');
+  const living = w.people.filter((p) => !p.dead).length;
+  $('khd').textContent = `Families of ${w.name}`;
+  $('ktree').innerHTML = html;
+  $('ksub').textContent = `${living} living · ${all.size - living} remembered · ${deep} generation${deep === 1 ? '' : 's'} · click a name to follow them`;
+  if (focus != null) {
+    const el = $('kn' + focus);
+    if (el) { el.classList.add('hl'); el.scrollIntoView({ block: 'center' }); }
+  }
+}
+function showFamilies(on, focus) {
+  $('kin').hidden = !on; $('kinbtn').classList.toggle('on', on);
+  if (on) { $('sky').hidden = true; $('skybtn').classList.remove('on'); $('hist').hidden = true; $('histbtn').classList.remove('on'); drawFamilies(focus); }
 }
 
 // ---------- the sky: discoveries as constellations ----------
@@ -1558,16 +1642,24 @@ async function boot() {
   });
   cv.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.35, Math.min(4, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); computeView(); }, { passive: false });
   cv.addEventListener('dblclick', () => { zoom = 1; pan = { x: 0, y: 0 }; if (follow != null) stopFollow(); cam = null; returning = false; computeView(); });
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('hist').hidden) return showHistory(false); if (e.key === 'Escape' && follow != null) stopFollow(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('kin').hidden) return showFamilies(false); if (e.key === 'Escape' && !$('hist').hidden) return showHistory(false); if (e.key === 'Escape' && follow != null) stopFollow(); });
   $('who').addEventListener('click', (e) => {
-    const a = e.target.closest('[data-id],[data-close]');
+    const a = e.target.closest('[data-id],[data-close],[data-tree]');
     if (!a) return;
-    if (a.hasAttribute('data-close')) stopFollow(); else startFollow(+a.dataset.id);
+    if (a.hasAttribute('data-tree')) showFamilies(true, +a.dataset.tree);
+    else if (a.hasAttribute('data-close')) stopFollow(); else startFollow(+a.dataset.id);
   });
+  $('ktree').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-kid]');
+    if (!a) return;
+    showFamilies(false); startFollow(+a.dataset.kid);
+  });
+  $('kinbtn').onclick = () => showFamilies($('kin').hidden);
+  $('kinback').onclick = () => showFamilies(false);
   cv.addEventListener('mouseleave', () => { mouse = null; $('tip').hidden = true; });
   $('histbtn').onclick = () => showHistory($('hist').hidden);
   $('histback').onclick = () => showHistory(false);
-  $('skybtn').onclick = () => { if (!$('hist').hidden) showHistory(false); $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
+  $('skybtn').onclick = () => { if (!$('hist').hidden) showHistory(false); if (!$('kin').hidden) showFamilies(false); $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
   try {
     const r = await fetch('world/state.json', { cache: 'no-store' });

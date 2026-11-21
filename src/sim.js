@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 32;
+export const SIM_VERSION = 33;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -407,7 +407,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -1537,6 +1537,7 @@ function boatLeaves(w, B) {
       !(w.heal && w.heal.id === o.id) && !(w.horn && w.horn.hid === o.id) && !(w.goats && w.goats.hid === o.id) && !(w.lost && w.lost.cur && w.lost.cur.id === o.id) &&
       !w.people.some((k) => !k.dead && (k.mother === o.id || k.father === o.id) && ageY(w, k) < 14));
     if (p && rnd(w) < ISLE_LEAVE) {
+      rollCall(w, { id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why: 'sailed away to the far isle', m: p.mother, f: p.father, pt: null, by: byname(p) });
       release(w, p); p.dead = true; I.gone++; unname(w, p);
       B.gs.push({ nm: p.name, sex: p.sex, a: Math.floor(ageY(w, p)), x: B.x, y: B.y, px: p.x, py: p.y, k: 'boat', isl: 1 });
       if (I.gone === 1) milestone(w, `At first light the guests push off for the far isle, and ${p.name} goes with them. Nobody on ${w.name} was left for ${p.sex === 'f' ? 'her' : 'him'} to marry. The first islander to leave ${w.name} waves from the boat until it is gone into the haze.`);
@@ -2838,6 +2839,15 @@ function findYardSite(w) {
 export function gravePos(yard, s) {
   return { x: yard.x + (2 + (s % GRAVE_COLS) * 3) / 8, y: yard.y + (4 + Math.floor(s / GRAVE_COLS) * 4) / 8 };
 }
+// the roll of names: everyone whose grave has sunk into the turf, or who sailed away, so the family
+// tree keeps them. Only the Families view reads it; nothing in the step path looks at it.
+function rollCall(w, g) {
+  if (!w.roll) w.roll = [];
+  const r = { id: g.id, n: g.n, x: g.x, b: g.b, d: g.d, why: g.why, m: g.m, f: g.f };
+  if (g.pt != null) r.pt = g.pt;
+  if (g.by) r.by = g.by;
+  w.roll.push(r);
+}
 function bury(w, p, why) {
   if (!w.graves) return;
   let first = false;
@@ -2856,8 +2866,9 @@ function bury(w, p, why) {
   const used = new Array(GRAVE_CAP).fill(false);
   for (const g of w.graves) used[g.s] = true;
   let s = used.indexOf(false), old = null;
-  if (s < 0) { old = w.graves.shift(); s = old.s; Y.sunk++; }
+  if (s < 0) { old = w.graves.shift(); s = old.s; Y.sunk++; rollCall(w, old); }
   const g = { id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why, m: p.mother, f: p.father, s };
+  if (p.partner != null) g.pt = p.partner;
   if (p.dd && p.dd.by) { g.by = byname(p); g.dd = deedsText(p.dd); }
   w.graves.push(g);
   Y.n++;
@@ -4248,6 +4259,11 @@ const MIGRATIONS = {
   // v31 -> v32: coppice. No stools yet; from year 8 someone notices the shoots on an old stump one spring.
   31: (w) => {
     if (w.copse === undefined) w.copse = null;
+  },
+  // v33: the roll of names behind the Families view. The living and the graves are already known;
+  // only those whose graves sink or who sail away from now on are added.
+  32: (w) => {
+    if (!w.roll) w.roll = [];
   },
 };
 export function migrate(w) {
