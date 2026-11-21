@@ -248,5 +248,10 @@
   "at": "2026-11-21T22:50:36.172Z",
   "title": "Add a hard-years strip to the History chart",
   "body": "- History now shows a strip under the population chart: one column per finished year, rows for storms, fog, fever, beasts, lost fields, lost grain and deaths\n- Each cell is shaded red by how bad that year was for that row compared with the island's worst year; the hardest year overall gets a white frame\n- Hover a column to read that year's troubles; click it to jump to the year in the list below\n- Render only (render.js, index.html); no change to the simulation or the save\n- Watch: on Hais the founding year (24 storm days, 10 boar raids) should stand out until a worse year comes"
+ },
+ {
+  "at": "2026-11-21T23:29:30.643Z",
+  "title": "Add foot rot that lames the goats in wet spells",
+  "body": "- SIM_VERSION 47 (w.rot {n, k, d, y, yd, yr, last, cur {at, n, d}}; g.lm lame since, g.im sound until; ROT_* in sim.js; tech 'footrot'; yearly `lame`, `rotDied`): after 3+ days of rain, fog or storm outside winter, a pen of 6+ goats can catch foot rot (at most one outbreak a year)\n- It spreads through the mud from hoof to hoof, faster on wet days and in a full pen. Lame goats stay bedded in the pen: no grazing, no milk, no kids. About 0.6% die each day (kids twice as likely); they heal once the ground dries and then stay sound for 200 days\n- Visible: lame goats lie in the straw with muddied coats and flies over them, a hover line, a \"lame\" count on the Goats row, a History line. Nothing stops it yet\n- Watch: on Hais the first outbreak is due in the wet spring of Y9, and after that one every 2 years or so, killing 1-3 goats each time. Milk and kids drop in those years"
  }
 ]

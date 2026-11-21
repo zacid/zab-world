@@ -464,3 +464,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     moving hardScore into the sim would let tales and the eldest refer to it.
   - The year in progress has no column yet (yearly rows are written at year end); a partial column from w.stats would show it live.
   - Rows only cover what `hist.yearly` records; hunger or cold deaths are not split out of `deaths`. A `cold` count per year would help.
+- Foot rot is done, as a problem only (SIM_VERSION 47; w.rot, g.lm / g.im; rotDay/rotBegins/rotEnds in sim.js, ROT_* constants; yearly `lame`,
+  `rotDied`; muddied coats and flies in drawGoats(); `scripts/_rotprobe.mjs [years] [seed|live]`). Outbreaks usually reach most of the herd and kill
+  1-5. Nobody has an answer yet, and it is not in the Hard-years strip. Answers it invites:
+  - Hoof trimming: the herder pares the rotten horn with a flint and stands the lame in a trough of salt water or crushed oak bark (heal faster).
+  - A sick fold: the first lame goat is penned apart (a second small wattle pen), which stops most of the spread. Ties to how rogueing and the healer work.
+  - A raised floor or stone-laid floor in the pen, or moving the herd to a drier pen on higher ground after a bad year; fresh straw from the harvest.
+  - Herbs for goats: the healer learns that the same willow-bark wash helps hooves.
+  - Thinning: a smaller herd stays sound (the spread is scaled by herd size), so the village might choose to kill more for the pot in autumn.
+  - A Hard-years cell for goats (lame + dead of rot + lost to wolves) would show bad herd years.

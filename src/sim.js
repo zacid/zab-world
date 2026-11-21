@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 46;
+export const SIM_VERSION = 47;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -71,6 +71,7 @@ export const TECHS = {
   lone:     { name: 'The lone wolf', added: '2026-11-21T16:37Z', desc: 'Years of spears have kept the pack at the den down to two, and a young wolf driven out of it has no pack to run with. It stays near the village, lies up in a thicket by the fields and walks the treeline by day, when the pack sleeps. It takes goats that stray and springs on anyone working alone. While it lives every hunt goes after it, and the pack at the den is left to grow. If nobody kills it, in a few years it moves on.', req: ['hunting'] },
   lore:     { name: 'Sky lore', added: '2026-11-21T20:43Z', desc: 'The eldest has sat out a lifetime of storms and at dusk reads the sky over the sea: a red sky in the west with mares\' tails high up, a long swell under a flat sea, gulls coming in off the water, hearth smoke that beats down instead of rising. When the signs say a storm by morning the village works on into the dark: the ripe grain is cut by firelight, and ropes weighted with stones are thrown over every roof so the wind cannot lift the thatch. The signs are not always right, and some storms come without any.', req: ['fire', 'shelter'] },
   muck:     { name: 'Muck', added: '2026-11-21T21:34Z', desc: 'Dung forked out of the goat pen goes on a heap beside it, with the hearth ash and the kitchen scraps, and steams there through the winter. After the harvest it is carried out in baskets and forked over the bare fields, nearest the pen first. A mucked field stands thicker and heavier at its next harvest, by about a third, so the village needs fewer fields and fells less of the wood. The more goats, the bigger the heap.', req: ['goats', 'farming'] },
+  footrot:  { name: 'Foot rot', added: '2026-11-21T22:51Z', desc: 'After days of rain the goat pen turns to a wallow of mud and dung, and the hooves go soft in it. A goat starts holding up a foot and hobbling on three; the hoof is grey and stinking between the claws. Lame goats lie in the straw and will not go out to graze, give no milk and kid no more, and a few never stand up again. It passes from hoof to hoof through the mud, fastest when the pen is wet and crowded, and goes when the ground dries. Nobody yet knows what to do for it.', req: ['goats'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -335,7 +336,19 @@ const GOAT_MEAT = 20;
 const GOAT_OLD = 10;         // years before a goat is killed for the pot
 const GOAT_BROWSE = 4;       // saplings this small are eaten back to grass around the pen
 const GOAT_NIBBLE = 0.04;    // growth an unminded goat eats from a young field each hour it stands in it
-const PEN_ODDS = 0.025;      // chance per winter night that a hungry wolf comes to the goat pen
+// foot rot: a wet spell turns the pen to mud and the hooves go soft. w.rot {n outbreaks, k lame ever, d died,
+// y lame this year, yd died this year, yr year of the last outbreak, last tick, cur {at, n, d} | null}; g.lm lame since, g.im sound until
+const ROT_HERD = 6;          // goats in the pen before it gets crowded and fouled enough
+const ROT_WET = 3;           // days of rain, fog or storm in a row before the mud gets into the hooves
+const ROT_START = 0.015;     // daily chance on such a day (scaled by how full the pen is), at most one outbreak a year
+const ROT_SPREAD = 0.3;      // daily chance a sound goat goes lame, times the share of the herd already lame (wet days)
+const ROT_SPREAD_DRY = 0.1;  // the same on dry days
+const ROT_HEAL = 0.07;       // daily chance a lame goat walks sound again once the ground is dry (after ROT_MIN days)
+const ROT_HEAL_WET = 0.02;
+const ROT_MIN = 6;
+const ROT_DIE = 0.006;       // daily chance a lame goat dies in the straw (kids twice as likely)
+const ROT_IMM = 200;        // days a goat that has had it stays sound
+const PEN_ODDS = 0.025;     // chance per winter night that a hungry wolf comes to the goat pen
 const PEN_COLD = 2;          // x this on a frost or snow night
 const PEN_DEER = 0.5;        // x this while the pack still has more than three deer to chase
 const PEN_HOLD = 0.35;       // chance the wattle holds until the wolf gives up
@@ -494,7 +507,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -691,7 +704,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -3181,7 +3194,7 @@ function goatDay(w, c) {
     if (w.tiles[i] === T.FOREST && w.wood[i] <= GOAT_BROWSE && !isStool(w, i)) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
   }
   let grown = 0;
-  for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR) grown++;
+  for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR && g.lm == null) grown++; // a lame goat gives no milk and does not kid
   if (c.season < 2 && grown) {
     const milk = Math.round(grown * GOAT_MILK * 10) / 10;
     w.food = Math.round((w.food + milk) * 100) / 100; G.ym = Math.round((G.ym + milk) * 10) / 10; G.milk = Math.round((G.milk + milk) * 10) / 10;
@@ -3217,6 +3230,67 @@ function goatDay(w, c) {
       log(w, `${plural(kill.length, 'goat is', 'goats are')} killed before winter. Meat for the smoke, ${kill.length === 1 ? 'a hide' : 'hides'} for the doorways.`, 'info');
     }
   }
+  rotDay(w, c);
+}
+// ---------- foot rot ----------
+// A long wet spell turns a full pen into a wallow of mud and dung, and the hooves go soft in it. One goat
+// starts to limp; others follow, fastest while the wet holds. Lame goats bed down in the straw: no grazing,
+// no milk, no kids, and now and then one dies. When the ground dries they walk sound again and stay sound a while.
+function rotDay(w, c) {
+  const G = w.goats, n = G.herd.length;
+  if (w.rot && c.doy === 0) { w.rot.y = 0; w.rot.yd = 0; }
+  const wx = w.wx ? w.wx.k : 'clear', wet = wx === 'rain' || wx === 'fog' || wx === 'storm';
+  const R = w.rot, C = R && R.cur;
+  if (!C) {
+    if (n < ROT_HERD || c.season > 2 || !wet || w.wx.n < ROT_WET || (R && R.yr === c.year)) return;
+    if (rnd(w) >= ROT_START * Math.min(1, n / GOAT_MAX)) return;
+    const sound = G.herd.filter((g) => w.t - g.b >= TICKS_PER_YEAR && !(g.im > w.t));
+    if (!sound.length) return;
+    rotBegins(w, c, sound[ri(w, sound.length)]);
+    return;
+  }
+  let lame = 0;
+  for (const g of G.herd) if (g.lm != null) lame++;
+  // spread through the mud, hoof to hoof
+  if (lame && lame < n) {
+    const odds = (wet ? ROT_SPREAD : ROT_SPREAD_DRY) * lame / n * Math.min(1, n / 10); // a small herd has room to keep its feet out of the mud
+    for (const g of G.herd) if (g.lm == null && !(g.im > w.t) && rnd(w) < odds) { g.lm = w.t; C.n++; R.k++; R.y++; }
+  }
+  // the lame mend or die
+  const dead = [];
+  for (const g of G.herd) {
+    if (g.lm == null || g.lm === w.t) continue;
+    const kid = w.t - g.b < TICKS_PER_YEAR;
+    if (rnd(w) < ROT_DIE * (kid ? 2 : 1)) { dead.push(g); continue; }
+    if (w.t - g.lm >= ROT_MIN * TICKS_PER_DAY && rnd(w) < (wet ? ROT_HEAL_WET : ROT_HEAL)) { g.lm = null; g.im = w.t + ROT_IMM * TICKS_PER_DAY; }
+  }
+  if (dead.length) {
+    G.herd = G.herd.filter((g) => !dead.includes(g));
+    C.d += dead.length; R.d += dead.length; R.yd += dead.length;
+    w.hides = (w.hides || 0) + dead.length; // the hide is still worth taking; the meat is not
+    log(w, dead.length === 1 ? 'A lame goat that has not stood up for days dies in the straw. Its hide is kept; the carcass is dragged off and burnt.'
+      : `${dead.length} lame goats die in the straw. Their hides are kept; the carcasses are dragged off and burnt.`, 'bad');
+  }
+  if (!G.herd.some((g) => g.lm != null)) rotEnds(w);
+}
+function rotBegins(w, c, g) {
+  const first = !w.rot;
+  if (first) w.rot = { n: 0, k: 0, d: 0, y: 0, yd: 0, yr: 0, last: 0, cur: null };
+  const R = w.rot, G = w.goats;
+  g.lm = w.t;
+  R.n++; R.k++; R.y++; R.yr = c.year; R.last = w.t;
+  R.cur = { at: w.t, n: 1, d: 0 };
+  const h = aliveId(w, G.hid), who = h || elder(w), wet = w.wx.k === 'fog' ? 'fog' : 'rain';
+  if (first) {
+    if (!w.techs.includes('footrot')) w.techs.push('footrot');
+    milestone(w, `After ${spellLen(w.wx.n).toLowerCase()} of ${wet} the goat pen is a wallow of mud and dung, churned knee-deep by the gate. ${who ? who.name : 'The herder'} finds one of the goats holding up a foreleg and hobbling on three; between the claws the hoof is soft, grey and stinking. The lame ones lie down in the straw and will not go out to graze, and their milk dries up. Nobody on ${w.name} has seen it before, and nobody knows what to do for it but wait for the ground to dry.`);
+  } else log(w, `After ${spellLen(w.wx.n).toLowerCase()} of ${wet} a goat is limping again. The foot rot is back in the muddy pen.`, 'bad');
+}
+function rotEnds(w) {
+  const R = w.rot, C = R.cur;
+  R.cur = null;
+  const text = `The pen dries out and the last lame goat walks sound again. The foot rot laid ${plural(C.n, 'goat', 'goats')} lame${C.d ? ` and killed ${C.d}` : ', and every one came through'}.`;
+  if (R.n === 1) milestone(w, text); else log(w, text, C.d ? 'bad' : 'info');
 }
 // someone close enough to shout, wave a stick and bring the herd together
 function goatGuard(w, g) {
@@ -3359,10 +3433,10 @@ function goatHour(w, c) {
   for (let k = 0; k < G.herd.length; k++) {
     const g = G.herd[k];
     g.px = g.x; g.py = g.y;
-    if (!out) { // back into the pen, each to its corner of the straw
+    if (!out || g.lm != null) { // back into the pen, each to its corner of the straw; the lame stay bedded down
       g.tx = null;
       const sx = G.pen.x + 0.35 + (k % 4) * 0.42, sy = G.pen.y + 0.45 + (Math.floor(k / 4) % 4) * 0.4;
-      if (moveToward(g, sx, sy, SPEED)) g.out = 0;
+      if (moveToward(g, sx, sy, g.lm != null ? GOAT_SPEED / 2 : SPEED)) g.out = 0;
       continue;
     }
     g.out = 1;
@@ -3392,7 +3466,7 @@ function goatHour(w, c) {
 }
 function herdTask(w, p) {
   const G = w.goats;
-  if (!G || G.hid !== p.id || !G.at || !G.herd.length || p.hurt || p.haul) return null;
+  if (!G || G.hid !== p.id || !G.at || !G.herd.some((g) => g.lm == null) || p.hurt || p.haul) return null;
   return { k: 'herd', x: G.at.x, y: G.at.y, h: 99 };
 }
 
@@ -5447,6 +5521,10 @@ const MIGRATIONS = {
   45: (w) => {
     if (w.muck === undefined) w.muck = null;
   },
+  // v46 -> v47: foot rot. None yet; a long wet spell with a full pen may lame the goats (g.lm, g.im).
+  46: (w) => {
+    if (w.rot === undefined) w.rot = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5532,6 +5610,7 @@ export function summary(w) {
     muck: !!w.muck, muckHeap: w.muck ? Math.floor(w.muck.h / MUCK_FIELD) : 0, mucked: w.fields.filter((f) => f.mk).length,
     muckYear: w.muck ? w.muck.y : 0, muckEver: w.muck ? w.muck.n : 0, muckGrain: w.muck ? w.muck.g : 0, muckGrainYear: w.muck ? w.muck.yg : 0,
     mucking: w.muck ? w.people.filter((p) => p.task && p.task.k === 'muck').length : 0,
+    lame: w.goats ? w.goats.herd.filter((g) => g.lm != null).length : 0, rots: w.rot ? w.rot.n : 0, rotLame: w.rot ? w.rot.k : 0, rotDied: w.rot ? w.rot.d : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
