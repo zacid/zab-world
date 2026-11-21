@@ -458,3 +458,9 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Night soil and a midden by every house: the heap grows with people, but a midden near the houses could bring sickness.
   - Fields sown many years running without muck could tire (yield falls each year), so muck or rotation matters more.
   - The muck heap as a rat and fly nest in a hot summer, or the dogs rolling in it (show only).
+- Hard-years strip is done (render.js only: HARD rows, drawHardYears/hardCap/hardAt/hardGo; year entries have id hy<y>). Answers it invites:
+  - A matching "good years" strip (births, harvest, honey, deep fish, midsummer guests) in green, or a toggle between the two.
+  - The chronicle could name the hardest year in elders' tales ("the year of the 24 storms"), now that a score per year exists in the UI;
+    moving hardScore into the sim would let tales and the eldest refer to it.
+  - The year in progress has no column yet (yearly rows are written at year end); a partial column from w.stats would show it live.
+  - Rows only cover what `hist.yearly` records; hunger or cold deaths are not split out of `deaths`. A `cold` count per year would help.

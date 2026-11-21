@@ -243,5 +243,10 @@
   "at": "2026-11-21T22:27:14.506Z",
   "title": "Add muck: goat dung forked over the fields for bigger harvests",
   "body": "- SIM_VERSION 46 (w.muck {h heap, n, y, g, yg, nm, at}; f.mk; MUCK_* in sim.js; tech 'muck'; task 'muck', key m<fieldId>; yearly `mucked`, `muckGrain`): learned at the harvest of a field within 6 tiles of the goat pen, once goats have been kept 2 years\n- A heap by the pen grows by 1 a day per goat plus 0.2 per islander (ash and scraps), up to 40 fields' worth. Idle adults carry 100 of it out in a basket and fork it over a bare field, nearest the pen first, any season but snow and storm. A mucked field yields 30% more at its next harvest\n- needFields counts the extra yield of the fields a year of muck can cover, so villages clear fewer fields per person and fell less of the wood\n- Visible: a dung heap against the pen wall that grows and steams in autumn and winter, dark forkfuls on bare mucked fields, thicker darker shoots on them, a basket on the back and a fork at work, hover tips, a Muck row in the panel, a History line\n- Watch: Hais should learn it at this spring's harvest (Y8), muck every field from then on and need ~37-40 fields at 25 people instead of ~50"
+ },
+ {
+  "at": "2026-11-21T22:50:36.172Z",
+  "title": "Add a hard-years strip to the History chart",
+  "body": "- History now shows a strip under the population chart: one column per finished year, rows for storms, fog, fever, beasts, lost fields, lost grain and deaths\n- Each cell is shaded red by how bad that year was for that row compared with the island's worst year; the hardest year overall gets a white frame\n- Hover a column to read that year's troubles; click it to jump to the year in the list below\n- Render only (render.js, index.html); no change to the simulation or the save\n- Watch: on Hais the founding year (24 storm days, 10 boar raids) should stand out until a worse year comes"
  }
 ]

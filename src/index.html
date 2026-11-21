@@ -89,6 +89,10 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #hchart { position:relative; padding:10px 12px; }
 #hspark { width:100%; height:120px; display:block; }
 #hcap { color:var(--muted); font-size:12px; margin-top:6px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+#hband { width:100%; display:block; margin-top:12px; cursor:pointer; }
+#hbcap { color:var(--muted); font-size:12px; margin-top:4px; min-height:2.6em; }
+#hbcap b { font-weight:normal; color:var(--fg); }
+.yr.hl .yh b { color:var(--bad); }
 .yr { border-left:1px solid rgba(255,255,255,.25); margin:18px 0 0 6px; padding:0 0 0 14px; position:relative; }
 .yr::before { content:""; position:absolute; left:-5px; top:5px; width:9px; height:9px; background:#04070d; border:1px solid var(--fg); transform:rotate(45deg); }
 .yr.now::before { border-color:var(--accent); background:var(--accent); }
@@ -158,7 +162,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
     <div id="hwrap">
       <div id="hhd"></div>
       <div id="hsub"></div>
-      <div class="panel" id="hchart"><canvas id="hspark"></canvas><div id="hcap"></div></div>
+      <div class="panel" id="hchart"><canvas id="hspark"></canvas><div id="hcap"></div><canvas id="hband" hidden></canvas><div id="hbcap" hidden></div></div>
       <div id="hyears"></div>
     </div>
   </div>

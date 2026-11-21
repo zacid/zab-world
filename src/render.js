@@ -1878,7 +1878,7 @@ function drawHistory() {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
     }
     const list = (ev[y] || []).map((e) => `<div class="ev"><span class="se">${esc(S.SEASONS[S.clock(e.t).season])}</span>${esc(e.text)}</div>`).join('');
-    return `<div class="yr${now ? ' now' : ''}"><div class="yh"><b>Year ${y}${now ? ' · in progress' : ''}</b><span class="rd">${esc(when)}</span></div>`
+    return `<div class="yr${now ? ' now' : ''}" id="hy${y}"><div class="yh"><b>Year ${y}${now ? ' · in progress' : ''}</b><span class="rd">${esc(when)}</span></div>`
       + (st ? `<div class="ys">${st}</div>` : '') + (list || '<div class="quiet">A quiet year.</div>') + '</div>';
   };
   let html = '';
@@ -1914,6 +1914,76 @@ function drawHistChart() {
   g.fillStyle = '#8a8f98'; g.font = `${Math.round(11 * dpr)}px "Share Tech Mono", monospace`; g.textAlign = 'left';
   g.fillText(String(Math.round(hi * 0.75)), 4 * dpr, Y(hi * 0.75) - 3 * dpr);
   $('hcap').innerHTML = cap.map((t) => `<span>${esc(t)}</span>`).join('');
+  drawHardYears();
+}
+
+// ---------- hard years: one cell per finished year and kind of trouble, darker red is worse ----------
+const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+const HARD = [
+  ['storms', (h) => h.storms || 0, (h) => [h.storms && pl(h.storms, 'storm day', 'storm days'), h.flattened && pl(h.flattened, 'field flattened', 'fields flattened')]],
+  ['fog', (h) => h.fog || 0, (h) => [h.fog && pl(h.fog, 'fog day', 'fog days'), h.lost && pl(h.lost, 'search in the fog', 'searches in the fog')]],
+  ['fever', (h) => h.sick || 0, (h) => [h.sick && `${h.sick} fell sick`]],
+  ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
+  ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
+  ['grain', (h) => (h.rats || 0) + (h.stolen || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`]],
+  ['deaths', (h) => h.deaths || 0, (h) => [h.deaths && pl(h.deaths, 'death', 'deaths')]],
+];
+let hb = null; // layout of the last drawn strip, for hover and click
+function hardScore(yearly) {
+  // each kind counts from 0 (its best year) to 1 (its worst); a year's score is the sum
+  const mx = HARD.map(([, f]) => Math.max(0, ...yearly.map(f)));
+  return yearly.map((h) => HARD.reduce((a, [, f], i) => a + (mx[i] ? f(h) / mx[i] : 0), 0));
+}
+function hardText(h) {
+  const xs = HARD.flatMap(([, , d]) => d(h)).filter(Boolean);
+  return `<b>Year ${h.y}</b> · ${h.pop} people · ${h.harvest} grain harvested<br>${xs.length ? esc(xs.join(' · ')) : 'nothing went wrong'}`;
+}
+function drawHardYears() {
+  const cvs = $('hband'), cap = $('hbcap'), yearly = w.hist.yearly || [];
+  cvs.hidden = cap.hidden = yearly.length < 2; hb = null;
+  if (cvs.hidden) return;
+  const RH = 9 * dpr, GAP = 2 * dpr;
+  cvs.style.height = `${(HARD.length * (RH + GAP)) / dpr}px`;
+  const W = (cvs.width = cvs.clientWidth * dpr), H = (cvs.height = HARD.length * (RH + GAP));
+  const g = cvs.getContext('2d');
+  g.clearRect(0, 0, W, H);
+  g.font = `${Math.round(10 * dpr)}px "Share Tech Mono", monospace`; g.textBaseline = 'middle'; g.textAlign = 'left';
+  const L = Math.ceil(g.measureText('deaths  ').width) + 4 * dpr, n = yearly.length, cw = (W - L) / n;
+  const pad = cw > 4 * dpr ? Math.min(GAP, cw * 0.25) : 0;
+  HARD.forEach(([label, f], r) => {
+    const y0 = r * (RH + GAP), vals = yearly.map(f), mx = Math.max(0, ...vals);
+    g.fillStyle = '#8a8f98'; g.fillText(label, 0, y0 + RH / 2);
+    vals.forEach((v, i) => {
+      const x = L + i * cw, t = mx ? Math.sqrt(v / mx) : 0;
+      g.fillStyle = v ? `rgba(224,96,90,${(0.15 + 0.85 * t).toFixed(3)})` : 'rgba(255,255,255,0.05)';
+      g.fillRect(Math.round(x), y0, Math.max(1, Math.round(cw - pad)), RH);
+    });
+  });
+  const sc = hardScore(yearly), worst = sc.indexOf(Math.max(...sc));
+  // a thin white frame round the hardest year so far
+  g.strokeStyle = '#e8e8e8'; g.lineWidth = dpr;
+  g.strokeRect(Math.round(L + worst * cw) + dpr / 2, dpr / 2, Math.max(1, Math.round(cw - pad)) - dpr, H - GAP - dpr);
+  hb = { L, cw, n, worst };
+  hardCap(-1);
+}
+function hardCap(i) {
+  const yearly = w.hist.yearly || [];
+  if (!hb) return;
+  const h = yearly[i >= 0 ? i : hb.worst];
+  if (!h) return;
+  $('hbcap').innerHTML = i >= 0 ? hardText(h) : `hard years · darker red is worse · the framed year was the hardest: ${hardText(h).replace(/<br>/, ' — ')}`;
+}
+function hardAt(e) {
+  if (!hb) return -1;
+  const x = e.offsetX * dpr - hb.L;
+  return x < 0 ? -1 : Math.min(hb.n - 1, Math.floor(x / hb.cw));
+}
+function hardGo(i) {
+  const h = (w.hist.yearly || [])[i], el = h && $(`hy${h.y}`);
+  if (!el) return;
+  for (const o of document.querySelectorAll('.yr.hl')) o.classList.remove('hl');
+  el.classList.add('hl');
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 function showHistory(on) {
   $('hist').hidden = !on; $('histbtn').classList.toggle('on', on);
@@ -2052,7 +2122,7 @@ function drawSky() {
 // ---------- boot ----------
 async function boot() {
   resize();
-  window.addEventListener('resize', () => { resize(); if (w) updatePanels(); });
+  window.addEventListener('resize', () => { resize(); if (w) updatePanels(); if (w && !$('hist').hidden) drawHistChart(); });
   cv.addEventListener('mousemove', (e) => {
     const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top };
     if (drag) dragTo(e);
@@ -2094,6 +2164,9 @@ async function boot() {
   cv.addEventListener('mouseleave', () => { mouse = null; $('tip').hidden = true; });
   $('histbtn').onclick = () => showHistory($('hist').hidden);
   $('histback').onclick = () => showHistory(false);
+  $('hband').onmousemove = (e) => hardCap(hardAt(e));
+  $('hband').onmouseleave = () => hardCap(-1);
+  $('hband').onclick = (e) => { const i = hardAt(e); if (i >= 0) { hardCap(i); hardGo(i); } };
   $('skybtn').onclick = () => { if (!$('hist').hidden) showHistory(false); if (!$('kin').hidden) showFamilies(false); $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
   try {
