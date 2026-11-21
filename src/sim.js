@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 34;
+export const SIM_VERSION = 35;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -60,6 +60,7 @@ export const TECHS = {
   canoe:    { name: 'Dugout', added: '2026-11-21T06:13Z', desc: 'A tall oak felled above the beach, its back burnt out with small fires and scraped hollow with shell adzes, a little each dry day. Pushed into the sea it carries one islander past the surf to the deep water, where the shore fishers cannot reach and the big fish are. Out on calm days from spring to autumn, home by mid-afternoon. A storm can drag it off the sand and smash it, and in time the sun splits it, and a new oak must be felled.', req: ['fishing', 'farisle', 'woodcut'] },
   coppice:  { name: 'Coppice', added: '2026-11-21T07:01Z', desc: 'A hazel cut low sends up a ring of straight poles from the stump. Trees felled near the village are left as stools instead of grubbed out; the fields and houses go round them and the goats and deer are kept off. A stool grows back to a stand of poles in a year or two, far faster than a wild tree, so there is still wood in reach of the hearth when the fields have eaten the woods.', req: ['woodcut'] },
   hedges:   { name: 'Hedges', added: '2026-11-21T09:42Z', desc: 'Slips of hawthorn dug from the wood\'s edge and set a hand apart along the fields by the trees, in autumn and winter while the thorn sleeps. For three years a hedge is only twigs behind the wattle; then it is a wall of thorn that turns nearly every boar and keeps the goats out of the grain. It costs no timber, does not rot and stands up to storms, so the fence behind it is left to fall. Only fire kills it.', req: ['fencing'] },
+  whale:    { name: 'Whales', added: '2026-11-21T10:08Z', desc: 'Once in a few years a long storm drives a whale onto the sand. The morning after, everyone who can hold a flint knife goes down to the beach and cuts: strips of meat for the stores, blubber for the fires. In three days it begins to stink and the gulls and the tide take what is left; the great ribs stay on the beach for good.', req: ['fishing'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -416,7 +417,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -611,7 +612,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -684,6 +685,7 @@ function daily(w, c, fx) {
   if (w.pot !== undefined) potDay(w, c);
   if (w.canoe !== undefined) canoeDay(w, c);
   if (w.copse !== undefined) copseDay(w, c);
+  if (w.whale) whaleDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
@@ -745,6 +747,7 @@ function weather(w, c) {
   if (next === s.k) s.n++;
   else {
     endSpell(w, s);
+    if (s.k === 'storm') whaleStorm(w, c, s.n);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
     if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
@@ -3196,6 +3199,9 @@ function pickTask(w, p, c) {
     f = nearestFree(w, L.fallow, p, 'fallow', 'f');
     if (f) return { k: 'plant', key: 'f' + f.id, x: f.x, y: f.y, h: 3 };
   }
+  // a whale on the beach: knives out before it turns
+  const wk = whaleTask(w, p);
+  if (wk) return wk;
   // lean times: everyone who can, forages
   if (c.season < 3 && w.food < w.people.length * 20 && w.wild >= 3) {
     const tk = forage(w, p);
@@ -3784,6 +3790,8 @@ function finish(w, p, t, c, fx) {
     if (ok) pop('+' + ok + ' jars', 'pot');
   } else if (t.k === 'snow') {
     snowDone(w, p, t);
+  } else if (t.k === 'whale') {
+    whaleCut(w, p, pop);
   } else if (t.k === 'dig') {
     const got = canoeDig(w, p, c);
     if (got) pop(got, 'build');
@@ -3890,6 +3898,96 @@ function snowDay(w, c) {
   const had = S.men.length;
   S.men = S.men.filter((m) => m.s > 0 || (c.season === 3 && !m.m));
   if (had && !S.men.length && c.season !== 3) log(w, `The last snowman by the hearth slumps into the mud. Spring has come to ${w.name}.`, 'info');
+}
+
+// ---------- the whale ----------
+// Now and then a long storm drives a whale onto the sand. The morning after, whoever can be spared goes
+// down with flint knives and cuts it up: strips of meat for the stores and blubber for the fires. After a
+// few days it starts to rot and the gulls take the rest; the ribs are left standing on the beach for good.
+// w.whale { n strandings ever, g meat ever, last tick, cur { x, y sand tile, dx, dy toward the sea, at, d day ashore,
+//   m meat left, m0 at the start, g meat cut, hands [ids], nm finder, rot told }, bones [{ x, y, dx, dy, t, g, n hands }] }
+const WHALE_YEAR = 2;        // nobody walks the far beaches in the first year
+const WHALE_ODDS = 0.02;     // chance per storm day of a spell that ends, that it leaves a whale behind
+const WHALE_MAX = 0.1;       // however long the storm
+const WHALE_GAP = 3 * TICKS_PER_YEAR; // at most one every few years
+const WHALE_MEAT = 1200;     // meat and blubber on a whale
+const WHALE_CUT = 18;        // meat a cutter carries up for each spell of work (+0..9)
+const WHALE_OIL = 0.08;      // timber's worth of blubber for the fires per meat
+const WHALE_HANDS = 8;       // knives at the carcass at once
+const WHALE_FRESH = 3;       // days before it turns
+const WHALE_ROT = 0.7;       // share left each day after that
+const WHALE_GONE = 30;       // meat left that is not worth the stink
+const WHALE_BONES = 6;       // skeletons kept on the beaches
+const WHALE_SPOTS = [[-0.6, -0.4], [0.6, -0.4], [-0.6, 0.4], [0.6, 0.4], [0, -0.7], [0, 0.7], [-0.9, 0], [0.9, 0]];
+function whaleStorm(w, c, n) {
+  if (w.whale === undefined || c.year < WHALE_YEAR || !w.shore || !w.shore.length) return;
+  const W = w.whale;
+  if (W && (W.cur || w.t - W.last < WHALE_GAP)) return;
+  if (rnd(w) >= Math.min(WHALE_MAX, WHALE_ODDS * n)) return;
+  const R2 = 26 * 26, fx = w.fire.x + 0.5, fy = w.fire.y + 0.5, spots = [];
+  for (const i of w.shore) {
+    const x = i % MAP, y = (i - x) / MAP, dd = d2(x + 0.5, y + 0.5, fx, fy);
+    if (dd < 36 || dd > R2 || (W && W.bones.some((b) => d2(b.x, b.y, x, y) < 9))) continue;
+    if (lineOfLand(w, fx, fy, x + 0.5, y + 0.5)) spots.push(i);
+  }
+  if (!spots.length) return;
+  const i = spots[ri(w, spots.length)], x = i % MAP, y = (i - x) / MAP;
+  const [dx, dy] = DIRS4.find(([a, b]) => tile(w, x + a, y + b) === T.WATER);
+  const adults = w.people.filter((p) => !p.dead && ageY(w, p) >= 14);
+  const who = adults.length ? adults[ri(w, adults.length)] : null;
+  const first = !W;
+  if (first) { w.whale = { n: 0, g: 0, last: 0, cur: null, bones: [] }; w.techs.push('whale'); }
+  const V = w.whale;
+  V.n++; V.last = w.t;
+  V.cur = { x, y, dx, dy, at: w.t, d: c.day, m: WHALE_MEAT, m0: WHALE_MEAT, g: 0, hands: [], nm: who ? who.name : null, rot: 0 };
+  const side = sideOf(w, x, y), len = n === 1 ? 'the storm' : `${spellLen(n).toLowerCase()} of storm`;
+  if (first) milestone(w, `After ${len} ${who ? who.name : 'someone'} walks the ${side} beach to see what the sea has thrown up, and finds a whale: a grey hill of a beast longer than any house, lying in the surf with gulls already on its back. ` +
+    `It is dead. By noon every islander who can carry a knife is down there, cutting. ${w.name} learns that the sea sometimes gives as well as takes.`);
+  else log(w, `${len.charAt(0).toUpperCase() + len.slice(1)} ${n === 1 ? 'leaves' : 'leave'} a whale stranded on the ${side} beach. ${who ? who.name : 'Someone'} runs up to the village with the news, and the knives come out.`, 'good');
+}
+function whaleTask(w, p) {
+  const C = w.whale && w.whale.cur;
+  if (!C || C.m <= 0) return null;
+  for (let s = 0; s < WHALE_HANDS; s++) {
+    const key = 'w' + s;
+    if (w.res[key] != null) continue;
+    const [ox, oy] = WHALE_SPOTS[s];
+    const x = C.x + ox - C.dx * 0.3, y = C.y + oy - C.dy * 0.3; // on the landward side of the carcass
+    if (tile(w, Math.floor(x + 0.5), Math.floor(y + 0.5)) === T.WATER) continue;
+    if (!lineOfLand(w, p.x, p.y, x + 0.5, y + 0.5)) return null;
+    return { k: 'whale', key, x, y, h: 3 };
+  }
+  return null;
+}
+function whaleCut(w, p, pop) {
+  const C = w.whale && w.whale.cur;
+  if (!C || C.m <= 0) return;
+  const got = Math.min(C.m, WHALE_CUT + ri(w, 10));
+  C.m -= got; C.g += got; w.whale.g += got;
+  w.food += got;
+  w.timber = Math.round((w.timber + got * WHALE_OIL) * 100) / 100;
+  if (!C.hands.includes(p.id)) C.hands.push(p.id);
+  pop('+' + got, 'meat');
+  if (C.m <= 0) whaleDone(w, 'cut');
+}
+function whaleDone(w, how) {
+  const W = w.whale, C = W.cur;
+  W.bones.push({ x: C.x, y: C.y, dx: C.dx, dy: C.dy, t: w.t, g: C.g, n: C.hands.length });
+  if (W.bones.length > WHALE_BONES) W.bones.shift();
+  W.cur = null;
+  const hands = plural(C.hands.length, 'pair of hands', 'pairs of hands');
+  log(w, how === 'cut'
+    ? `The whale is cut to the bone: ${C.g} meat and blubber carried up from the beach by ${hands}. The ribs stand on the sand like the frame of a house.`
+    : `The gulls and the tide have the rest of the whale. ${C.g} meat was carried up before it turned; the ribs are left bleaching on the sand.`, 'good');
+}
+function whaleDay(w, c) {
+  const C = w.whale && w.whale.cur;
+  if (!C) return;
+  const days = c.day - C.d;
+  if (days < WHALE_FRESH) return;
+  C.m = Math.floor(C.m * WHALE_ROT);
+  if (!C.rot && C.m >= 200) { C.rot = 1; log(w, 'The whale on the beach has begun to stink. The cutters hurry to strip what is still good before the gulls and the tide take it.', 'info'); }
+  if (C.m < WHALE_GONE) { C.m = 0; whaleDone(w, 'rot'); }
 }
 
 // ---------- wildfire ----------
@@ -4321,6 +4419,10 @@ const MIGRATIONS = {
     if (w.hedge === undefined) w.hedge = null;
     if (w.fauna && w.fauna.br === undefined) w.fauna.br = 0;
   },
+  // v34 -> v35: whales. None stranded yet; the next long storm may leave one on the sand.
+  34: (w) => {
+    if (w.whale === undefined) w.whale = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4377,6 +4479,8 @@ export function summary(w) {
     canoeFish: w.canoe ? w.canoe.f : 0, canoeYear: w.canoe ? w.canoe.y : 0, canoeDeep: w.canoe ? w.canoe.d : 0, canoeLost: w.canoe ? w.canoe.lost : 0,
     copse: !!w.copse, copseStools: w.copse ? w.copse.s.length : 0, copseReady: w.copse ? w.copse.s.filter((i) => w.wood[i] >= 6).length : 0,
     copseYear: w.copse ? Math.round(w.copse.y) : 0, copseCut: w.copse ? w.copse.n : 0, copseCap: w.copse ? copseCap(w) : 0,
+    whales: w.whale ? w.whale.n : 0, whaleMeat: w.whale ? w.whale.g : 0, whaleLeft: w.whale && w.whale.cur ? w.whale.cur.m : null,
+    whaleCutting: w.whale && w.whale.cur ? w.people.filter((p) => p.task && p.task.k === 'whale').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

@@ -345,3 +345,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Hedge laying: an old hedge grows gappy after ~20 years unless someone lays it in winter (a craft and a byname, "the Hedger").
   - Wolves or deer could use hedgerows as cover to come close to the village; a fire runs along a hedge line in a dry summer.
   - Fences now only matter for the 3 years a hedge grows; timber saved on fences could show in History.
+- Whales are done (SIM_VERSION 35; w.whale {n, g, last, cur, bones}; whaleStorm/whaleTask/whaleCut/whaleDone/whaleDay in sim.js;
+  drawWhales()/whaleAt() and whale gulls in render.js; `scripts/_whaleprobe.mjs [years] [seed|live]`). ~1 whale every 5-8 years.
+  Late game only 4-10 of 280 people cut, because only idle adults pick it. Answers it invites:
+  - Whale oil: render the blubber in pots (pottery) into lamp oil kept for winter, so it saves real fuel in the cold months.
+  - Whalebone: ribs as rafters for a bigger house or a longhouse, or a whalebone arch over the path to the burying ground.
+  - Scavengers: wolves and boars come down to the carcass at night (a danger for late cutters, and a chance for the hunters).
+  - A whale seen from the dugout in calm water: the boldest paddler tries to drive one into the shallows (high risk).
+  - Rotting whale brings flies and a fever if it is left near the houses.
+  - The far isle hears of a whale and its dugout comes for a share (trade, or a quarrel).

@@ -108,6 +108,7 @@ function doing(p) {
   if (p.task && p.task.k === 'shape') return 'coiling a jar by the kiln';
   if (p.task && p.task.k === 'fire') return 'firing the kiln';
   if (p.task && p.task.k === 'lost') return 'lost in the fog';
+  if (p.task && p.task.k === 'whale') return p.x === p.px && p.y === p.py ? 'cutting blubber from the whale' : 'running down to the whale';
   if (p.task && p.task.k === 'snow') {
     const m = p.task.o != null && w.snow && w.snow.men.find((o) => o.id === p.task.o);
     return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
@@ -307,6 +308,7 @@ function drawTerrain() {
   drawPen(pal);
   drawKiln(pal);
   drawSnowmen();
+  drawWhales();
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -542,6 +544,61 @@ function drawSnowmen() {
     }
   }
 }
+// a stranded whale lies along the shore, half in the surf: a dark grey back, a pale belly and a tail fluke.
+// As it is cut up the flesh shows red from the head end, with white ribs through it; once it turns, it goes
+// a sickly green. Afterwards only the ribs stand on the sand, a spine with curved bones off it, greying with the years.
+const WHALE = [
+  '....GGGGGGGG...',
+  '..GGggggggggG.T',
+  '.Gegggggggggggt',
+  'Gwwwwgggggggg.T',
+  '.wwwwwwwwwGG...',
+];
+const WHALE_COL = { G: '#323b46', g: '#4f5a67', w: '#8f99a3', t: '#323b46', T: '#2a323c', e: '#11151a' };
+const WHALE_ROT = { G: '#3c4636', g: '#5a644a', w: '#8e9478', t: '#3c4636', T: '#343d30', e: '#11151a' };
+const RIBS = [
+  '....b.b.b.b....',
+  '..b.b.b.b.b.b..',
+  '.BB.b.b.b.b.b..',
+  'BBBbbbbbbbbbbbb',
+  '.B..........b.b',
+];
+function whaleSpots() { // [x, y, dx, dy, ...] of the whale and every skeleton, in map pixels at the top-left of the sprite
+  const out = [];
+  const at = (o) => {
+    const vert = o.dx !== 0, X = o.x * TILE + 4 + o.dx * 3, Y = o.y * TILE + 4 + o.dy * 2;
+    return vert ? { X: X - 2, Y: Y - 7, vert } : { X: X - 7, Y: Y - 2, vert };
+  };
+  if (w.whale) {
+    for (const b of w.whale.bones) out.push({ ...at(b), o: b, bone: true });
+    if (w.whale.cur) out.push({ ...at(w.whale.cur), o: w.whale.cur, bone: false });
+  }
+  return out;
+}
+function drawWhales() {
+  for (const s of whaleSpots()) {
+    const o = s.o, flip = (o.x + o.y) & 1; // which way the head points
+    const put = (rows, colOf) => {
+      for (let r = 0; r < 5; r++) for (let k = 0; k < 15; k++) {
+        const sk = flip ? 14 - k : k, ch = rows[r][sk]; // sk counts from the head
+        const col = ch !== '.' && colOf(ch, sk, r);
+        if (!col) continue;
+        if (s.vert) px(tc, s.X + r, s.Y + k, col); else px(tc, s.X + k, s.Y + r, col);
+      }
+    };
+    if (s.bone) {
+      const old = (w.t - o.t) / S.TICKS_PER_YEAR, c = old > 20 ? '#8f8c80' : old > 6 ? '#b4ae9c' : '#d8d0bc';
+      put(RIBS, () => c);
+      continue;
+    }
+    const pal = o.rot ? WHALE_ROT : WHALE_COL, cut = Math.round((1 - o.m / o.m0) * 13); // columns flensed from the head end
+    put(WHALE, (ch, k) => (k < cut + 1 && ch !== 'e' ? ((k & 1) && ch !== 'w' ? '#e2d8c2' : o.rot ? '#6e4a36' : '#9a3a30') : pal[ch]));
+  }
+}
+function whaleAt(mx, my) {
+  const X = mx * TILE, Y = my * TILE;
+  return whaleSpots().reverse().find((s) => X >= s.X && Y >= s.Y && X < s.X + (s.vert ? 5 : 15) && Y < s.Y + (s.vert ? 15 : 5)) || null;
+}
 function snowmanAt(mx, my) {
   if (!w.snow) return null;
   return w.snow.men.find((m) => m.s >= 1 && mx >= m.x && mx < m.x + 1 && my >= m.y && my < m.y + 1) || null;
@@ -665,16 +722,18 @@ function ambience(c, hf, now, layer) {
     }
   }
   // gulls: a few wheel over the shallows by day, drawn to whoever is fishing; gone at night and in storms
-  const want = dark > 0.3 || storm || wx === 'fog' || !surf.length ? 0 : c.season === 3 ? 2 : 4;
+  const carcass = w.whale && w.whale.cur, base = c.season === 3 ? 2 : 4; // a whale on the sand brings a crowd of them
+  const want = dark > 0.3 || storm || wx === 'fog' || !surf.length ? 0 : base + (carcass ? 7 : 0);
   const fishers = w.people.filter((p) => !p.asleep && p.task && p.task.k === 'fish');
   for (let g = 0; g < want; g++) {
     const f = fishers.length ? fishers[g % fishers.length] : null;
     const s = surf[Math.floor(S.hash(g, 5, 71) * surf.length)];
-    const ax = f ? f.x * TILE + 6 : s.X + 4, ay = f ? f.y * TILE - 2 : s.Y + 4;
+    const onWhale = carcass && g >= base;
+    const ax = onWhale ? carcass.x * TILE + 4 + carcass.dx * 3 : f ? f.x * TILE + 6 : s.X + 4, ay = onWhale ? carcass.y * TILE + 6 + carcass.dy * 2 : f ? f.y * TILE - 2 : s.Y + 4;
     let o = gulls[g];
     if (!o) o = gulls[g] = { x: ax, y: ay };
     o.x += (ax - o.x) * 0.01; o.y += (ay - o.y) * 0.01; // drift over to a new fisher, never jump
-    const r = 7 + g * 3, sp = (g & 1 ? -1 : 1) / (1400 + g * 300);
+    const r = onWhale ? 5 + (g - base) * 2 : 7 + g * 3, sp = (g & 1 ? -1 : 1) / (1400 + g * 300);
     const X = Math.round(o.x + Math.cos(now * sp + g * 2) * r), Y = Math.round(o.y + Math.sin(now * sp + g * 2) * r * 0.6) - 6;
     const flap = Math.floor(now / 220 + g * 3) % 4 < 2;
     sc.fillStyle = `rgba(240,240,240,${(0.9 - dark).toFixed(3)})`;
@@ -1015,6 +1074,12 @@ function frame() {
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       const by = S.byname(p);
       tip.innerHTML = `<b>${p.name}</b>${by ? ` <span class="by">${by}</span>` : ''}<br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = whaleAt(mx, my))) {
+      const o = best.o, s = S.summary(w);
+      tip.innerHTML = best.bone
+        ? `<b>Whale bones</b><br>ribs bleaching on the sand<br><span class="m">stranded ${when(o.t)} · ${o.g.toLocaleString()} meat cut by ${o.n} ${o.n === 1 ? 'islander' : 'islanders'}</span>`
+        : `<b>Stranded whale</b><br>${o.rot ? 'starting to stink' : 'fresh from the storm'} · ${s.whaleCutting ? `${s.whaleCutting} cutting` : 'nobody at it'}<br><span class="m">${o.g.toLocaleString()} meat carried up · ${o.nm ? `found by ${esc(o.nm)}` : 'washed up'} ${when(o.at)}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = snowmanAt(mx, my))) {
       const b = known.get(best.by) || w.people.find((q) => q.id === best.by);
@@ -1411,6 +1476,7 @@ function updatePanels() {
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
     ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back</span>`]] : []),
+    ...(s.whales ? [['whale', 'Whales', `${s.whaleLeft != null ? `<span class="fest">a whale on the beach · ${s.whaleCutting} cutting</span> · ` : ''}<span class="m">${s.whales} stranded · ${s.whaleMeat.toLocaleString()} meat cut${w.whale.last ? ` · last ${when(w.whale.last)}` : ''}</span>`]] : []),
     ...(s.blazeFires ? [['blaze', 'Fire', `${s.blaze ? `<span class="bad">the woods are burning · ${s.blazeAlight} alight · ${s.blazeFighting} beating</span> · ` : ''}<span class="m">${s.blazeFires} ${s.blazeFires === 1 ? 'fire' : 'fires'} · ${s.blazeBurnt.toLocaleString()} acres burnt${!s.blaze && w.blaze.last >= 0 ? ` · last ${when(w.blaze.last)}` : ''}</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),

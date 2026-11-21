@@ -183,5 +183,10 @@
   "at": "2026-11-21T10:05:31.538Z",
   "title": "Add hawthorn hedges that turn the boars for good",
   "body": "- SIM_VERSION 34 (w.hedge, f.hg, fauna.br; HEDGE_* in sim.js; tech 'hedges'; task kind 'hedge'; yearly `hedges`/`hedgesNew`): after 5 fences are shouldered through, the eldest sees that boars never go through the hawthorn thickets\n- In autumn and winter (not in snow, storm, frost or fog) idle adults set thorn slips along every field by the woods. No timber cost. A hedge holds nothing for 3 years, then turns 97% of boars, keeps goats out of the grain, never rots and ignores storms. Fences are not rebuilt behind grown hedges. Fire kills a hedge\n- Visible: bare slips, then small bushes, then a dark wall of thorn with white blossom in late spring, red haws in autumn and bare stems in winter; hover tip, Fields row shows hedged/grown, History line\n- Watch: Hais should learn it in spring Y9, plant ~29 hedges that autumn, and see boar raid nights fall from 5-9 a year to 0-1 from Y12-13"
+ },
+ {
+  "at": "2026-11-21T10:42:31.106Z",
+  "title": "Add stranded whales that storms wash onto the beach",
+  "body": "- SIM_VERSION 35 (w.whale {n, g, last, cur {x, y, dx, dy, at, d, m, m0, g, hands, nm, rot}, bones [{x, y, dx, dy, t, g, n}]}; tech 'whale'; task kind 'whale', keys w0..w7; WHALE_* in sim.js; yearly `whales`)\n- When a storm spell ends (from Y2, at most one every 3 years), 2% per storm day (max 10%) that a whale lies on a sand tile within 26 tiles of the hearth. Up to 8 idle adults cut it, after harvest and sowing and before everything else: 18-27 meat per 3-hour spell, plus 0.08 timber of blubber per meat\n- From day 3 it rots (30% of what is left lost each day); the ribs stay on the beach for good (last 6 kept). About 700-950 of 1200 meat is cut\n- Visible: a grey whale half in the surf, red flesh and white ribs showing as it is cut, a green tinge once it turns, a crowd of gulls over it, skeletons that grey with age, hover tips, a Whales row in the panel\n- Watch: on the live world the first whale comes around Y8-12 and then one every 4-7 years; the first stranding becomes winter tale material"
  }
 ]
