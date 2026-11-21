@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 35;
+export const SIM_VERSION = 36;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -61,6 +61,7 @@ export const TECHS = {
   coppice:  { name: 'Coppice', added: '2026-11-21T07:01Z', desc: 'A hazel cut low sends up a ring of straight poles from the stump. Trees felled near the village are left as stools instead of grubbed out; the fields and houses go round them and the goats and deer are kept off. A stool grows back to a stand of poles in a year or two, far faster than a wild tree, so there is still wood in reach of the hearth when the fields have eaten the woods.', req: ['woodcut'] },
   hedges:   { name: 'Hedges', added: '2026-11-21T09:42Z', desc: 'Slips of hawthorn dug from the wood\'s edge and set a hand apart along the fields by the trees, in autumn and winter while the thorn sleeps. For three years a hedge is only twigs behind the wattle; then it is a wall of thorn that turns nearly every boar and keeps the goats out of the grain. It costs no timber, does not rot and stands up to storms, so the fence behind it is left to fall. Only fire kills it.', req: ['fencing'] },
   whale:    { name: 'Whales', added: '2026-11-21T10:08Z', desc: 'Once in a few years a long storm drives a whale onto the sand. The morning after, everyone who can hold a flint knife goes down to the beach and cuts: strips of meat for the stores, blubber for the fires. In three days it begins to stink and the gulls and the tide take what is left; the great ribs stay on the beach for good.', req: ['fishing'] },
+  frost:    { name: 'Late frost', added: '2026-11-21T10:44Z', desc: 'Some springs the cold comes back after the sowing. On a still, clear night the frost settles on the fields, and by morning the young green shoots have gone black and limp. Grain killed while it is still short has to be dug over and sown again; grain already knee-high only has its leaf tips burnt. Nobody on the island yet knows how to read a frost coming.', req: ['farming'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -417,7 +418,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -612,14 +613,14 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.rats) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
@@ -627,6 +628,8 @@ function daily(w, c, fx) {
     }
     if (w.lost) w.lost.y = 0;
     if (w.hedge) w.hedge.y = 0;
+    if (w.frost) w.frost.y = 0;
+    w.stats.yfr = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -649,6 +652,8 @@ function daily(w, c, fx) {
     for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; delete f.lost; rot++; }
     if (rot) log(w, `Frost takes ${rot} unharvested field${rot > 1 ? 's' : ''}.`, 'bad');
   }
+  // a cold snap after the sowing: frost on the young shoots
+  if (w.frost !== undefined && c.season === 0 && wx === 'cold' && c.year >= FROST_YEAR) frostNight(w);
   // growth
   if (c.season < 3) {
     const g = WX_GROW[wx] / GROW_DAYS;
@@ -748,6 +753,7 @@ function weather(w, c) {
   else {
     endSpell(w, s);
     if (s.k === 'storm') whaleStorm(w, c, s.n);
+    if (s.fk) frostTold(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
     if (next === 'storm') log(w, 'Black clouds roll in off the sea. Everyone runs for shelter.', 'bad');
     else if (next === 'cold' && c.season === 3) log(w, 'A hard frost grips the island. The woodpile shrinks fast.', 'bad');
@@ -800,7 +806,7 @@ function endSpell(w, s) {
   } else if (s.k === 'heat' && n >= 7) {
     text = `${len} of blazing heat ${v('break')} at last. The grain stood still in the sun.`;
     big = n >= 18 || s.d >= 2;
-  } else if (s.k === 'cold' && n >= 6) {
+  } else if (s.k === 'cold' && n >= 6 && !s.fk) {
     text = `${len} of bitter cold ${v('lift')}.` + (s.d ? ` ${plural(s.d, 'soul was', 'souls were')} lost to it.` : ' Every hearth was kept burning.');
     big = n >= 15 || s.d >= 2;
   } else if (s.k === 'snow' && n >= 5) {
@@ -817,6 +823,50 @@ function endSpell(w, s) {
   }
   if (!text) return;
   if (big) milestone(w, text); else log(w, text, k);
+}
+
+// ---------- late frost ----------
+// A spring cold snap after the sowing: each frost night, young shoots in a sown field may be killed outright
+// (the field goes back to fallow, black and limp, and has to be sown again while it is still spring), and
+// taller grain may have its leaf tips burnt (growth set back). Nothing guards against it yet.
+// w.frost { n spells that killed grain, k fields killed ever, y this year, last tick }; f.fr tick a field was
+// frosted (cleared when it is sown again); w.wx.fk / fn fields killed / nipped this spell.
+const FROST_YEAR = 2;        // the first spring that can turn
+const FROST_YOUNG = 0.35;    // shoots shorter than this die in a frost
+const FROST_SET_IN = 3;      // the first days of a cold snap are only a chill; the frost settles from the third night
+const FROST_KILL = 0.2;   // chance per frost night that a field of young shoots is killed
+const FROST_NIP = 0.2;       // chance that taller (but not yet tall) grain is nipped
+const FROST_SET = 0.1;       // growth a nip costs
+function frostNight(w) {
+  const s = w.wx;
+  if (s.n < FROST_SET_IN) return;
+  for (const f of w.fields) {
+    if (f.stage !== 'planted') continue;
+    if (f.growth < FROST_YOUNG) {
+      if (rnd(w) < FROST_KILL) { f.stage = 'fallow'; f.growth = 0; f.fr = w.t; s.fk = (s.fk || 0) + 1; }
+    } else if (f.growth < 0.7 && rnd(w) < FROST_NIP) {
+      f.growth = Math.max(0, Math.round((f.growth - FROST_SET) * 10000) / 10000); s.fn = (s.fn || 0) + 1;
+    }
+  }
+}
+function frostTold(w, s) {
+  const first = !w.frost;
+  if (first) { w.frost = { n: 0, k: 0, y: 0, last: 0 }; if (!w.techs.includes('frost')) w.techs.push('frost'); }
+  const F = w.frost;
+  F.n++; F.k += s.fk; F.y += s.fk; F.last = w.t;
+  w.stats.yfr = (w.stats.yfr || 0) + s.fk;
+  const who = elder(w), len = spellLen(s.n).toLowerCase(), kill = len.startsWith('a ') ? 'kills' : 'kill';
+  const nip = s.fn ? ` On ${plural(s.fn, 'more field', 'more fields')} the leaf tips are burnt brown.` : '';
+  if (first) milestone(w, `The sowing is done and the shoots are up when the cold comes back. For ${len} the nights are clear and still, and every dawn the fields are white. ` +
+    `When it lifts, ${who ? who.name : 'the eldest'} walks the rows and pulls up a handful of black, limp stalks: the frost has killed the young grain in ${plural(s.fk, 'field', 'fields')}.${nip} ` +
+    `There is nothing for it but to dig them over and sow again, and hope the seed is quicker than the summer. Nobody on ${w.name} had thought the spring could turn.`);
+  else {
+    const black = w.fields.some((f) => f.fr != null);
+    const after = !black ? ' The black rows were dug over and sown again before the cold even lifted.'
+      : s.fk === 1 ? ' It has to be sown again.' : ' They have to be sown again.';
+    if (s.fk >= Math.max(8, w.fields.length >> 2)) milestone(w, `A late frost: ${len} of white dawns ${kill} the young grain in ${plural(s.fk, 'field', 'fields')}.${nip}${after}`);
+    else log(w, `A late frost blackens the young grain in ${plural(s.fk, 'field', 'fields')}.${nip}${after}`, 'bad');
+  }
 }
 
 // ---------- the wild ----------
@@ -3123,7 +3173,8 @@ function workLists(w) {
   if (c.wt !== w.t || c.wf !== w.fields.length || c.wb !== w.buildings.length) {
     c.wt = w.t; c.wf = w.fields.length; c.wb = w.buildings.length;
     c.ripe = []; c.fallow = []; c.raw = [];
-    for (const f of w.fields) if (f.stage === 'ripe') c.ripe.push(f); else if (f.stage === 'fallow') c.fallow.push(f);
+    const frozen = w.wx && w.wx.k === 'cold'; // nobody sows the frost-black rows again while the cold holds
+    for (const f of w.fields) if (f.stage === 'ripe') c.ripe.push(f); else if (f.stage === 'fallow' && !(frozen && f.fr != null)) c.fallow.push(f);
     for (const b of w.buildings) if (b.progress < 1) c.raw.push(b);
   }
   return c;
@@ -3706,7 +3757,11 @@ function finish(w, p, t, c, fx) {
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
-    if (f && f.stage === 'fallow') { f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; pop('sown', 'muted'); }
+    if (f && f.stage === 'fallow') {
+      const fr = f.fr != null;
+      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; pop(fr ? 'sown again' : 'sown', 'muted');
+      if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
+    }
   } else if (t.k === 'build') {
     const b = w.buildings.find((o) => 'b' + o.id === t.key);
     if (!b || b.progress >= 1) return;
@@ -4423,6 +4478,10 @@ const MIGRATIONS = {
   34: (w) => {
     if (w.whale === undefined) w.whale = null;
   },
+  // v35 -> v36: late frost. No spring has turned yet; the next cold snap after the sowing can kill the young grain.
+  35: (w) => {
+    if (w.frost === undefined) w.frost = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4481,6 +4540,8 @@ export function summary(w) {
     copseYear: w.copse ? Math.round(w.copse.y) : 0, copseCut: w.copse ? w.copse.n : 0, copseCap: w.copse ? copseCap(w) : 0,
     whales: w.whale ? w.whale.n : 0, whaleMeat: w.whale ? w.whale.g : 0, whaleLeft: w.whale && w.whale.cur ? w.whale.cur.m : null,
     whaleCutting: w.whale && w.whale.cur ? w.people.filter((p) => p.task && p.task.k === 'whale').length : 0,
+    frosts: w.frost ? w.frost.n : 0, frostKilled: w.frost ? w.frost.k : 0, frostYear: w.frost ? w.frost.y : 0,
+    frostBlack: w.fields.filter((f) => f.fr != null).length,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

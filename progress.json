@@ -188,5 +188,10 @@
   "at": "2026-11-21T10:42:31.106Z",
   "title": "Add stranded whales that storms wash onto the beach",
   "body": "- SIM_VERSION 35 (w.whale {n, g, last, cur {x, y, dx, dy, at, d, m, m0, g, hands, nm, rot}, bones [{x, y, dx, dy, t, g, n}]}; tech 'whale'; task kind 'whale', keys w0..w7; WHALE_* in sim.js; yearly `whales`)\n- When a storm spell ends (from Y2, at most one every 3 years), 2% per storm day (max 10%) that a whale lies on a sand tile within 26 tiles of the hearth. Up to 8 idle adults cut it, after harvest and sowing and before everything else: 18-27 meat per 3-hour spell, plus 0.08 timber of blubber per meat\n- From day 3 it rots (30% of what is left lost each day); the ribs stay on the beach for good (last 6 kept). About 700-950 of 1200 meat is cut\n- Visible: a grey whale half in the surf, red flesh and white ribs showing as it is cut, a green tinge once it turns, a crowd of gulls over it, skeletons that grey with age, hover tips, a Whales row in the panel\n- Watch: on the live world the first whale comes around Y8-12 and then one every 4-7 years; the first stranding becomes winter tale material"
+ },
+ {
+  "at": "2026-11-21T11:18:01.477Z",
+  "title": "Add late spring frosts that kill the young grain",
+  "body": "- SIM_VERSION 36 (w.frost {n, k, y, last}; f.fr; w.wx.fk/fn; FROST_* in sim.js; tech 'frost'; yearly `frosted`): from Y2, from the third day of a spring cold snap, each frost night kills a sown field with shoots under 35% grown (20%) or burns back taller grain by 10% (20%)\n- Killed fields go back to fallow and are not sown again while the cold holds; once it lifts they are resown, so the harvest comes later and smaller. The first frost is a chronicle entry; big ones (8+ fields or a quarter of all) too\n- Visible: rows of black, bent shoots with white rime while it is cold, a hover tip, a Frost row in the panel and a History line\n- Watch: on Hais about one spring in two loses some grain, and a bad one every 3-5 years; harvest dips (e.g. 11k to 5k) but the stores carry it. Late-game growth is a little slower"
  }
 ]

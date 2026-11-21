@@ -354,3 +354,13 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A whale seen from the dugout in calm water: the boldest paddler tries to drive one into the shallows (high risk).
   - Rotting whale brings flies and a fever if it is left near the houses.
   - The far isle hears of a whale and its dugout comes for a share (trade, or a quarrel).
+- Late frost is done, as a problem only (SIM_VERSION 36; w.frost {n, k, y, last}, f.fr tick killed, w.wx.fk/fn this spell; frostNight/frostTold
+  in sim.js, FROST_* constants; workLists hides f.fr fields from sowing while the cold holds; yearly `frosted`; frostAt() and black rimed rows
+  in render.js; `scripts/_frostprobe.mjs [years] [seed|live]`, `scripts/_frostbench.mjs`). About one spring in two loses some fields; at
+  Y90-95 on seed 4242 pop is ~224 instead of ~270 without it. Nobody has an answer yet. Answers it invites:
+  - Weather lore: after the first frost the eldest learns to read a still, clear evening sky and the village holds back the sowing a few
+    days (sow only after doy ~20), or waits to sow until a cold snap has passed (normal fallow fields are still sown in the cold today).
+  - Straw or smudge fires: on a frost night the young set damp fires along the rows; the smoke keeps the frost off (costs timber and a night's sleep).
+  - Seed corn: resowing is free now. A kept seed store (in jars) that a bad frost can empty would make a double frost really bite.
+  - Hedges as shelter: hedged fields could be nipped less (a windbreak), giving the hawthorn a second use.
+  - A frost tale on the longest night that teaches the children not to sow before the blackthorn flowers.
