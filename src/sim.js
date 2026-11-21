@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 31;
+export const SIM_VERSION = 32;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -58,6 +58,7 @@ export const TECHS = {
   snowmen:  { name: 'Snowmen', added: '2026-11-21T04:41Z', desc: 'When the snow lies deep the children are sent out of the smoke and onto the green by the hearth. They roll it into balls, stack three, and give each figure pebble eyes, a stick nose and a name: often the name of someone the island tells of. Up to three stand at once, the rest of the snow goes in fights. They keep all winter and slump into the mud in the first warm days of spring.', req: ['fire'] },
   gifts:    { name: 'Peace gifts', added: '2026-11-21T03:05Z', desc: 'The far isle has thin years, and in a thin year its dugout comes back by night for the granaries. Once robbed, the islanders learn the signs: guests who come to midsummer with sharp cheekbones and nothing to trade. Before they push off at first light each one is given a sack of grain to carry home, and that autumn nobody comes by night.', req: ['farisle'] },
   canoe:    { name: 'Dugout', added: '2026-11-21T06:13Z', desc: 'A tall oak felled above the beach, its back burnt out with small fires and scraped hollow with shell adzes, a little each dry day. Pushed into the sea it carries one islander past the surf to the deep water, where the shore fishers cannot reach and the big fish are. Out on calm days from spring to autumn, home by mid-afternoon. A storm can drag it off the sand and smash it, and in time the sun splits it, and a new oak must be felled.', req: ['fishing', 'farisle', 'woodcut'] },
+  coppice:  { name: 'Coppice', added: '2026-11-21T07:01Z', desc: 'A hazel cut low sends up a ring of straight poles from the stump. Trees felled near the village are left as stools instead of grubbed out; the fields and houses go round them and the goats and deer are kept off. A stool grows back to a stand of poles in a year or two, far faster than a wild tree, so there is still wood in reach of the hearth when the fields have eaten the woods.', req: ['woodcut'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -406,7 +407,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null,
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null,
   };
   // name the island
   let nm = '';
@@ -491,7 +492,7 @@ function findHouseSite(w) {
   const { x: fx, y: fy } = w.fire;
   for (let y = 1; y < MAP - 1; y++) for (let x = 1; x < MAP - 1; x++) {
     const tt = tile(w, x, y);
-    if ((tt !== T.GRASS && tt !== T.FOREST) || nearBuild(w, x, y, 1)) continue;
+    if ((tt !== T.GRASS && tt !== T.FOREST) || nearBuild(w, x, y, 1) || (tt === T.FOREST && isStool(w, idx(x, y)))) continue;
     const dd = d2(x, y, fx, fy) + hash(x, y, w.seed + 9) * 2 + (tt === T.FOREST ? 6 : 0);
     if (dd < 5 || dd >= bd) continue;
     if (!lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) continue;
@@ -522,7 +523,7 @@ function scanFieldSite(w) {
     const tt = tile(w, x, y);
     if (tt !== T.GRASS && tt !== T.FOREST) continue;
     const dd = d2(x, y, fx, fy);
-    if (dd < 16) continue;
+    if (dd < 16 || (tt === T.FOREST && isStool(w, idx(x, y)))) continue;
     let adj = 0;
     for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (tile(w, x + ax, y + ay) === T.FIELD) adj++;
     const sc = Math.sqrt(dd) - adj * 1.6 + hash(x, y, w.seed + 5) + (tt === T.FOREST ? 4 : 0);
@@ -601,7 +602,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -672,6 +673,7 @@ function daily(w, c, fx) {
   if (w.rats !== undefined) rats(w, c);
   if (w.pot !== undefined) potDay(w, c);
   if (w.canoe !== undefined) canoeDay(w, c);
+  if (w.copse !== undefined) copseDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.goats !== undefined) goatDay(w, c);
@@ -924,7 +926,7 @@ function deerDay(w, c) {
     const x = F.mead.x + ri(w, 11) - 5, y = F.mead.y + ri(w, 11) - 5;
     if (!inMap(x, y)) continue;
     const i = idx(x, y);
-    if (w.tiles[i] === T.FOREST && w.wood[i] <= DEER_BROWSE) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
+    if (w.tiles[i] === T.FOREST && w.wood[i] <= DEER_BROWSE && !isStool(w, i)) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
   }
   if (c.season !== 3 || n <= 3 || !F.den) return;
   const pack = w.beasts.filter((b) => b.k === 'wolf');
@@ -2307,7 +2309,7 @@ function goatDay(w, c) {
     const x = Math.floor(m.x) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH, y = Math.floor(m.y) + ri(w, GOAT_REACH * 2 + 1) - GOAT_REACH;
     if (!inMap(x, y)) continue;
     const i = idx(x, y);
-    if (w.tiles[i] === T.FOREST && w.wood[i] <= GOAT_BROWSE) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
+    if (w.tiles[i] === T.FOREST && w.wood[i] <= GOAT_BROWSE && !isStool(w, i)) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
   }
   let grown = 0;
   for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR) grown++;
@@ -3302,6 +3304,75 @@ function fish(w, p) {
 }
 
 // ---------- the dugout ----------
+// ---------- coppice ----------
+// A hazel cut low does not die: by the next spring a ring of straight poles has sprung from the stump. Once
+// the island sees it, a tree felled to the stump near the village is left as a stool instead of grubbed out.
+// Fields and houses leave the stools be, the deer and goats are kept off them, and they grow back far
+// faster than wild wood, so the woodpile still has trees in reach once the fields have eaten the woods.
+// w.copse { s: [tile indices of the stools], n poles cut from them ever, y timber from them this year,
+//   nm who first kept one, at tick learned }
+const COPSE_YEAR = 8;        // from this year on
+const COPSE_SPARK = 0.05;    // daily chance in spring that someone notices the shoots
+const COPSE_R2 = 14 * 14;    // stools are kept within 14 tiles of the hearth (squared)
+const COPSE_BASE = 10;       // stools kept at most: this many,
+const COPSE_PER_HOUSE = 1.5; // and this many more for each house
+const COPSE_MAX = 150;
+const COPSE_GROW = 0.1;      // daily chance from spring to autumn that a stool puts on another measure of poles
+const COPSE_FIRST = 6;       // trees cut to the stool on the day it is learned
+function copseCap(w) {
+  let h = 0;
+  for (const b of w.buildings) if (isHouse(b)) h++;
+  return Math.min(COPSE_MAX, COPSE_BASE + Math.floor(h * COPSE_PER_HOUSE));
+}
+// a mask of stool tiles, rebuilt whenever the list changes (it is only ever pushed to or replaced)
+export function isStool(w, i) {
+  const K = w.copse;
+  if (!K) return false;
+  const c = cacheOf(w);
+  if (c.copS !== K.s || c.copL !== K.s.length) {
+    c.copS = K.s; c.copL = K.s.length; c.cop = new Uint8Array(MAP * MAP);
+    for (const j of K.s) c.cop[j] = 1;
+  }
+  return c.cop[i] === 1;
+}
+// a tree near the hearth felled to the stump: kept as a stool if there is room for one more
+function keepStool(w, x, y, i) {
+  const K = w.copse;
+  if (!K || isStool(w, i) || K.s.length >= copseCap(w) || d2(x, y, w.fire.x, w.fire.y) > COPSE_R2) return false;
+  K.s.push(i);
+  setTile(w, i, T.FOREST); // the map has changed for the field and house searches
+  return true;
+}
+function learnCopse(w, c) {
+  if (c.season !== 0 || c.year < COPSE_YEAR || !w.techs.includes('woodcut') || rnd(w) >= COPSE_SPARK) return;
+  let who = null;
+  for (const p of w.people) { const a = ageY(w, p); if (!p.dead && !p.sick && a >= 16 && a < 60 && (!who || p.born < who.born)) who = p; }
+  if (!who) return;
+  w.copse = { s: [], n: 0, y: 0, nm: who.name, at: w.t };
+  w.techs.push('coppice');
+  // the trees nearest the hearth are cut to the stool at once
+  const near = [];
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    const i = idx(x, y), dd = d2(x, y, w.fire.x, w.fire.y);
+    if (w.tiles[i] === T.FOREST && w.wood[i] >= 6 && dd <= COPSE_R2 && w.res['t' + i] == null) near.push([dd, i]);
+  }
+  near.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let got = 0;
+  for (const [, i] of near.slice(0, COPSE_FIRST)) { got += w.wood[i]; w.wood[i] = 0; keepStool(w, i % MAP, (i - (i % MAP)) / MAP, i); }
+  w.timber = Math.round((w.timber + got) * 100) / 100;
+  const P = pron(who), Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, `Out at the edge of the woods ${who.name} stops by a hazel ${P} cut down two winters ago. The stump has not died: a ring of straight green poles has sprung up from it, taller than a child. ${Pc} says a tree cut low grows back faster than a seedling ever could, and that the stumps nearest the village must be left in the ground and fenced from the goats. That day ${plural(near.slice(0, COPSE_FIRST).length, 'tree is', 'trees are')} cut to the stool. ${w.name} learns to coppice.`);
+}
+function copseDay(w, c) {
+  const K = w.copse;
+  if (!K) { learnCopse(w, c); return; }
+  if (c.doy === 0) K.y = 0; // last year's poles are already in the history
+  // a stool that has been burnt out, built on or ploughed is gone
+  if (K.s.some((i) => w.tiles[i] !== T.FOREST)) K.s = K.s.filter((i) => w.tiles[i] === T.FOREST);
+  if (c.season === 3) return;
+  for (const i of K.s) if (w.wood[i] < TREE_MAX && rnd(w) < COPSE_GROW) w.wood[i]++;
+}
+
 // After watching the far isle's dugout come in a few summers, the island's best fisher fells an oak above
 // the landing beach and burns and scrapes it hollow, one spell of work a dry day. Once afloat, one islander
 // at a time paddles it out past the surf on calm mornings from spring to autumn, fishes the deep water and
@@ -3600,9 +3671,14 @@ function finish(w, p, t, c, fx) {
   } else if (t.k === 'chop') {
     const i = idx(t.x, t.y);
     if (w.tiles[i] !== T.FOREST) return;
-    const got = Math.min(CHOP, w.wood[i]);
+    // a stool's poles are all cut at once, down to the stump; a tree near the village left too small to
+    // fell again is cut to the stool and kept, once the island coppices
+    const stool = !!w.copse && isStool(w, i);
+    let got = stool ? w.wood[i] : Math.min(CHOP, w.wood[i]);
+    if (!stool && w.copse && w.wood[i] - got < 6 && keepStool(w, t.x, t.y, i)) got = w.wood[i];
     w.wood[i] -= got; w.timber += got;
-    if (w.wood[i] <= 0) { setTile(w, i, T.GRASS); w.wood[i] = 0; }
+    if (stool) { w.copse.n++; w.copse.y += got; }
+    if (w.wood[i] <= 0) { w.wood[i] = 0; if (!isStool(w, i)) setTile(w, i, T.GRASS); }
     pop('+' + got, 'wood');
   } else if (t.k === 'clear') {
     const tt = tile(w, t.x, t.y);
@@ -4169,6 +4245,10 @@ const MIGRATIONS = {
   30: (w) => {
     if (w.canoe === undefined) w.canoe = null;
   },
+  // v31 -> v32: coppice. No stools yet; from year 8 someone notices the shoots on an old stump one spring.
+  31: (w) => {
+    if (w.copse === undefined) w.copse = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -4222,6 +4302,8 @@ export function summary(w) {
     canoe: !!w.canoe, canoeOk: !!(w.canoe && w.canoe.ok), canoeDug: w.canoe && !w.canoe.ok && w.canoe.wk >= 0 ? Math.round((w.canoe.wk / CANOE_WORK) * 100) : null,
     canoeOut: (w.canoe && w.canoe.at != null && (aliveId(w, w.canoe.at) || {}).name) || null, canoeTrips: w.canoe ? w.canoe.t : 0,
     canoeFish: w.canoe ? w.canoe.f : 0, canoeYear: w.canoe ? w.canoe.y : 0, canoeDeep: w.canoe ? w.canoe.d : 0, canoeLost: w.canoe ? w.canoe.lost : 0,
+    copse: !!w.copse, copseStools: w.copse ? w.copse.s.length : 0, copseReady: w.copse ? w.copse.s.filter((i) => w.wood[i] >= 6).length : 0,
+    copseYear: w.copse ? Math.round(w.copse.y) : 0, copseCut: w.copse ? w.copse.n : 0, copseCap: w.copse ? copseCap(w) : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

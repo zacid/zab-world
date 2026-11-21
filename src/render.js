@@ -195,6 +195,24 @@ function drawTree(c, x, y, size, pal, h) {
   px(c, x + 2, y + 1, l2, 2, 1); px(c, x + 1, y + 2, l2, 1, 1); px(c, x + 3, y + 2, l2, 1, 1);
   if (pal.snow) { px(c, x + 2, y + 1, '#eef3f7', 3, 1); px(c, x + 1, y + 2, '#eef3f7', 1, 1); }
 }
+// a coppice stool: a low stump cut flat, with a fan of straight hazel poles that grow taller and thicker
+// until they are cut back to the stump again; leaves at the tips (bare in winter), a rail of dead hedge
+// along the foot to keep the goats off
+function drawStool(X, Y, size, pal, h) {
+  const [mid, lit] = pal.tree, pole = '#8a7550', bark = '#5e4630';
+  px(tc, X + 2, Y + 6, bark, 4, 2); px(tc, X + 3, Y + 6, '#a88a5c', 2, 1); // the cut face
+  px(tc, X, Y + 7, '#4a3a28', 1, 1); px(tc, X + 7, Y + 7, '#4a3a28', 1, 1); // brash stacked at the corners
+  const n = size < 0.1 ? 0 : 2 + Math.min(3, Math.floor(size * 4));
+  if (!n) { px(tc, X + 2, Y + 5, '#7fbf5a'); if (h > 0.5) px(tc, X + 5, Y + 5, '#7fbf5a'); return; } // new shoots
+  const tall = 1 + Math.round(size * 5);
+  const xs = [3, 4, 2, 5, 1].slice(0, n).sort((a, b) => a - b);
+  for (const x of xs) {
+    const lean = x < 3 ? -1 : x > 4 ? 1 : 0, top = Y + 6 - tall;
+    px(tc, X + x, top + 1, pole, 1, tall);
+    if (pal.snow) { px(tc, X + x, top, '#eef3f7'); continue; }
+    px(tc, X + Math.max(0, Math.min(7, x + lean)), top, size >= 0.5 ? lit : mid); px(tc, X + x, top, mid);
+  }
+}
 // footpaths: trampled grass shows scuffs of earth; a real path is a ragged bare track that joins up
 // with the paths, houses, beach and fields around it. Under snow it is churned grey slush.
 const isWay = (x, y) => {
@@ -257,7 +275,8 @@ function drawTerrain() {
     for (let k = 0; k < 5; k++) { const hh = S.hash(x * 5 + k, y, 17); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, k < 3 ? pal.grass[1] : pal.grass[2]); }
     const ash = ashAt.get(i);
     if (ash) drawAsh(X, Y, x, y, ash, pal);
-    if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, pal, h);
+    if (t === S.T.FOREST && S.isStool(w, i)) drawStool(X, Y, w.wood[i] / 12, pal, h);
+    else if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, pal, h);
     else if (t === S.T.GRASS && w.wear && w.wear[i] >= S.WEAR_SEEN) drawPath(x, y, X, Y, w.wear[i], pal);
   }
   // fields
@@ -524,6 +543,13 @@ function drawSnowmen() {
 function snowmanAt(mx, my) {
   if (!w.snow) return null;
   return w.snow.men.find((m) => m.s >= 1 && mx >= m.x && mx < m.x + 1 && my >= m.y && my < m.y + 1) || null;
+}
+function stoolAt(mx, my) { // the stool tile under the pointer, or null
+  if (!w.copse) return null;
+  const x = Math.floor(mx), y = Math.floor(my);
+  if (x < 0 || y < 0 || x >= N || y >= N) return null;
+  const i = y * N + x;
+  return w.tiles[i] === S.T.FOREST && S.isStool(w, i) ? i : null;
 }
 function graveAt(mx, my) {
   if (!w.yard) return null;
@@ -959,6 +985,10 @@ function frame() {
         : best.a[2] === 2 ? `<b>Scorched trees</b><br><span class="m">saved from the fire ${when(best.a[1])}</span>`
         : `<b>Burnt ground</b><br>${best.age < 90 ? 'black ash' : best.age < 360 ? 'new grass through the ash' : 'fireweed and young grass'}<br><span class="m">${best.a[2] ? 'woods' : 'grass'} burnt ${when(best.a[1])}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = stoolAt(mx, my)) != null) {
+      const v = w.wood[best], K = w.copse;
+      tip.innerHTML = `<b>Coppice stool</b><br>${v < 1 ? 'cut back to the stump · new shoots' : v < 6 ? 'young poles growing from the stump' : 'a stand of poles ready to cut'}<br><span class="m">${K.s.length} ${K.s.length === 1 ? 'stool' : 'stools'} kept near the village · first left by ${esc(K.nm)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
       tip.innerHTML = `<b>${esc(best.n)}</b>${best.by ? ` <span class="by">${esc(best.by)}</span>` : ''}<br>${esc(best.why)}, aged ${Math.floor((best.d - best.b) / S.TICKS_PER_YEAR)}<br><span class="m">laid to rest ${when(best.d)}${kin.length ? `<br>child of ${kin.map(esc).join(' &amp; ')}` : ''}</span>`;
@@ -1324,6 +1354,7 @@ function updatePanels() {
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced)</span>` : s.fields],
     ['gran', 'Granaries', `${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
+    ...(s.copse ? [['copse', 'Coppice', `${s.copseStools} <span class="m">stools · ${s.copseReady} ready to cut · ${s.copseYear.toLocaleString()} timber this year</span>`]] : []),
     ...(w.techs.includes('paths') ? [['path', 'Paths', `${s.paths} <span class="m">tiles trodden bare</span>`]] : []),
     ...(w.techs.includes('herbs') ? [['herb', 'Herbs', `${s.herbs} <span class="m">bundles · ${s.healer ? esc(s.healer) + ' heals' : 'no healer'}</span>`]] : []),
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
@@ -1405,7 +1436,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;

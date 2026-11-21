@@ -318,3 +318,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Smoked or salted deep-water fish in jars for winter (pottery), and a drying rack on the beach.
   - Seals or a whale washed up after a storm; a "Boatwright" byname once someone has hollowed two boats.
   - The paddler could spot the far isle's dugout coming in by night and warn the beach watch.
+- Coppice is done (w.copse { s stool tiles, n cuts, y timber this year, nm, at }; isStool() mask in the cache; stools are
+  FOREST tiles that never turn to grass when cut). Chop only picks trees with wood >= 6 and takes 4, so wild trees near the
+  hearth were never cut to 0 before; now the last of a tree near the village is taken and the stump kept. Answers it invites:
+  - Hazel rods from the coppice for fences and the goat pen (FENCE_COST could come from poles, not timber).
+  - Woodcutters still walk past stools to wild trees farther out only when no stool is ready; a woodward who keeps a
+    cutting rotation (one panel a year) would make the ring show visible age bands.
+  - Field sprawl itself is untouched (needFields ~2 per person, 500 fields at 230 people). Manuring with goat dung or
+    rotation would shrink it; houses could also stop being built when the woodpile cannot heat them.
+  - Fire through the coppice kills the stools (they drop out of the list); real stools resprout after fire.
