@@ -1,6 +1,8 @@
 node_modules/
 dist/
 world/
+scripts/.prof*/
+*.cpuprofile
 
 
 LAST_RUN.md

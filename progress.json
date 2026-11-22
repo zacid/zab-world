@@ -263,5 +263,10 @@
   "at": "2026-11-22T00:54:39.219Z",
   "title": "Add wolf-skin cloaks for whoever kills a lone wolf",
   "body": "- SIM_VERSION 49 (p.cl {nm, y, by, n}; w.cloak {n, h, g}; cloakMade/cloakPass in sim.js; tech 'cloak'; grave g.cl): the hunter whose spear kills a lone wolf wears its pelt. If they already have one, it goes to the partner on the hunt\n- No wolf singles out a cloak wearer (lone() skips them). At death the cloak goes to the eldest grown child, else the partner, else into the grave\n- Visible: a pelt across the shoulders with two hood ears on the sprite, coloured by wolf (Pale-Eye is near white); \"wears the pelt of ...\" on the islander card; \"buried in the pelt of ...\" on graves\n- Watch: on Hais, Duten and Hamor should kill Pale-Eye this spring (Y8), and Duten will wear the first cloak. Expect it to pass to one of his children decades later"
+ },
+ {
+  "at": "2026-11-22T02:11:35.727Z",
+  "title": "Speed up late-game years by about 45% with identical results",
+  "body": "- Give people, fields and buildings one fixed key order (personShape/fieldShape/buildingShape), rebuilt on every load in migrate()\n- Clear keys with `= undefined` instead of `delete`: almost every villager, field and building had fallen into slow dictionary mode\n- Skip repeat fence/hedge searches within an hour once one finds nothing (reset when a fence or hedge claim is given up)\n- Seed 4242 Y80-83 on a loaded world: ~3.8 -> ~2.1 s per year, same world as before; fingerprint() now hashes keys in sorted order\n- No change to the island itself; new probes: _speedbench, _prof/_profsum, _fastprops, _keys, _tasks"
  }
 ]

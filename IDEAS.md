@@ -490,6 +490,16 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Lone wolf names repeat, so two "Pale-Eye" cloaks can be worn at once. More names, or "the second Pale-Eye", would fix the chronicle.
   - A cloak wearer could get warmth in hard frost (frail old wearers die of cold less), which matters more as the cloak passes to the old.
   - Snowmen already dress up as the Wolf-slayer; they could wear a little grey cloak drawn on the sprite too.
-- Speed has slipped again: `node scripts/_lonebench.mjs 4242 80 85` shows the committed code at 3.0-3.6 s/yr at 171 people on the
-  test machine, and check.mjs 100 averages 1.8-3.0 s/yr. That is well over the 1.5 s budget at 300 people. A profiling pass over the
-  newer daily/hourly hooks (rot, pare, muck, lore, bow, lone, wade, smudge) is due before more systems are added.
+- Speed pass 2 is done (same world, sorted-key fingerprints match HEAD): seed 4242 Y80-83 went from ~3.8 to ~2.1 s/yr at ~210 people.
+  The causes were not the newer hooks. Nearly every person, field and building had fallen into V8 dictionary mode because of `delete`,
+  and the rest had 40+ hidden classes; fenceTask/hedgeTask also scanned every exposed field for each idle worker every hour.
+  Rules for later visits:
+  - Never `delete` a key on a person, field, building or goat in the step path: set it to undefined. Add any new key to personShape /
+    fieldShape / buildingShape in sim.js (`node scripts/_keys.mjs [seed] [years]` lists the keys seen;
+    `node --allow-natives-syntax scripts/_fastprops.mjs [seed] [year]` counts shapes, which should be 1 each).
+  - `fingerprint()` now hashes keys in sorted order, so key order no longer matters; values still must match exactly.
+  - `node scripts/_speedbench.mjs [seed] [from] [to]` times HEAD against the working copy on a loaded world and checks the worlds match;
+    `node --cpu-prof scripts/_prof.mjs` plus `node scripts/_profsum.mjs <file>` gives self time, hot lines and inclusive time.
+  What is left: act() itself (~50% inclusive), walk/tread (~12%), prowl/deer (~9%), GC (~7%). Goats, guests, beasts and tasks still
+  have mixed shapes; tasks are new object literals with different keys per kind, so a common task shape would help. Idle adults still
+  run the whole pickTask chain every 2 hours (half of daytime adult hours are idle, foraging or fishing).

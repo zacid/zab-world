@@ -577,14 +577,39 @@ function findShore(w) {
   return out;
 }
 
+// ---------- object shapes ----------
+// People, fields and buildings are built with every key they can ever hold, always in the same order
+// (unset ones are undefined, which JSON leaves out), and the step path clears a key by setting it to
+// undefined, never with delete. Then every villager shares one hidden class and property reads stay
+// fast. A world loaded from JSON is rebuilt the same way in migrate(). Only speed depends on this.
+const personShape = (o) => ({
+  id: o.id, name: o.name, sex: o.sex, born: o.born, mother: o.mother, father: o.father, partner: o.partner, home: o.home,
+  wants: o.wants, lastBirth: o.lastBirth, hunger: o.hunger, x: o.x, y: o.y, px: o.px, py: o.py, task: o.task, asleep: o.asleep,
+  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl,
+});
+const fieldShape = (o) => ({
+  id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
+  lost: o.lost, root: o.root, flat: o.flat, mk: o.mk, fence: o.fence, hg: o.hg,
+});
+const buildingShape = (o) => ({ id: o.id, kind: o.kind, x: o.x, y: o.y, progress: o.progress, hands: o.hands, dmg: o.dmg, tie: o.tie, burnt: o.burnt });
+// rebuild a list loaded from JSON in the shared shape, keeping any key the shape does not know about
+function reshape(list, make) {
+  if (!list) return list;
+  return list.map((o) => {
+    const n = make(o);
+    for (const k of Object.keys(o)) if (!(k in n)) n[k] = o[k];
+    return n;
+  });
+}
+
 function addPerson(w, sex, ageYears, mother, father, home) {
-  const p = {
-    id: w.nextId++, name: makeName(w), sex, born: w.t - Math.floor(ageYears * TICKS_PER_YEAR),
+  const id = w.nextId++, name = makeName(w); // name first, then the spot: both draw on rnd(w), in this order
+  const x = w.fire.x + 0.5 + (rnd(w) - 0.5) * 3, y = w.fire.y + 0.5 + (rnd(w) - 0.5) * 3;
+  const p = personShape({
+    id, name, sex, born: w.t - Math.floor(ageYears * TICKS_PER_YEAR),
     mother, father, partner: null, home, wants: false, lastBirth: -1e9, hunger: 0,
-    x: w.fire.x + 0.5 + (rnd(w) - 0.5) * 3, y: w.fire.y + 0.5 + (rnd(w) - 0.5) * 3, px: 0, py: 0,
-    task: null, asleep: false,
-  };
-  p.px = p.x; p.py = p.y;
+    x, y, px: x, py: y, task: null, asleep: false,
+  });
   w.people.push(p);
   return p;
 }
@@ -608,7 +633,7 @@ function addBuilding(w, progress, kind = 'house') {
   w.timber += w.wood[idx(s.x, s.y)];
   w.wood[idx(s.x, s.y)] = 0;
   setTile(w, idx(s.x, s.y), T.BUILD);
-  const b = { id: w.nextId++, kind, x: s.x, y: s.y, progress };
+  const b = buildingShape({ id: w.nextId++, kind, x: s.x, y: s.y, progress });
   w.buildings.push(b);
   return b.id;
 }
@@ -639,7 +664,7 @@ function addField(w, at) {
   const s = at || findFieldSite(w);
   if (!s) return null;
   setTile(w, idx(s.x, s.y), T.FIELD);
-  const f = { id: w.nextId++, x: s.x, y: s.y, stage: 'fallow', growth: 0 };
+  const f = fieldShape({ id: w.nextId++, x: s.x, y: s.y, stage: 'fallow', growth: 0 });
   w.fields.push(f);
   return f;
 }
@@ -713,7 +738,7 @@ function daily(w, c, fx) {
     w.harvest = Math.round((0.65 + rnd(w) * 0.65) * 100) / 100;
     if (w.harvest < 0.8) log(w, 'A dry spring. The elders fear a thin harvest.', 'bad');
     else if (w.harvest > 1.15) log(w, 'Warm rains this spring. The soil feels rich.', 'good');
-    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) delete f.flat; delete f.root; delete f.lost; delete f.burnt; delete f.fr; delete f.ru; delete f.rl; delete f.rg; }
+    for (const f of w.fields) { if (f.stage === 'harvested') f.stage = 'fallow'; if (f.flat) f.flat = undefined; f.root = f.lost = f.burnt = f.fr = f.ru = f.rl = f.rg = undefined; }
     w.stats.yw = w.stats.yr = w.stats.yk = w.stats.yi = w.stats.yg = 0;
     if (w.rats) {
       if (w.rats.y >= 50) log(w, `Rats ate ${Math.round(w.rats.y)} grain from the stores last year.`, 'bad');
@@ -735,7 +760,7 @@ function daily(w, c, fx) {
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
-    for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { delete f.fence; rot++; }
+    for (const f of w.fields) if (f.fence && rnd(w) < FENCE_ROT) { f.fence = undefined; rot++; }
     if (rot) log(w, `${plural(rot, 'fence has', 'fences have')} rotted at the stakes over the year.`, 'info');
   }
   if (w.beasts) wilds(w, c);
@@ -753,7 +778,7 @@ function daily(w, c, fx) {
   // crops rot at the first frost
   if (c.doy === DAYS_PER_SEASON * 3) {
     let rot = 0;
-    for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; delete f.lost; rot++; }
+    for (const f of w.fields) if (f.stage === 'planted' || f.stage === 'ripe') { f.stage = 'fallow'; f.growth = 0; f.lost = undefined; rot++; }
     if (rot) log(w, `Frost takes ${rot} unharvested field${rot > 1 ? 's' : ''}.`, 'bad');
     if (w.rust && w.rust.cur) rustEnds(w);
   }
@@ -916,7 +941,7 @@ function loreMorning(w, c, was, next) {
       log(w, `${L.rd} called a storm, but the morning comes in ${next === 'rain' ? 'grey and drizzling' : next === 'fog' ? 'thick with fog' : 'calm'}. The children laugh at the stones hanging off the roofs.`, 'info');
     }
   } else if (next === 'storm' && was !== 'storm') log(w, 'Black clouds roll in off the sea with no warning in last night\'s sky. Everyone runs for shelter.', 'bad');
-  if (next !== 'storm') for (const b of w.buildings) if (b.tie) delete b.tie;
+  if (next !== 'storm') for (const b of w.buildings) if (b.tie) b.tie = undefined;
 }
 // a warned evening: cut what is ripe, then rope the roofs
 function prepTask(w, p) {
@@ -944,14 +969,14 @@ function storm(w) {
     if (f.stage !== 'ripe' && !(f.stage === 'planted' && f.growth >= 0.5)) continue;
     if (rnd(w) < STORM_FLATTEN) { f.stage = 'fallow'; f.growth = 0; f.flat = 1; s.f++; w.stats.yf = (w.stats.yf || 0) + 1; }
   }
-  for (const f of w.fields) if (f.fence && rnd(w) < FENCE_STORM) { delete f.fence; s.g = (s.g || 0) + 1; }
+  for (const f of w.fields) if (f.fence && rnd(w) < FENCE_STORM) { f.fence = undefined; s.g = (s.g || 0) + 1; }
   // and now and then it takes a roof
   if (rnd(w) < STORM_ROOF) {
     const standing = w.buildings.filter((b) => b.progress >= 1);
     if (standing.length) {
       const b = standing[ri(w, standing.length)];
       if (b.tie && rnd(w) < LORE_HOLD) { s.held = (s.held || 0) + 1; w.lore.s++; w.lore.y++; }
-      else { b.progress = 0.75; b.dmg = 1; delete b.tie; s.r++; }
+      else { b.progress = 0.75; b.dmg = 1; b.tie = undefined; s.r++; }
     }
   }
 }
@@ -1166,7 +1191,7 @@ function rustCut(w, f, y) {
   if (f.ru == null) return;
   const lost = f.rl ? Math.round((y / Math.max(0.2, 1 - (f.lost || 0))) * f.rl) : 0;
   if (w.rust) { w.rust.g += lost; if (w.rust.cur) w.rust.cur.g += lost; }
-  delete f.ru; delete f.rl; delete f.rg;
+  f.ru = f.rl = f.rg = undefined;
 }
 function rustEnds(w, stopped) {
   const R = w.rust, C = R.cur;
@@ -1372,7 +1397,7 @@ function stockWilds(w) {
 // once a day: wounds heal, lairs shift as the woods change, litters are born and the weak leave
 function wilds(w, c) {
   const F = w.fauna;
-  for (const p of w.people) if (p.hurt && p.hurt <= w.t) delete p.hurt;
+  for (const p of w.people) if (p.hurt && p.hurt <= w.t) p.hurt = undefined;
   if (c.day % 30 === 0 || (F.den && tile(w, F.den.x, F.den.y) !== T.FOREST) || (F.lair && tile(w, F.lair.x, F.lair.y) !== T.FOREST)) findLairs(w);
   else if (!F.mead || tile(w, F.mead.x, F.mead.y) !== T.GRASS) findMeadow(w);
   deerDay(w, c);
@@ -1797,7 +1822,7 @@ function boar(w, b, active) {
   if (--b.h > 0) return;
   const f = w.fields.find((o) => o.id === b.f);
   if (f && f.fence && (f.stage === 'planted' || f.stage === 'ripe')) {
-    delete f.fence; F.broke = (F.broke || 0) + 1;
+    f.fence = undefined; F.broke = (F.broke || 0) + 1;
     if (!w.hedge && w.techs.includes('fencing')) F.br = (F.br || 0) + 1;
   } else if (f && hedged(w, f) && (f.stage === 'planted' || f.stage === 'ripe')) F.gap = (F.gap || 0) + 1; // the thorn springs back behind it
   if (f && f.stage === 'planted') { f.growth = Math.max(0, Math.round((f.growth - 0.3) * 10000) / 10000); f.root = 1; F.hit++; }
@@ -2259,7 +2284,7 @@ function isleHour(w, c) {
     for (const g of B.gs) {
       if (fest && g.r == null) { const s = festSpot(w); g.tx = s.x + 0.5; g.ty = s.y + 0.5; g.r = s.r; } // into the ring, behind the islanders
       else if (!fest && g.r != null) { // the dance is over: they lie down by the embers
-        g.tx = Math.round(((g.tx + w.fire.x + 0.5) / 2) * 1000) / 1000; g.ty = Math.round(((g.ty + w.fire.y + 0.5) / 2 + 0.6) * 1000) / 1000; delete g.r;
+        g.tx = Math.round(((g.tx + w.fire.x + 0.5) / 2) * 1000) / 1000; g.ty = Math.round(((g.ty + w.fire.y + 0.5) / 2 + 0.6) * 1000) / 1000; g.r = undefined;
       }
       g.k = moveToward(g, g.tx, g.ty, GUEST_SPEED) ?(fest ? 'fest' : c.day === B.d && h < FEST_FROM ? 'wait' : 'sleep') : 'walk';
     }
@@ -2504,10 +2529,21 @@ function exposed(w) {
   }
   return c.ex;
 }
+// Within one villagers' hour a field only stops needing a fence or a hedge (one is put up, or claimed),
+// except when a g/q claim is given up (release() counts those in cache.rel) or a tile changes (exposed() is
+// relisted). So once a search finds nothing, the next worker that hour gets the same answer without one.
+function noneYet(w, cc, tag) {
+  const k = cc[tag];
+  return !!k && k.t === w.t && k.rel === cc.rel && k.ex === cc.ex;
+}
+function noneFound(w, cc, tag) { cc[tag] = { t: w.t, rel: cc.rel, ex: cc.ex }; }
 function fenceTask(w, p, c) {
   if (c.season === 3 || w.timber < FENCE_COST + HOUSE_COST || !w.techs.includes('fencing')) return null;
-  const f = nearest(exposed(w), p, (o) => !o.fence && !hedged(w, o) && w.res['g' + o.id] == null);
-  return f && { k: 'fence', key: 'g' + f.id, x: f.x, y: f.y, h: FENCE_WORK };
+  const ex = exposed(w), cc = cacheOf(w);
+  if (noneYet(w, cc, 'fenceNone')) return null;
+  const f = nearest(ex, p, (o) => !o.fence && !hedged(w, o) && w.res['g' + o.id] == null);
+  if (!f) { noneFound(w, cc, 'fenceNone'); return null; }
+  return { k: 'fence', key: 'g' + f.id, x: f.x, y: f.y, h: FENCE_WORK };
 }
 
 // ---------- hedges ----------
@@ -2528,8 +2564,11 @@ function hedgeTask(w, p, c) {
   if (!w.hedge || c.season < 2) return null; // slips are set while the thorn sleeps, from the harvest to the end of winter
   const wx = w.wx ? w.wx.k : 'clear';
   if (wx === 'snow' || wx === 'storm' || wx === 'cold' || wx === 'fog') return null;
-  const f = nearest(exposed(w), p, (o) => o.hg == null && w.res['q' + o.id] == null);
-  return f && { k: 'hedge', key: 'q' + f.id, x: f.x, y: f.y, h: HEDGE_WORK };
+  const ex = exposed(w), cc = cacheOf(w);
+  if (noneYet(w, cc, 'hedgeNone')) return null;
+  const f = nearest(ex, p, (o) => o.hg == null && w.res['q' + o.id] == null);
+  if (!f) { noneFound(w, cc, 'hedgeNone'); return null; }
+  return { k: 'hedge', key: 'q' + f.id, x: f.x, y: f.y, h: HEDGE_WORK };
 }
 
 // ---------- muck ----------
@@ -2697,8 +2736,8 @@ function fever(w, c, fx) {
   let sick = 0;
   for (const p of w.people) {
     if (p.dead) continue;
-    if (p.imm && p.imm <= w.t) delete p.imm;
-    if (p.sick && p.sick <= w.t) { delete p.sick; p.imm = w.t + FEVER_IMMUNE * TICKS_PER_YEAR; continue; }
+    if (p.imm && p.imm <= w.t) p.imm = undefined;
+    if (p.sick && p.sick <= w.t) { p.sick = undefined; p.imm = w.t + FEVER_IMMUNE * TICKS_PER_YEAR; continue; }
     if (!p.sick) continue;
     const a = ageY(w, p);
     let risk = 0.002;
@@ -3320,7 +3359,7 @@ function rotDay(w, c) {
       : `${dead.length} lame goats die in the straw. Their hides are kept; the carcasses are dragged off and burnt.`, 'bad');
   }
   if (!G.herd.some((g) => g.lm != null)) rotEnds(w);
-  for (const g of G.herd) if (g.lm == null && g.pf != null) delete g.pf; // walked sound out of the sick fold
+  for (const g of G.herd) if (g.lm == null && g.pf != null) g.pf = undefined; // walked sound out of the sick fold
 }
 // ---------- hoof paring and the sick fold ----------
 // After foot rot has killed PARE_LEARN goats, the herder (or the healer) sees that the lame ones on dry ground mend
@@ -4186,6 +4225,8 @@ function release(w, p) {
   }
   if (p.task && p.task.key) {
     delete w.res[p.task.key];
+    const k0 = p.task.key.charCodeAt(0);
+    if (k0 === 103 || k0 === 113) { const cc = cacheOf(w); cc.rel = (cc.rel || 0) + 1; } // a fence (g) or hedge (q) claim is given up: look again
     if (p.task.h > 0 && p.task.k === 'clear') w.prog[p.task.key] = p.task.h;
   }
   p.task = null;
@@ -4198,9 +4239,15 @@ function reserve(w, p, task) {
   p.task = task;
 }
 
+// ok() is only asked about a candidate that would be the new nearest; every ok() is a pure test, so
+// this picks the same one as testing them all
 function nearest(list, p, ok) {
   let best = null, bd = 1e9;
-  for (const o of list) { if (!ok(o)) continue; const dd = d2(o.x + 0.5, o.y + 0.5, p.x, p.y); if (dd < bd) { bd = dd; best = o; } }
+  const px = p.x, py = p.y;
+  for (let k = 0; k < list.length; k++) {
+    const o = list[k], dx = o.x + 0.5 - px, dy = o.y + 0.5 - py, dd = dx * dx + dy * dy;
+    if (dd < bd && ok(o)) { bd = dd; best = o; }
+  }
   return best;
 }
 // the nearest field in a given stage that nobody has claimed; the claim is only looked up for a field
@@ -4730,7 +4777,7 @@ function act(w, p, c, fx) {
   }
   if (p.mourn) { // the morning after a death in the family: to the graveside
     const [d, s] = p.mourn;
-    if (c.day > d || (c.day === d && h >= MOURN_TO) || !w.yard) delete p.mourn;
+    if (c.day > d || (c.day === d && h >= MOURN_TO) || !w.yard) p.mourn = undefined;
     else if (c.day === d && h >= MOURN_FROM && !(p.task && (p.task.k === 'hunt' || p.task.k === 'haul'))) {
       if (!p.task || p.task.k !== 'mourn') { release(w, p); p.task = mournSpot(w, p, s); }
       walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
@@ -4776,7 +4823,7 @@ function finish(w, p, t, c, fx) {
     const base = FIELD_YIELD * w.harvest * (1 - (f.lost || 0));
     const y = Math.round(base * (f.mk ? 1 + MUCK_GAIN : 1));
     if (f.mk && w.muck) { const more = y - Math.round(base); w.muck.g += more; w.muck.yg += more; }
-    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); delete f.lost; delete f.mk;
+    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); f.lost = f.mk = undefined;
     if (!w.muck && w.goats && w.learned && w.learned.goats != null && w.t - w.learned.goats >= MUCK_YEARS * TICKS_PER_YEAR &&
       d2(f.x + 0.5, f.y + 0.5, penMid(w.goats).x, penMid(w.goats).y) <= MUCK_NEAR * MUCK_NEAR) learnMuck(w, p, f);
     deed(w, p, 'g', y);
@@ -4786,7 +4833,7 @@ function finish(w, p, t, c, fx) {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (f && f.stage === 'fallow') {
       const fr = f.fr != null;
-      f.stage = 'planted'; f.growth = 0; delete f.flat; delete f.root; delete f.fr; delete f.ru; delete f.rl; delete f.rg; pop(fr ? 'sown again' : 'sown', 'muted');
+      f.stage = 'planted'; f.growth = 0; f.flat = f.root = f.fr = f.ru = f.rl = f.rg = undefined; pop(fr ? 'sown again' : 'sown', 'muted');
       if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
     }
   } else if (t.k === 'build') {
@@ -4797,11 +4844,11 @@ function finish(w, p, t, c, fx) {
     pop('+' + Math.round(b.progress * 100) + '%', 'build');
     if (b.progress >= 1 && b.hands) {
       for (const id of b.hands) deed(w, aliveId(w, id), 'h');
-      delete b.hands;
+      b.hands = undefined;
     }
     if (b.progress >= 1 && b.dmg) {
       log(w, b.kind === 'granary' ? 'The granary roof is thatched again.' : b.burnt ? 'A burnt roof is thatched again.' : 'A storm-torn roof is mended.', 'good');
-      delete b.dmg; delete b.burnt;
+      b.dmg = b.burnt = undefined;
     } else if (b.progress >= 1 && b.kind === 'granary') {
       const n = w.buildings.filter((o) => o.kind === 'granary' && o.progress >= 1).length;
       if (n === 1) milestone(w, `The first granary stands on ${w.name}, its floor raised above the damp.`);
@@ -4902,7 +4949,7 @@ function finish(w, p, t, c, fx) {
     if (t.key === 'h0') strike(w, p, t);
   } else if (t.k === 'haul') {
     const n = MEAT[t.q] || 0;
-    w.food += n; delete p.haul;
+    w.food += n; p.haul = undefined;
     pop('+' + n, 'meat');
   } else if (t.k === 'fish') {
     const got = Math.min(w.fish, 3 + ri(w, 4));
@@ -5290,7 +5337,7 @@ function blazeHour(w, c) {
         if (rnd(w) < BLAZE_CROP * fw * (guarded(nx, ny) ? BLAZE_GUARD : 1)) {
           busy.add(n); lit.push([n, 2]);
           if (f.stage !== 'harvested') C.f++;
-          f.stage = 'fallow'; f.growth = 0; f.burnt = 1; delete f.lost; delete f.fence; delete f.hg;
+          f.stage = 'fallow'; f.growth = 0; f.burnt = 1; f.lost = f.fence = f.hg = undefined;
         }
       } else if (tt === T.BUILD) {
         const b = w.buildings.find((o) => o.x === nx && o.y === ny);
@@ -5672,6 +5719,10 @@ export function migrate(w) {
     if (m) m(w);
     w.v++;
   }
+  // every load: one shared shape for villagers, fields and buildings (see personShape)
+  w.people = reshape(w.people, personShape);
+  w.fields = reshape(w.fields, fieldShape);
+  w.buildings = reshape(w.buildings, buildingShape);
   return w;
 }
 
@@ -5759,8 +5810,16 @@ export function summary(w) {
   };
 }
 
+// Keys are hashed in sorted order: a world reloaded from JSON holds the same values as the one that ran on,
+// but a key that was cleared to undefined and set again may sit in a different place in the object.
+const sortedKeys = (k, v) => {
+  if (!v || typeof v !== 'object' || Array.isArray(v) || ArrayBuffer.isView(v)) return v;
+  const o = {};
+  for (const key of Object.keys(v).sort()) o[key] = v[key];
+  return o;
+};
 export function fingerprint(w) {
-  const s = JSON.stringify(w);
+  const s = JSON.stringify(w, sortedKeys);
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(16);
