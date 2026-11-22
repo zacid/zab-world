@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 53;
+export const SIM_VERSION = 54;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -79,6 +79,7 @@ export const TECHS = {
   crows:    { name: 'Rooks', added: '2026-11-22T03:27Z', desc: 'A flock of rooks from the woods that comes down by day on new-sown fields to dig out the seed, and on the ripe grain to strip the ears. A field picked bare of its seed has to be sown again. The flock grows a little every year with the fields.', req: ['farming'] },
   scaring:  { name: 'Bird-scaring', added: '2026-11-22T03:27Z', desc: 'Two flat boards tied loosely with a thong, swung so they clap like a breaking branch. When the rooks come down on the grain the children run out with clappers and stones and shout until the flock lifts and goes back to the trees for a while. A flock driven off often enough in a year loses some of its birds to other woods.', req: ['crows'] },
   foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
+  drought:  { name: 'Dry spring', added: '2026-11-22T04:45Z', desc: 'The spring by the village is fed by the rain. A hot, dry summer draws it down, and the more mouths there are the faster it goes, until one morning there is only cracked mud between the stones. Then the water comes from a deep pool in the woods, a long walk each way with a skin bag, or a jar once there is a potter. On a day with too few carries the small children and the old go thirsty and some sicken, and the goats give less milk. The autumn rains fill the spring again. Nobody has an answer for it yet.', req: ['fire'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -221,6 +222,24 @@ const CHEESE_WORK = 3;       // hours to curd, press and set out a round
 export const CHEESE_RACK = 60; // rounds the rack holds
 const CHEESE_FRAIL = 6;      // a round a day feeds this many of the small and the old
 const CHEESE_GUARD = 0.4;    // on a day they have cheese, the cold reaches the frail this much as hard
+
+// ---------- the spring ----------
+// A spring by the village gives the water. Rain fills it; summer sun and many mouths draw it down. In a
+// hot dry summer it can fail, and then water must be carried from a deep pool in the woods, a long walk
+// each way. A day with too few carries leaves the small and the old thirsty, and the goats give less.
+export const SPRING_FULL = 200; // the spring brim-full
+const SPRING_BACK = 40;      // a failed spring runs again once it has filled back to this
+const SPRING_GAIN = [['rain', 8], ['storm', 6], ['snow', 4], ['fog', 2], ['cold', 0], ['heat', -8]]; // per day; clear is below
+const SPRING_CLEAR = 2;      // a clear day outside summer: the ground still gives
+const SPRING_SUN = -2;       // a clear summer day
+const SPRING_DRAW = 40;      // in spring and summer, one more point drawn a day for every this many islanders
+const SPRING_DRAW_MAX = 4;
+const SPRING_DRYYEAR = -1;   // in a dry year (thin harvest called), spring and summer
+const SPRING_SKIN = 3;       // islanders one carry keeps in water: a skin bag
+const SPRING_JAR = 5;        // with the potter's jars
+const SPRING_LATE = 15;      // nobody sets out for the pool after this hour
+const SPRING_THIRST = 0.004; // daily death risk for the small and the old on a day with no water at all (twice in a heatwave)
+const SPRING_MILK = 0.5;     // share of the milk lost on a day with no water at all
 
 // ---------- midsummer ----------
 const FEST_DAY = 135;        // day of the year (summer day 46); rain puts it off a few days, a storm until it passes
@@ -536,7 +555,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -759,7 +778,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -786,6 +805,7 @@ function daily(w, c, fx) {
     if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
     if (w.pare) w.pare.y = 0;
     if (w.cheese) { w.cheese.y = 0; w.cheese.ye = 0; }
+    if (w.spring) { w.spring.yd = 0; w.spring.yt = 0; w.spring.yc = 0; }
     crowYear(w);
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
@@ -855,6 +875,7 @@ function daily(w, c, fx) {
   if (w.whale) whaleDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
+  if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
   if (w.muck) muckDay(w);
   if (w.dogs !== undefined) dogDay(w, c);
@@ -3480,7 +3501,7 @@ function goatDay(w, c) {
   let grown = 0;
   for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR && g.lm == null) grown++; // a lame goat gives no milk and does not kid
   if (c.season < 2 && grown) {
-    const milk = Math.round(grown * GOAT_MILK * 10) / 10, kept = w.cheese ? cheeseMilk(w, milk) : 0;
+    const milk = Math.round(grown * GOAT_MILK * (1 - thirst(w) * SPRING_MILK) * 10) / 10, kept = w.cheese ? cheeseMilk(w, milk) : 0;
     w.food = Math.round((w.food + milk - kept) * 100) / 100; G.ym = Math.round((G.ym + milk) * 10) / 10; G.milk = Math.round((G.milk + milk) * 10) / 10;
   }
   if (c.season === 3 && n) { // winter: grain from the stores, if there is grain to spare
@@ -3554,6 +3575,109 @@ function learnCheese(w, c, grown) {
   const M = mk && mk !== who ? mk.name : Cap(pron(who));
   milestone(w, `${who.name} takes the morning milk out to the grazing in a bag sewn from the stomach of a kid killed last autumn, and leaves it hanging on a thorn in the sun. By noon it has gone to soft white curd in thin green whey. ` +
     `${M} tastes it and does not spit it out. The curd is tipped into a wicker basket with a flat stone on top, the whey runs out through the weave, and in a few days there is a firm pale round with a rind on it. A rack of hazel rods goes up ${r ? 'against the pen wall' : 'in a corner of the pen'}, out of the rain, to dry the rounds. Half the summer milk goes to the press now, to be eaten when the frost comes. ${w.name} learns to make cheese.`);
+}
+// ---------- the spring ----------
+// w.spring { x, y spring tile, l level (0..SPRING_FULL), dry 0/1, px, py pool in the woods (null until first needed),
+//   nd carries needed today, c carried today, o out now, sh share of yesterday's water that never came (0..1),
+//   n carries ever, f times it failed, k days of this dry spell, dd dry days ever, th thirsty days ever, d died of thirst,
+//   yd, yt, yc dry days, thirsty days and carries this year, at first failed, nm who found the pool, tk thirst told this spell }
+const thirst = (w) => (w.spring ? w.spring.sh : 0);
+const springDry = (w) => !!(w.spring && w.spring.dry);
+function springSite(w) {
+  const { x: fx, y: fy } = w.fire;
+  for (const any of [false, true]) {
+    let best = null, bd = 1e9;
+    for (let y = fy - 7; y <= fy + 7; y++) for (let x = fx - 7; x <= fx + 7; x++) {
+      if (!inMap(x, y)) continue;
+      const tt = tile(w, x, y), dd = d2(x, y, fx, fy);
+      if (dd < 6 || dd > 49 || (tt !== T.GRASS && !(any && tt === T.FOREST)) || isStool(w, idx(x, y)) || (!any && nearBuild(w, x, y, 1))) continue;
+      const sc = dd + hash(x, y, w.seed + 13) * 3;
+      if (sc < bd) { bd = sc; best = { x, y }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+function poolSite(w) {
+  const { x: fx, y: fy } = w.fire, R = 18;
+  let best = null, bd = 1e9;
+  for (let y = fy - R; y <= fy + R; y++) for (let x = fx - R; x <= fx + R; x++) {
+    if (!inMap(x, y) || x < 1 || y < 1 || x >= MAP - 1 || y >= MAP - 1) continue;
+    const tt = tile(w, x, y), dd = d2(x, y, fx, fy);
+    if (dd < 64 || dd > R * R || (tt !== T.FOREST && tt !== T.GRASS) || isStool(w, idx(x, y)) || nearBuild(w, x, y, 1)) continue;
+    const sc = Math.abs(dd - 121) + (tt === T.FOREST ? 0 : 60) + hash(x, y, w.seed + 17) * 20; // about 11 tiles out, under the trees
+    if (sc >= bd || !lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) continue;
+    bd = sc; best = { x, y };
+  }
+  return best;
+}
+function placeSpring(w) {
+  const s = springSite(w);
+  if (!s) return;
+  const i = idx(s.x, s.y);
+  w.timber += w.wood[i]; w.wood[i] = 0; setTile(w, i, T.BUILD);
+  w.spring = { x: s.x, y: s.y, l: SPRING_FULL, dry: 0, px: null, py: null, nd: 0, c: 0, o: 0, sh: 0, n: 0, f: 0, k: 0, dd: 0, th: 0, d: 0, yd: 0, yt: 0, yc: 0, at: null, nm: null, tk: 0 };
+}
+const carryFor = (w) => (w.techs.includes('pottery') ? SPRING_JAR : SPRING_SKIN);
+function springDay(w, c, wx) {
+  if (!w.spring) { placeSpring(w); return; }
+  const S = w.spring, pop = w.people.length;
+  // yesterday's reckoning: how much of the water the village needed came up from the pool
+  if (S.dry && S.nd) {
+    S.sh = S.c >= S.nd ? 0 : Math.round(((S.nd - S.c) / S.nd) * 100) / 100;
+    if (S.sh > 0) {
+      S.th++; S.yt++;
+      if (!S.tk && S.sh >= 0.25) {
+        S.tk = 1;
+        log(w, S.th === 1
+          ? `Not enough water came up from the pool yesterday. The babies cry with dry mouths, the old lie still in the doorways, and the goats stand bleating at the empty trough.`
+          : `Too few carries came up from the pool again. Cups are rationed, and the small and the old go thirsty.`, 'bad');
+      }
+    }
+  } else S.sh = 0;
+  // the spring fills with the rain and falls in the sun, faster with more mouths and in a dry year
+  let g = wx === 'clear' ? (c.season === 1 ? SPRING_SUN : SPRING_CLEAR) : 0;
+  for (const [k, v] of SPRING_GAIN) if (k === wx) g = v;
+  if (c.season < 2) g -= Math.min(SPRING_DRAW_MAX, Math.floor(pop / SPRING_DRAW)) + (w.harvest < 0.8 ? -SPRING_DRYYEAR : 0);
+  S.l = Math.max(0, Math.min(SPRING_FULL, S.l + g));
+  if (!S.dry && S.l <= 0) springFails(w, c, wx);
+  else if (S.dry && S.l >= SPRING_BACK) {
+    S.dry = 0;
+    log(w, `Water wells up between the stones of the spring again after ${plural(S.k, 'dry day', 'dry days')}. The skins and jars are hung up${S.yt ? '. Nobody has to go thirsty now' : ''}.`, 'good');
+    S.k = 0; S.tk = 0;
+  } else if (!S.dry && S.l <= SPRING_BACK && S.l - g > SPRING_BACK && c.season === 1) log(w, 'The spring by the village runs low. The water comes up muddy and slow.', 'info');
+  S.c = 0; S.o = 0;
+  if (S.dry) { S.k++; S.dd++; S.yd++; S.nd = S.px != null ? Math.ceil(pop / carryFor(w)) : 0; }
+  else S.nd = 0;
+}
+function springFails(w, c, wx) {
+  const S = w.spring;
+  S.dry = 1; S.f++; S.k = 0;
+  if (S.px == null) {
+    const p = poolSite(w);
+    if (p) { const i = idx(p.x, p.y); w.timber += w.wood[i]; w.wood[i] = 0; setTile(w, i, T.BUILD); S.px = p.x; S.py = p.y; }
+  }
+  if (S.f === 1) {
+    const old = elder(w), who = old ? old.name : 'The eldest';
+    S.at = w.t; S.nm = old ? old.name : null;
+    if (!w.techs.includes('drought')) w.techs.push('drought');
+    milestone(w, `In the grey of the morning the first one down to the spring with a skin comes back with it empty. Between the stones there is only a skin of cracked mud, and the cress on the bank has gone brown. ${wx === 'heat' ? 'The sun has beaten down for days, and n' : 'N'}obody on ${w.name} has seen it fail before. ` +
+      (S.px != null ? `${who} remembers a deep pool in the woods where the deer go to drink, a long walk under the trees, and by noon a line of islanders is going out to it with skins and ${w.techs.includes('pottery') ? 'jars' : 'gourds'} and coming back bent under the weight. Until the rain comes, every cup on ${w.name} is carried in from the woods.` : `Nobody knows where else to find water.`));
+  } else log(w, `The spring has failed again. The skins and ${w.techs.includes('pottery') ? 'jars' : 'gourds'} come down from the rafters, and the long walks to the pool in the woods begin.`, 'bad');
+}
+function waterTask(w, p, c) {
+  const S = w.spring;
+  if (!S || !S.dry || S.px == null || c.hour > SPRING_LATE || S.c + S.o >= S.nd) return null;
+  S.o++;
+  return { k: 'water', x: S.px, y: S.py, h: 1 };
+}
+function waterDone(w, p, t, pop) {
+  const S = w.spring;
+  if (!S || !t.b) return;
+  t.b = 2; S.c++; S.n++; S.yc++;
+  pop('water', 'muted');
+  if (S.n === 1) log(w, `${p.name} sets the first ${w.techs.includes('pottery') ? 'jar' : 'skin'} of pool water down by the dry spring, and the children crowd round it with their cups.`, 'good');
+  else if (S.n === 500 || S.n === 2000 || S.n === 10000) log(w, `${S.n} loads of water have been carried in from the pool in the woods.`, 'info');
 }
 // half of each day's milk goes into the pails, as far as they hold; returns what was kept back
 function cheeseMilk(w, milk) {
@@ -4380,11 +4504,13 @@ function lifeAndDeath(w, c) {
   const wx = w.wx ? w.wx.k : 'clear';
   const bitter = wx === 'cold' && c.season === 3; // a deep frost reaches the frail even by the fire
   const fed = cheeseFed(w) ? CHEESE_GUARD : 1; // a wedge of cheese by the fire on the bitter days
+  const dry = thirst(w) * SPRING_THIRST * (wx === 'heat' ? 2 : 1); // too little water carried up from the pool yesterday
   for (const p of w.people) {
     if (p.dead) continue;
     const a = ageY(w, p);
     const frail = a < 6 || a > 55;
     let risk = 0.00003;
+    if (dry && frail) risk += dry;
     if (a > 45) { const k = (a - 45) / 30; risk += k * k * k * 0.012; }
     if (a < 2) risk += 0.0002;
     if (w.stats.cold && frail) risk += 0.006 * fed;
@@ -4392,8 +4518,9 @@ function lifeAndDeath(w, c) {
     if (wx === 'heat' && a > 65) risk += 0.0006;
     if (p.hunger > 12) risk += 0.0015 * (p.hunger - 12) * (a < 6 || a > 60 ? 2 : 1);
     if (rnd(w) < risk) {
-      const why = p.hunger > 12 ? 'starved' : (w.stats.cold || bitter) && frail ? 'died of the cold' : wx === 'heat' && a > 65 ? 'died in the heat' : 'passed away';
-      if (why !== 'passed away' && w.wx) w.wx.d++;
+      const why = p.hunger > 12 ? 'starved' : (w.stats.cold || bitter) && frail ? 'died of the cold' : dry && frail && dry * 2 >= risk ? 'died of thirst' : wx === 'heat' && a > 65 ? 'died in the heat' : 'passed away';
+      if (why === 'died of thirst') { w.spring.d++; }
+      else if (why !== 'passed away' && w.wx) w.wx.d++;
       die(w, p, why);
     }
   }
@@ -4509,6 +4636,10 @@ function release(w, p) {
   if (p.task && p.task.sea && w.canoe) { // called in off the water: back on the beach at once
     p.x = w.canoe.bx + 0.5; p.y = w.canoe.by + 0.5; w.canoe.at = null;
   }
+  if (p.task && p.task.k === 'water' && w.spring) { // back with the water, or the carry is given up
+    if (w.spring.o > 0) w.spring.o--;
+    if (p.task.b === 1) { w.spring.c++; w.spring.n++; w.spring.yc++; } // called in on the way home: the water still comes in with them
+  }
   if (p.task && p.task.key) {
     delete w.res[p.task.key];
     const k0 = p.task.key.charCodeAt(0);
@@ -4564,6 +4695,9 @@ function pickTask(w, p, c) {
     f = nearestFree(w, L.fallow, p, 'fallow', 'f');
     if (f) return { k: 'plant', key: 'f' + f.id, x: f.x, y: f.y, h: 3 };
   }
+  // the spring has failed: to the pool in the woods for water
+  const ak = waterTask(w, p, c);
+  if (ak) return ak;
   // rust in the grain: pull the spotted plants before it travels
   const rk = rogueTask(w, p);
   if (rk) return rk;
@@ -5219,6 +5353,7 @@ function act(w, p, c, fx) {
   if (t.k === 'paddle') { t.sea = 1; w.canoe.at = p.id; return; } // down at the boat: push off
   t.h--;
   if (t.h > 0) return;
+  if (t.k === 'water' && !t.b && w.spring) { t.b = 1; t.x = w.spring.x; t.y = w.spring.y; t.h = 1; return; } // filled at the pool: the long walk home
   finish(w, p, t, c, fx);
   release(w, p);
 }
@@ -5300,6 +5435,8 @@ function finish(w, p, t, c, fx) {
     muckDone(w, p, t, pop);
   } else if (t.k === 'cheese') {
     cheeseDone(w, p, pop);
+  } else if (t.k === 'water') {
+    waterDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
     const f = w.fields.find((o) => 'q' + o.id === t.key);
     if (!f || f.hg != null || !w.hedge) return;
@@ -6138,6 +6275,10 @@ const MIGRATIONS = {
   52: (w) => {
     if (w.lore) for (const [k, v] of Object.entries(FOG_FRESH())) if (w.lore[k] === undefined) w.lore[k] = v;
   },
+  // v53 -> v54: the spring (w.spring). Set by the village at the next daily reckoning, brim-full; a dry summer can make it fail.
+  53: (w) => {
+    if (w.spring === undefined) w.spring = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6247,6 +6388,11 @@ export function summary(w) {
     crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
     scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
     scarers: w.crow && w.crow.cur ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'scare').length : 0,
+    spring: !!w.spring, springLevel: w.spring ? Math.round((w.spring.l / SPRING_FULL) * 100) : 0, springDry: springDry(w),
+    springNeed: w.spring ? w.spring.nd : 0, springCarried: w.spring ? w.spring.c : 0, springThirst: thirst(w),
+    springDays: w.spring ? w.spring.k : 0, springFailed: w.spring ? w.spring.f : 0, springDryYear: w.spring ? w.spring.yd : 0,
+    springThirstYear: w.spring ? w.spring.yt : 0, springThirstEver: w.spring ? w.spring.th : 0, springDied: w.spring ? w.spring.d : 0,
+    springLoads: w.spring ? w.spring.n : 0, springCarrying: w.spring && w.spring.dry ? w.people.filter((p) => p.task && p.task.k === 'water').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

@@ -104,6 +104,7 @@ function doing(p) {
   if (p.task && p.task.k === 'rogue') return p.x === p.px && p.y === p.py ? 'pulling rusted plants out of the grain' : 'going out to pull the rusted grain';
   if (p.task && p.task.k === 'herd') return 'minding the goats';
   if (p.task && p.task.k === 'pare') return p.x === p.px && p.y === p.py ? 'paring a lame goat\'s hoof with a flint' : 'going to catch a limping goat';
+  if (p.task && p.task.k === 'water') { const v = w.techs.includes('pottery') ? 'jar' : 'skin'; return p.task.b ? (p.x === p.px && p.y === p.py ? `pouring a ${v} of water out by the dry spring` : `carrying a ${v} of water home from the pool in the woods`) : p.x === p.px && p.y === p.py ? `filling a ${v} at the pool in the woods` : `walking out to the pool in the woods with an empty ${v}`; }
   if (p.task && p.task.k === 'cheese') return p.x === p.px && p.y === p.py ? 'pressing curd in a basket under a stone' : 'carrying a pail of milk to the cheese rack';
   if (p.task && p.task.k === 'muck') return p.x === p.px && p.y === p.py ? 'forking muck over a bare field' : 'carrying a basket of muck from the heap by the pen';
   if (p.task && p.task.k === 'shore') return p.x === p.px && p.y === p.py ? (w.squall && w.squall.cur && w.squall.cur.sw ? `watching ${w.squall.cur.nm} swim for the beach` : `watching the squall for ${w.squall && w.squall.cur ? w.squall.cur.nm : 'the dugout'}`) : 'running down to the landing';
@@ -402,6 +403,7 @@ function drawTerrain() {
   drawPen(pal);
   drawKiln(pal);
   drawHives(pal);
+  drawSpring(pal);
   drawSnowmen();
   drawWhales();
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
@@ -728,6 +730,41 @@ function hiveAt(mx, my) {
   if (!w.bees) return null;
   const x = Math.floor(mx), y = Math.floor(my);
   return w.bees.h.find((h) => h.x === x && h.y === y) || null;
+}
+// the spring: a ring of grey stones round a pool that shrinks as the level falls, cracked mud when it fails,
+// with the skins and jars carried in from the woods set down beside it. Out in the woods, once someone has
+// had to find it, the deep pool where the deer drink, with reeds along one side.
+function drawSpring(pal) {
+  const P = w.spring;
+  if (!P) return;
+  const X = P.x * TILE, Y = P.y * TILE, r = P.l / S.SPRING_FULL;
+  const ice = pal.snow, stone = ice ? '#c9ced4' : '#7d7a72', stone2 = ice ? '#e4e8ec' : '#9a978d';
+  if (P.dry) { // cracked mud between the stones
+    px(tc, X + 2, Y + 2, '#6e5638', 4, 4);
+    px(tc, X + 2, Y + 3, '#3e2e1e', 2, 1); px(tc, X + 4, Y + 4, '#3e2e1e', 2, 1); px(tc, X + 3, Y + 5, '#3e2e1e'); px(tc, X + 5, Y + 2, '#3e2e1e');
+  } else {
+    px(tc, X + 2, Y + 2, ice ? '#9aa9b4' : '#5a4630', 4, 4); // muddy bottom showing as it falls
+    const n = r > 0.6 ? 4 : r > 0.3 ? 3 : 2, o = (4 - n) >> 1;
+    px(tc, X + 2 + o, Y + 2 + o, ice ? '#b8cfdc' : r > 0.3 ? '#3d6f9e' : '#2c4a63', n, n);
+    if (r > 0.6 && !ice) px(tc, X + 3, Y + 3, '#7fb0d8');
+  }
+  for (const [a, b] of [[1, 1], [3, 1], [5, 1], [6, 2], [6, 4], [6, 6], [4, 6], [2, 6], [1, 5], [1, 3]]) px(tc, X + a, Y + b, (a + b) & 2 ? stone : stone2);
+  if (!ice) px(tc, X + 7, Y + 5, P.dry ? '#8a6a3c' : '#4f9a48'); // cress on the bank, brown when the spring fails
+  if (P.dry && P.c) { // the day's water, set down in a row by the stones
+    const jar = w.techs.includes('pottery');
+    for (let k = 0; k < Math.min(4, P.c); k++) px(tc, X + k * 2, Y + 7, jar ? '#a0623a' : '#5a3d24', 1, 1);
+  }
+  if (P.px != null) {
+    const PX0 = P.px * TILE, PY0 = P.py * TILE;
+    px(tc, PX0 + 1, PY0 + 2, ice ? '#b8cfdc' : '#1f3f5e', 6, 4); px(tc, PX0 + 2, PY0 + 1, ice ? '#b8cfdc' : '#1f3f5e', 4, 1); px(tc, PX0 + 2, PY0 + 6, ice ? '#b8cfdc' : '#1f3f5e', 4, 1);
+    if (!ice) { px(tc, PX0 + 3, PY0 + 3, '#2f5a80', 2, 1); px(tc, PX0 + 6, PY0 + 1, '#5f8f3a', 1, 2); px(tc, PX0 + 7, PY0 + 2, '#6fa044', 1, 3); px(tc, PX0, PY0 + 4, '#5f8f3a', 1, 2); }
+  }
+}
+function springAt(mx, my) {
+  const P = w.spring;
+  if (!P) return null;
+  const x = Math.floor(mx), y = Math.floor(my);
+  return x === P.x && y === P.y ? 'spring' : P.px != null && x === P.px && y === P.py ? 'pool' : null;
 }
 // on warm days the bees go in and out: a few circling the door, the rest flying off to the flowers and back.
 // While someone is taking the honey, smoke drifts off the brand and the bees boil out round the log.
@@ -1196,6 +1233,12 @@ function frame() {
         px(sc, X + 3 + jab, Y - 2, '#b49a6a', 1, 5); px(sc, X + 3 + jab, Y - 3, '#e8e8e8', 1, 1);
       }
       if (p.task && p.task.k === 'cheese' && moving) { px(sc, X + 3, Y + 2, '#7a5232', 2, 2); px(sc, X + 3, Y + 2, '#efe9da', 2, 1); } // a pail of milk in the hand
+      if (p.task && p.task.k === 'water') { // out with an empty skin over the shoulder; home with a full jar on the head, or a fat skin on the back
+        const jar = w.techs.includes('pottery');
+        if (!p.task.b) px(sc, X - 1, Y + 1, '#6b4a2c', 1, 2);
+        else if (jar) { px(sc, X, Y - 2, '#a0623a', 3, 2); px(sc, X + 1, Y - 3, '#b87444'); px(sc, X, Y - 2, '#c48450'); }
+        else { px(sc, X - 1, Y, '#5a3d24', 2, 3); px(sc, X - 1, Y, '#7a5636'); }
+      }
       if (p.task && p.task.k === 'muck' && moving) { px(sc, X - 1, Y, WOOD, 2, 3); px(sc, X - 1, Y - 1, '#3d2a19', 2, 1); } // a basket of muck on the back
       if (p.task && p.task.k === 'haul') { // the kill slung over a shoulder
         const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : '#4d3527';

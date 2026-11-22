@@ -293,5 +293,10 @@
   "at": "2026-11-22T04:40:35.377Z",
   "title": "Add fog signs: the sky reader calls fog and the goats stay in",
   "body": "- SIM_VERSION 53 (w.lore gains fl, fnm, fg, fn, fh, fm, ff, fk, fc; fogRead/fogKept/learnFog in sim.js, FOG_* constants; tech 'foglore'): learned when a fog of 2+ days lifts, once the island has sky lore, goats, and a past wolf attack or someone lost in the fog\n- At the evening fire the eldest calls about 70% of coming fogs, with a rare false alarm. On a called fog day, and on every day after the first in a long fog, the goats stay shut in the pen (no wolf can take one from the grazing) and most children and old ones who would wander off stay by the houses\n- Visible: \"Fog by morning\" evening lines, a Fog signs row (calls, misses, false alarms, days the herd was kept in), \"kept in the pen out of the fog\" on goat hover\n- Watch: Hais should learn it at the next 2-day fog (autumn Y8, Morceem), then call 3-4 fogs a year; goats lost in fog should drop close to zero"
+ },
+ {
+  "at": "2026-11-22T05:07:05.929Z",
+  "title": "Island improvements",
+  "body": ""
  }
 ]
