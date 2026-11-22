@@ -283,5 +283,10 @@
   "at": "2026-11-22T03:52:52.959Z",
   "title": "Add rooks on the grain and children with clappers",
   "body": "- SIM_VERSION 52 (w.crow {b, n, e, g, y, st, ys, s, wait, cur, up, sc, nm, k}; crowHour/crowEat/crowScare/crowYear, CROW_* in sim.js; techs 'crows' and 'scaring'; task 'scare'; yearly `rooks`, `scared`): once there are 10 fields, a flock of rooks comes down by day in spring and summer on new-sown seed or ripe grain\n- While down it eats 0.1% of the field per bird per hour; a sown field that loses 35% of its seed goes back to fallow and must be sown again. The flock starts at 8 and grows by 5 a year (up to 8 + fields/2, max 40)\n- After 2 fields' worth is eaten, the eldest makes a clapper: idle children aged 6-13 run to the flock and mostly put it up (80% an hour once there); 40+ scarings in a year send a quarter of the flock away\n- Visible: black rooks pecking in the rows, gliding in and scattering up, children with clappers over their heads, hover text, a Rooks row in the panel, rooks in History and in the Hard-years grain row. Sowing now clears old crop losses on a field\n- Watch: Hais should get its first flock this summer (Y8) and the clappers next spring; expect 150-1100 grain a year to rooks and the flock to rise and fall between ~14 and 40"
+ },
+ {
+  "at": "2026-11-22T04:15:07.782Z",
+  "title": "Add a good-years strip to the History chart",
+  "body": "- History now shows a green strip under the red hard-years strip: rows for births, harvest, sea, hunt, larder and play\n- Brighter green is a bigger year for that row; the best year overall gets a white frame, and the caption names it\n- Hover a column to read the year, click it to jump to that year in the list (its title turns green)\n- Both strips share one drawing function and the same label width, so their year columns line up\n- Render only: no change to the simulation or the saved world"
  }
 ]

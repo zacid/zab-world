@@ -534,3 +534,9 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     flock off for good, at the cost of timber and a few years of more seed-eating birds.
   - A second flock (or gulls off the beach) once there are 100+ fields, so the late game feels it too.
   - Children out scaring can't wade, chase rainbows or mind goats at the same time; a busy spring could show the tension.
+- Good-years strip is done (render.js only: GOOD rows, STRIPS {hard, good}, drawStrip/stripCap/stripAt/stripGo, sb layouts; canvas #gband,
+  caption #gbcap, class .yr.gl). Larder mixes units (cheese rounds + honey/4 + coppice timber/10) and sea adds cockles/4. Answers it invites:
+  - Midsummer guests, far-isle weddings and mead are not in `hist.yearly`; recording them (sim, yearly keys) would give a "feast" row.
+  - Harvest and births grow with the population, so late years always look best. Per-head rows (harvest / pop) would make a small
+    good year stand out.
+  - A tale on the longest night could name the best year ("the year of the eleven births") the way the hard year could be named.
