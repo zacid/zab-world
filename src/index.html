@@ -14,7 +14,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #app { position:relative; width:100%; height:100vh; height:100dvh; overflow:hidden; }
 #c { position:absolute; inset:0; display:block; cursor:crosshair; }
 .panel { position:absolute; background:var(--panel); border:1px solid var(--line); padding:10px 12px; }
-#top { position:absolute; top:12px; left:50%; transform:translateX(-50%); text-align:center; pointer-events:none; white-space:nowrap; }
+#top { position:absolute; top:12px; left:50%; transform:translateX(-50%); text-align:center; pointer-events:none; white-space:nowrap; display:flex; flex-direction:column; align-items:center; }
 #title { font-size:28px; letter-spacing:.06em; }
 #when { color:var(--muted); margin-top:2px; }
 .wx { color:var(--muted); } .wx.rain { color:#8fb4dc; } .wx.storm { color:#c7d3ff; } .wx.heat { color:#f2a54c; } .wx.cold { color:#9fd0ff; } .wx.snow { color:#f2f6fa; } .wx.fog { color:#c4ccd2; } .fest { color:var(--food); } .herb { color:#8fcf7e; }
@@ -133,6 +133,18 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #who .ev { margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,.12); color:#cfd3d8; }
 #who .when { color:var(--muted); margin-right:6px; font-size:11px; }
 [hidden] { display:none !important; }
+#soon { margin-top:4px; font-size:12px; color:var(--fg); white-space:normal; max-width:min(720px, 92vw); }
+#soon .m { color:var(--muted); } #soon .bad { color:var(--bad); } #soon .love { color:var(--love); } #soon .maj { color:var(--accent); } #soon .good { color:#cfe9d7; }
+#away { left:50%; top:50%; transform:translate(-50%,-50%); width:min(460px, calc(100% - 24px)); max-height:70%; overflow:auto; scrollbar-width:thin; font-size:13px; z-index:3; }
+#away .hd { display:flex; } #away .x { margin-left:auto; cursor:pointer; color:var(--fg); } #away .x:hover, #away a:hover { color:var(--accent); }
+#away .m { color:var(--muted); } #away .ev { margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,.12); color:#cfd3d8; }
+#away .ev.maj { color:var(--accent); } #away .ev.bad { color:var(--bad); } #away .ev.love { color:var(--love); } #away .ev.good { color:#cfe9d7; } #away .ev.m { color:var(--muted); }
+#away .when { color:var(--muted); margin-right:6px; font-size:11px; }
+#away a { color:inherit; text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; }
+#away .news { margin-top:10px; padding-top:6px; border-top:1px solid rgba(89,240,139,.4); color:var(--accent); }
+#newbtn { left:50%; bottom:12px; transform:translateX(-50%); border-color:var(--accent); color:var(--accent); z-index:3; }
+#who .diary { margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,.12); }
+#who .dy { padding:1px 0; color:#cfd3d8; }
 @media (max-width: 760px) {
   #title { font-size:22px; } #top { top:8px; }
   #graph { display:none; }
@@ -152,7 +164,7 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 <body>
 <div id="app">
   <canvas id="c"></canvas>
-  <div id="top"><div id="title">…</div><div id="when"></div><div id="badge" hidden>demo · fast-forwarded world</div></div>
+  <div id="top"><div id="title">…</div><div id="when"></div><div id="soon" hidden></div><div id="badge" hidden>demo · fast-forwarded world</div></div>
   <div id="nav"><button class="btn" id="skybtn">✦ Sky</button><button class="btn" id="histbtn">≡ History</button><button class="btn" id="kinbtn">⋔ Families</button></div>
   <div class="panel" id="res"></div>
   <div class="panel" id="graph"><canvas id="spark"></canvas><div id="sparkcap"></div></div>
@@ -161,6 +173,8 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
   <div class="panel" id="who" hidden></div>
   <div id="tip" hidden></div>
   <div id="catch" hidden></div>
+  <div class="panel" id="away" hidden></div>
+  <button class="btn" id="newbtn" hidden>✦ The island has changed · reload</button>
   <div id="hist" hidden>
     <button class="btn" id="histback">← Island</button>
     <div id="hwrap">

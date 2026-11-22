@@ -182,6 +182,7 @@ function drawWho() {
     (w.goats && w.goats.hid === p.id ? ' <span class="goat">goatherd</span>' : '') +
     `<div class="do">${doing(p)}${!track ? ' · <a data-id="' + p.id + '">find</a>' : ''} · <a class="tree" data-tree="${p.id}">family tree</a></div>` +
     kin.map(([l, v]) => `<div class="kin"><span class="m">${l}</span> ${v}</div>`).join('') +
+    diaryHtml(p) +
     ev.map((e) => `<div class="ev"><span class="when">${e.s}</span>${esc(e.text)}</div>`).join('');
   el.hidden = false;
 }
@@ -1047,7 +1048,7 @@ function frame() {
   }
   const tf = nowTickF();
   const frac = Math.max(0, Math.min(1, tf - (w.t - 1)));
-  if (w.t !== lastTerrTick) { drawTerrain(); lastTerrTick = w.t; computeView(); updatePanels(); }
+  if (w.t !== lastTerrTick) { drawTerrain(); lastTerrTick = w.t; computeView(); noteDiaries(); updatePanels(); if (w.t >= target) live(); }
 
   const now = performance.now();
   const c = S.clock(Math.max(0, w.t - 1));
@@ -1363,6 +1364,8 @@ function frame() {
     }
     ctx.stroke(); ctx.setLineDash([]);
   }
+
+  drawBubbles(now);
 
   // popups
   const fs = Math.round(11 * dpr);
@@ -2080,7 +2083,7 @@ function gameWhen(id, long) {
 }
 let progress = null;
 async function loadProgress() {
-  if (progress) return;
+  if (progress) return drawTimeline();
   try { const r = await fetch('progress.json', { cache: 'no-store' }); progress = r.ok ? await r.json() : []; } catch { progress = []; }
   drawTimeline();
 }
@@ -2379,6 +2382,214 @@ function drawSky() {
 }
 
 // ---------- boot ----------
+// ---------- live: diaries, bubbles, what's coming, while you were away, new rules ----------
+// Render-only. Nothing here is saved to the world or changes what happens on the island.
+
+// Diaries: what each islander has been doing since this page was opened, one line per change of task.
+const diaries = new Map(); // id -> [{ t, text }]
+const DIARY_MAX = 10;
+function noteDiaries() {
+  for (const p of w.people) {
+    const d = diaries.get(p.id) || [], text = doing(p);
+    if (!d.length || d[d.length - 1].text !== text) {
+      d.push({ t: w.t, text });
+      if (d.length > DIARY_MAX) d.shift();
+      diaries.set(p.id, d);
+    }
+  }
+}
+const hh = (t) => String(S.clock(t).hour).padStart(2, '0') + ':00';
+function diaryHtml(p) {
+  const d = diaries.get(p.id);
+  if (!d || d.length < 2) return '';
+  const day = (t) => { const c = S.clock(t); return `${S.SEASONS[c.season]} ${c.dos}`; };
+  let last = '';
+  const rows = [...d].reverse().map((e) => {
+    const dl = day(e.t), head = dl !== last ? `${dl} ` : ''; last = dl;
+    return `<div class="dy"><span class="when">${esc(head)}${hh(e.t)}</span>${esc(e.text)}</div>`;
+  });
+  return `<div class="diary"><div class="m">since you started watching</div>${rows.join('')}</div>`;
+}
+
+// Bubbles: a line over the head of whoever you follow, and now and then over someone at work.
+const chatter = []; // { id, until }
+let nextChat = 0;
+function drawBubbles(now) {
+  if (!w || !lastShown.length) return;
+  if (view.s * TILE < 14 * dpr) return; // too far out to read
+  const byId = new Map(lastShown.map((o) => [o.p.id, o]));
+  for (let i = chatter.length - 1; i >= 0; i--) if (now > chatter[i].until || !byId.has(chatter[i].id)) chatter.splice(i, 1);
+  if (now > nextChat) {
+    nextChat = now + 3500 + Math.random() * 4000;
+    const pool = lastShown.filter((o) => o.p.id !== follow && !chatter.some((c) => c.id === o.p.id) && onScreen(o));
+    if (pool.length && chatter.length < 2) chatter.push({ id: pool[Math.floor(Math.random() * pool.length)].p.id, until: now + 4500 });
+  }
+  for (const c of chatter) { const o = byId.get(c.id); bubble(o, short(doing(o.p)), 0.85); }
+  const f = follow != null && byId.get(follow);
+  if (f) bubble(f, doing(f.p), 1, true);
+}
+function onScreen(o) {
+  const x = view.ox + o.x * TILE * view.s, y = view.oy + o.y * TILE * view.s;
+  return x > 40 * dpr && x < cv.width - 40 * dpr && y > 80 * dpr && y < cv.height - 40 * dpr;
+}
+const short = (t) => (t.length > 30 ? t.split(/ (?:by|at|with|from|for|to|in|on|over|between) /)[0] : t).slice(0, 34);
+function bubble(o, text, alpha, strong) {
+  const fs = Math.round(11 * dpr), pad = 4 * dpr;
+  ctx.font = `${fs}px "Share Tech Mono", monospace`; ctx.textAlign = 'center';
+  const sx = Math.round(view.ox + o.x * TILE * view.s), sy = Math.round(view.oy + (o.y * TILE - 6) * view.s) - 6 * dpr;
+  const tw = ctx.measureText(text).width, bw = tw + pad * 2, bh = fs + pad * 1.6;
+  const bx = Math.max(4 * dpr, Math.min(cv.width - bw - 4 * dpr, sx - bw / 2)), by = sy - bh;
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = 'rgba(2,4,9,0.86)'; ctx.fillRect(bx, by, bw, bh);
+  ctx.strokeStyle = strong ? '#59f08b' : 'rgba(232,232,232,0.7)'; ctx.lineWidth = dpr;
+  ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+  ctx.beginPath(); ctx.moveTo(sx - 3 * dpr, by + bh); ctx.lineTo(sx, by + bh + 4 * dpr); ctx.lineTo(sx + 3 * dpr, by + bh); ctx.fillStyle = 'rgba(2,4,9,0.86)'; ctx.fill();
+  ctx.fillStyle = strong ? '#e8e8e8' : '#cfd3d8'; ctx.fillText(text, bx + bw / 2, by + bh - pad * 0.9);
+  ctx.globalAlpha = 1;
+}
+
+// Coming up: a private copy of the island is played a few hours ahead (the same rules give the same future),
+// and the notable things in it are shown, with deaths left out and raids only hinted at.
+const AHEAD = 2160; // ticks = 6 real hours
+let soon = [], forecastAt = -Infinity, forecasting = false;
+function realIn(t) {
+  const m = Math.max(0, Math.round(((t - nowTickF()) * S.TICK_MS) / 60000));
+  return m < 1 ? 'now' : m < 60 ? `in ${m}m` : `in ${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+}
+function omen(e) {
+  const x = e.text;
+  if (e.k === 'death' || /\b(dies|died|dead|drown|buried|is gone|never comes back)\b/i.test(x)) return null;
+  if (/raider|dugout comes|granary door|creeps up to empty/i.test(x)) return { text: 'the dogs are restless at night', cls: 'bad' };
+  if (e.k === 'birth') return { text: (x.match(/^(.+?) welcome/) || [])[1] ? `a baby for ${x.match(/^(.+?) welcome/)[1]}` : 'a baby is coming', cls: 'love' };
+  if (e.k === 'love') return { text: 'a wedding', cls: 'love' };
+  if (/squall/i.test(x)) return { text: 'a squall out at sea', cls: 'bad' };
+  if (e.k === 'major') return { text: 'something big is coming', cls: 'maj' };
+  if (/midsummer/i.test(x) && /fire|dance/i.test(x)) return { text: 'the midsummer fire', cls: 'fest' };
+  if (/longest night/i.test(x)) return { text: 'the longest night', cls: 'fest' };
+  if (/black clouds|storm/i.test(x) && e.k === 'bad') return { text: 'a storm', cls: 'bad' };
+  if (/fog rolls/i.test(x)) return { text: 'fog off the sea', cls: 'm' };
+  if (/far isle|boat .*(fire|beach)|guests/i.test(x) && e.k !== 'bad') return { text: 'guests from the far isle', cls: 'good' };
+  if (/first snow|snow falls/i.test(x)) return { text: 'the first snow', cls: 'm' };
+  return null;
+}
+function forecast() {
+  if (forecasting || !w || document.hidden) return;
+  forecasting = true;
+  const f = S.migrate(JSON.parse(JSON.stringify(w))), start = f.t, end = start + AHEAD, found = [], seen = new Set();
+  let scanned = start;
+  const chunk = () => {
+    S.advanceTo(f, Math.min(end, f.t + 144), []);
+    for (const e of f.log) if (e.t > scanned) {
+      const o = omen(e);
+      if (o && !seen.has(o.text)) { seen.add(o.text); found.push({ t: e.t, ...o }); }
+    }
+    scanned = f.t;
+    if (f.t < end && found.length < 6) setTimeout(chunk, 30);
+    else { soon = found; forecasting = false; forecastAt = performance.now(); drawSoon(); }
+  };
+  setTimeout(chunk, 0);
+}
+function nextSeason() {
+  const c = S.clock(w.t), per = S.TICKS_PER_YEAR / 4, t0 = Math.floor(w.t / per + 1) * per;
+  return { t: t0, text: `${['Spring', 'Summer', 'Autumn', 'Winter'][(c.season + 1) % 4]} begins`, cls: 'm' };
+}
+function drawSoon() {
+  const el = $('soon');
+  if (!w || demo) { el.hidden = true; return; }
+  const items = soon.filter((o) => o.t > w.t).slice(0, 3);
+  const ns = nextSeason();
+  if (items.length < 3 && !items.some((o) => o.t > ns.t)) items.push(ns);
+  items.sort((a, b) => a.t - b.t);
+  el.innerHTML = '<span class="m">coming up</span> ' + items.map((o) => `<span class="${o.cls}">${esc(o.text)}</span> <span class="m">${realIn(o.t)}</span>`).join(' <span class="m">·</span> ');
+  el.hidden = false;
+}
+
+// While you were away: on return, what happened since your last visit, and what's new in the rules.
+const SEEN_KEY = 'island.seen';
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); } catch { return null; } },
+  set(v) { try { localStorage.setItem(SEEN_KEY, JSON.stringify(v)); } catch {} },
+};
+let lastSeen = null, awayShown = false, nProg = null;
+function saveSeen() { if (w && !demo && w.t >= S.tickAt(w, Date.now()) - 2) store.set({ t: w.t, at: Date.now(), pop: w.people.length, prog: nProg ?? (lastSeen && lastSeen.prog) ?? 0 }); }
+const AWAY_KINDS = { major: 3, birth: 2, death: 2, love: 1, bad: 1 };
+async function showAway() {
+  awayShown = true;
+  if (demo) return;
+  try { const r = await fetch('progress.json', { cache: 'no-store' }); if (r.ok) { progress = await r.json(); nProg = progress.length; } } catch {}
+  if (!lastSeen) return saveSeen(); // first visit: nothing to catch up on yet
+  const news = progress && lastSeen.prog != null && progress.length > lastSeen.prog ? progress.slice(lastSeen.prog) : [];
+  const ticks = w.t - lastSeen.t;
+  if (ticks < 60 && !news.length) return; // under ten real minutes and nothing new
+  const ev = w.log.filter((e) => e.t > lastSeen.t && AWAY_KINDS[e.k]);
+  const picked = ev.length > 8 ? ev.filter((e) => AWAY_KINDS[e.k] >= 2).slice(-8) : ev;
+  const cut = w.log.length && w.log[0].t > lastSeen.t;
+  const mins = Math.round((Date.now() - lastSeen.at) / 60000);
+  const away = mins < 60 ? `${mins} minutes` : mins < 2880 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${Math.round(mins / 1440)} days`;
+  const days = Math.round(ticks / S.TICKS_PER_DAY), dp = w.people.length - (lastSeen.pop || w.people.length);
+  const names = new Map(w.people.map((p) => [p.name, p.id]));
+  const linkNames = (t) => esc(t).replace(/\b([A-Z][a-z]+)\b/g, (m) => (names.has(m) ? `<a data-id="${names.get(m)}">${m}</a>` : m));
+  const kcls = { major: 'maj', birth: 'good', death: 'm', love: 'love', bad: 'bad' };
+  $('away').innerHTML = `<div class="hd">While you were away <span class="x" data-close>✕</span></div>` +
+    `<div class="m">${away} for you · ${days === 1 ? '1 day' : `${days} days`} on ${esc(w.name)}${dp ? ` · ${dp > 0 ? '+' : ''}${dp} ${Math.abs(dp) === 1 ? 'islander' : 'islanders'}` : ''}</div>` +
+    (picked.length ? picked.map((e) => `<div class="ev ${kcls[e.k]}"><span class="when">${esc(e.s)}</span>${linkNames(e.text)}</div>`).join('') : '<div class="ev m">A quiet spell: the island just got on with things.</div>') +
+    (cut ? '<div class="ev m">…and more before that. The History view has it all.</div>' : '') +
+    (news.length ? `<div class="news"><div class="m">new on the island</div>${news.slice(-6).map((n) => `<div>✦ ${esc(n.title.replace(/^Add /, ''))}</div>`).join('')}</div>` : '');
+  $('away').hidden = false;
+}
+
+// New rules: every few minutes, check whether the island's rules or this page have changed since it was opened.
+// If so, reload quietly when nobody is in the middle of something; otherwise offer a button.
+let pageTag = null, updatePending = false, lastInput = Date.now();
+async function tagNow() {
+  try {
+    const r = await fetch(location.pathname, { method: 'HEAD', cache: 'no-store' });
+    return r.headers.get('etag') || r.headers.get('last-modified');
+  } catch { return null; }
+}
+async function checkUpdate() {
+  if (demo || updatePending) return;
+  let newer = false;
+  try {
+    const r = await fetch('world/summary.json', { cache: 'no-store' });
+    if (r.ok) { const j = await r.json(); if (j.version > S.SIM_VERSION) newer = true; }
+  } catch {}
+  const tag = await tagNow();
+  if (pageTag && tag && tag !== pageTag) newer = true;
+  if (!newer) return;
+  updatePending = true;
+  maybeReload();
+}
+function busy() { return follow != null || !$('hist').hidden || !$('kin').hidden || !$('sky').hidden || !$('away').hidden || Date.now() - lastInput < 90000; }
+function maybeReload() {
+  if (!updatePending) return;
+  if (document.hidden || !busy()) { saveSeen(); location.reload(); return; }
+  $('newbtn').hidden = false;
+}
+function live() { // once per island hour, when caught up
+  if (!awayShown) showAway();
+  if (!forecasting && (performance.now() - forecastAt > 600000 || (soon.length && soon[0].t <= w.t))) forecast();
+  drawSoon();
+  if (updatePending) maybeReload();
+}
+function startLive() {
+  lastSeen = store.get();
+  tagNow().then((t) => { pageTag = t; });
+  setInterval(checkUpdate, 300000);
+  setInterval(saveSeen, 60000);
+  for (const ev of ['pointerdown', 'keydown', 'wheel']) window.addEventListener(ev, () => { lastInput = Date.now(); }, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveSeen(); else checkUpdate(); });
+  window.addEventListener('pagehide', saveSeen);
+  $('newbtn').onclick = () => { saveSeen(); location.reload(); };
+  $('away').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-id],[data-close]');
+    if (!a) return;
+    $('away').hidden = true; saveSeen();
+    if (a.hasAttribute('data-id')) startFollow(+a.dataset.id);
+  });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('away').hidden) { $('away').hidden = true; saveSeen(); } });
+}
+
 async function boot() {
   resize();
   window.addEventListener('resize', () => { resize(); if (w) updatePanels(); if (w && !$('hist').hidden) drawHistChart(); });
@@ -2442,6 +2653,7 @@ async function boot() {
     $('badge').hidden = false;
     S.advanceTo(w, S.tickAt(w, Date.now()) - 1);
   }
+  startLive();
   requestAnimationFrame(frame);
 }
 boot();
