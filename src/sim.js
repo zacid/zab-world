@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 51;
+export const SIM_VERSION = 52;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -76,6 +76,8 @@ export const TECHS = {
   paring:   { name: 'Hoof paring', added: '2026-11-21T23:32Z', desc: 'A little hurdle fold against the goat pen, with a dry straw floor. A day after a goat starts to limp it is caught, the soft grey horn is pared back with a flint to clean hoof, the foot is washed in sea water or the healer\'s willow-bark brew, and the goat is put in the fold until it walks sound. Out of the mud it passes the rot to nobody and mends in days instead of weeks; caught early, an outbreak stops at a goat or two.', req: ['footrot'] },
   cloak:    { name: 'Wolf-skin cloak', added: '2026-11-22T00:06Z', desc: 'The pelt of a lone wolf, bigger and paler than any from the den, scraped, rubbed with ash and brains and worn over the shoulders by the one whose spear killed it. No wolf will single out someone who walks in a wolf\'s skin. When the wearer dies the cloak goes to the eldest child, or to the widow or widower; with nobody to take it, it is laid in the grave.', req: ['lone'] },
   squall:   { name: 'Squalls', added: '2026-11-22T02:14Z', desc: 'Out past the surf the weather turns faster than anyone on the beach can see. On a hot afternoon, or in autumn, or the day before a storm, a black squall can come down on the deep water in minutes: wind, slanting rain and a short steep sea. The one in the dugout turns for home and fights the paddle; the village runs down to the landing to watch. Some come in through the surf with the catch thrown over the side, some are rolled over and swim for it, and the sea keeps a few. Nobody has an answer for it yet.', req: ['canoe'] },
+  crows:    { name: 'Rooks', added: '2026-11-22T03:27Z', desc: 'A flock of rooks from the woods that comes down by day on new-sown fields to dig out the seed, and on the ripe grain to strip the ears. A field picked bare of its seed has to be sown again. The flock grows a little every year with the fields.', req: ['farming'] },
+  scaring:  { name: 'Bird-scaring', added: '2026-11-22T03:27Z', desc: 'Two flat boards tied loosely with a thong, swung so they clap like a breaking branch. When the rooks come down on the grain the children run out with clappers and stones and shout until the flock lifts and goes back to the trees for a while. A flock driven off often enough in a year loses some of its birds to other woods.', req: ['crows'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -524,7 +526,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -700,6 +702,7 @@ export function step(w, fx) {
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
+  if (w.crow !== undefined) crowHour(w, c);
   if (w.dogs) dogHour(w, c);
   if (w.lost) lostHour(w, c);
   if (w.isle && w.isle.boat) isleHour(w, c);
@@ -746,7 +749,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -773,6 +776,7 @@ function daily(w, c, fx) {
     if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
     if (w.pare) w.pare.y = 0;
     if (w.cheese) { w.cheese.y = 0; w.cheese.ye = 0; }
+    crowYear(w);
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -1267,6 +1271,140 @@ function rogueDone(w, p, t, pop) {
   if (w.rogue.n === 1) milestone(w, `${p.name} wades into the rusted field with a basket and works down the rows, pulling every flecked plant up by the roots, until the orange dust coats both arms to the elbow. ` +
     `When it is done the field looks gap-toothed, and the heap of sick grain at its edge is smoking. The first field is rogued on ${w.name}.`);
 }
+
+// ---------- rooks at the seed ----------
+// Once there is grain enough to be worth the flight, a flock of rooks from the woods comes down by day in spring
+// and summer on a field of new-sown seed (growth < CROW_SEED) or ripe ears. While it is down it eats a share of
+// that field's yield each hour (f.lost, which the harvest counts); a sown field picked bare of its seed
+// (CROW_STRIP) goes back to fallow and has to be sown again. The flock grows every year with the fields.
+// After CROW_LEARN fields' worth of grain has gone, the eldest sends the children out with wooden clappers: while
+// a flock is down, a few idle children (CROW_KID_AGE-13) run to the field, and when one gets there the birds
+// mostly lift and keep off a while. A village that scares them often enough shrinks the flock the next spring.
+// w.crow { b birds, n landings ever, e fields' worth eaten ever, g grain ever, y grain this year, st fields
+// stripped ever, ys scared this year, s scared ever, wait tick before the next landing, cur {f, x, y, t, h} the
+// flock on a field, up {x, y, t} the flock lifting off, sc scaring learned (tick), nm who taught it, k first child
+// to drive them off }.
+const CROW_YEAR = 2;          // the first spring they can come
+const CROW_FIELDS = 10;       // fields before a flock thinks the village worth a visit
+const CROW_FROM = 6, CROW_TO = 19; // hours they feed
+const CROW_SEED = 0.2;        // a sown field is seed in the ground until it is this grown
+const CROW_LAND = 0.14;       // chance per daylight hour that the flock comes down (half that in rain)
+const CROW_PECK = 0.001;      // share of a field's yield each bird eats per hour
+const CROW_MAXLOST = 0.6;     // the most they can take of a ripe field
+const CROW_STRIP = 0.35;      // seed taken from a sown field before it is bare and must be sown again
+const CROW_START = 8, CROW_MAX = 40, CROW_BREED = 5; // birds in the first flock, the most, and the yearly growth
+const CROW_LEARN = 2;         // fields' worth eaten before the children are sent out
+const CROW_KID_AGE = 6;       // the youngest sent out with a clapper
+const CROW_KIDS = 2;          // children who run out to one flock (one more for every 6 children)
+const CROW_LIFT = 0.8;        // chance per hour a child at the field puts the flock up
+const CROW_SHY = 3;           // hours a scared flock keeps off
+const CROW_THIN = 40;         // scarings in a year that send a quarter of the flock to nest elsewhere
+const crowField = (f) => (f.stage === 'planted' && f.growth < CROW_SEED) || f.stage === 'ripe';
+function crowYear(w) {
+  const C = w.crow;
+  if (!C) return;
+  const was = C.b;
+  if (C.sc && C.ys >= CROW_THIN) C.b = Math.max(CROW_START, C.b - Math.floor(C.b / 4));
+  else C.b = Math.max(C.b, Math.min(CROW_MAX, CROW_START + (w.fields.length >> 1), C.b + CROW_BREED));
+  if (C.y >= 100) log(w, `Rooks ate ${Math.round(C.y).toLocaleString()} grain in the fields last year.`, 'bad');
+  if (C.b < was) log(w, `So many times driven off the grain, some of the rooks have gone to build in other woods. The flock is down to ${C.b}.`, 'good');
+  C.y = 0; C.ys = 0;
+}
+function crowHour(w, c) {
+  const C = w.crow, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
+  const out = c.season > 1 || h < CROW_FROM || h >= CROW_TO || wx === 'storm' || wx === 'snow' || wx === 'fog';
+  if (C && C.cur) {
+    const f = w.fields.find((o) => o.id === C.cur.f);
+    if (out || !f || !crowField(f)) { crowUp(w, C, h >= CROW_TO - 1 ? 2 : 1); return; }
+    crowEat(w, C, f, c);
+    if (!C.cur) return;
+    if (C.sc) crowScare(w, C, f, c);
+    if (C.cur && --C.cur.h <= 0) crowUp(w, C, 1 + ri(w, 2));
+    return;
+  }
+  if (out || c.year < CROW_YEAR || w.fields.length < CROW_FIELDS) return;
+  if (C && C.wait > w.t) return;
+  if (rnd(w) >= (wx === 'rain' ? CROW_LAND / 2 : CROW_LAND)) return;
+  const can = w.fields.filter(crowField);
+  if (!can.length) return;
+  const f = can[ri(w, can.length)];
+  if (!C) crowCome(w, f);
+  const K = w.crow;
+  K.cur = { f: f.id, x: f.x, y: f.y, t: w.t, h: 3 + ri(w, 4) };
+  K.n++;
+}
+function crowCome(w, f) {
+  w.crow = { b: CROW_START, n: 0, e: 0, g: 0, y: 0, st: 0, ys: 0, s: 0, wait: 0, cur: null, up: null, sc: null, nm: null, k: null };
+  if (!w.techs.includes('crows')) w.techs.push('crows');
+  const who = elder(w);
+  milestone(w, `A ragged black cloud comes up out of the woods at first light, wheels once over the houses, calling, and drops onto ${f.stage === 'ripe' ? 'the ripe grain' : 'a field sown only days ago'}. ` +
+    `Rooks: ${CROW_START} of them, walking the rows like old men, ${f.stage === 'ripe' ? 'pulling the ears down and stripping them' : 'stabbing into the soft earth for the seed'}. ${who ? `${who.name} runs at them waving both arms and they lift, but they only settle again further down the rows. ` : ''}` +
+    `There is enough grain on ${w.name} now for the rooks to think it worth the flight.`);
+}
+function crowEat(w, C, f, c) {
+  const seed = f.stage === 'planted';
+  const cap = seed ? 1 : CROW_MAXLOST, had = f.lost || 0;
+  const take = Math.min(C.b * CROW_PECK, Math.max(0, cap - had));
+  if (take <= 0) { crowUp(w, C, 1); return; }
+  f.lost = Math.round((had + take) * 10000) / 10000;
+  const g = Math.round(take * FIELD_YIELD * w.harvest * 100) / 100;
+  C.e = Math.round((C.e + take) * 10000) / 10000;
+  C.g = Math.round((C.g + g) * 100) / 100; C.y = Math.round((C.y + g) * 100) / 100;
+  if (seed && f.lost >= CROW_STRIP) { // picked bare: dig it over and sow again
+    f.stage = 'fallow'; f.growth = 0; f.lost = undefined;
+    C.st++;
+    const again = c.season === 0;
+    if (C.st === 1 || (C.st % 5 === 0)) log(w, `The rooks have had nearly every seed out of a field. ${again ? 'It will have to be sown again.' : 'It is too late in the year to sow it again.'}`, 'bad');
+    crowUp(w, C, 1);
+    return;
+  }
+  if (!C.sc && C.e >= CROW_LEARN) learnScare(w, C, f);
+}
+// the flock lifts off the field it was on: back to the trees for a while
+function crowUp(w, C, shy) {
+  if (!C.cur) return;
+  C.up = { x: C.cur.x, y: C.cur.y, t: w.t };
+  C.cur = null;
+  C.wait = w.t + shy;
+}
+const crowKid = (w, p) => { const a = ageY(w, p); return a >= CROW_KID_AGE && a < 14; };
+function learnScare(w, C, f) {
+  const kids = w.people.filter((p) => !p.dead && !p.sick && crowKid(w, p));
+  if (!kids.length) return; // nobody to send yet
+  const who = elder(w);
+  C.sc = w.t; C.nm = who ? who.name : null;
+  if (!w.techs.includes('scaring')) w.techs.push('scaring');
+  const kid = kids.sort((a, b) => a.born - b.born || a.id - b.id)[0];
+  milestone(w, `${who ? who.name : 'The eldest'} counts the bare patches in the rows and says the grown-ups cannot stand in the fields all day. ` +
+    `That evening two flat boards are tied loosely together with a thong, and ${kid.name} is shown how to swing them so they clap like a branch breaking. ` +
+    `From now on, when the rooks come down, the children run out with clappers and stones and shout until they lift. ${w.name} keeps bird-scarers.`);
+}
+// a few idle children run out to the flock; once one is there, the birds go up
+function crowScare(w, C, f, c) {
+  let there = false, going = 0;
+  for (const p of w.people) {
+    if (p.dead || !p.task || p.task.k !== 'scare') continue;
+    if (p.task.f !== f.id) { p.task.f = f.id; p.task.x = f.x; p.task.y = f.y; p.task.h = 2; } // to the field they are on now
+    going++;
+    if (d2(p.x, p.y, f.x + 0.5, f.y + 0.5) <= 2.25) there = true;
+  }
+  if (there && rnd(w) < CROW_LIFT) {
+    const by = w.people.find((p) => !p.dead && p.task && p.task.k === 'scare' && d2(p.x, p.y, f.x + 0.5, f.y + 0.5) <= 2.25);
+    C.s++; C.ys++;
+    if (!C.k && by) { C.k = by.name; log(w, `${by.name} runs into the rows swinging the clapper and yelling, and the whole flock goes up at once, cawing, and makes for the trees.`, 'good'); }
+    crowUp(w, C, CROW_SHY);
+    return;
+  }
+  const kids = w.people.filter((p) => !p.dead && !p.sick && !p.asleep && !p.hurt && crowKid(w, p)).length;
+  const want = Math.min(kids, CROW_KIDS + Math.floor(kids / 6));
+  for (let k = going; k < want; k++) {
+    const p = nearest(w.people, { x: f.x + 0.5, y: f.y + 0.5 }, (o) => !o.dead && !o.sick && !o.asleep && !o.hurt && crowKid(w, o) && (!o.task || o.task.k === 'idle'));
+    if (!p) break;
+    release(w, p);
+    p.task = { k: 'scare', f: f.id, x: f.x, y: f.y, h: 2 };
+  }
+}
+export const crowsDown = (w) => !!(w.crow && w.crow.cur);
 
 // ---------- smudge fires ----------
 // Twice blackened by a late frost, the village fights it. On the second evening of a spring cold snap (the night
@@ -5050,7 +5188,7 @@ function finish(w, p, t, c, fx) {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
     if (f && f.stage === 'fallow') {
       const fr = f.fr != null;
-      f.stage = 'planted'; f.growth = 0; f.flat = f.root = f.fr = f.ru = f.rl = f.rg = undefined; pop(fr ? 'sown again' : 'sown', 'muted');
+      f.stage = 'planted'; f.growth = 0; f.flat = f.root = f.fr = f.ru = f.rl = f.rg = f.lost = undefined; pop(fr ? 'sown again' : 'sown', 'muted');
       if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
     }
   } else if (t.k === 'build') {
@@ -5939,6 +6077,10 @@ const MIGRATIONS = {
   50: (w) => {
     if (w.cheese === undefined) w.cheese = null;
   },
+  // v51 -> v52: rooks (w.crow). None yet; once there are 10 fields a flock comes down on the seed or the ripe grain.
+  51: (w) => {
+    if (w.crow === undefined) w.crow = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6041,6 +6183,10 @@ export function summary(w) {
     cheese: !!w.cheese, cheeseRack: w.cheese ? w.cheese.c : 0, cheesePail: w.cheese ? Math.floor(w.cheese.p) : 0, cheeseMade: w.cheese ? w.cheese.n : 0,
     cheeseYear: w.cheese ? w.cheese.y : 0, cheeseEaten: w.cheese ? w.cheese.e : 0, cheeseDays: w.cheese ? w.cheese.d : 0, cheeseFed: cheeseFed(w),
     cheeseMaking: w.cheese ? w.people.filter((p) => p.task && p.task.k === 'cheese').length : 0,
+    crows: !!w.crow, crowFlock: w.crow ? w.crow.b : 0, crowDown: crowsDown(w), crowLandings: w.crow ? w.crow.n : 0,
+    crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
+    scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
+    scarers: w.crow && w.crow.cur ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'scare').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

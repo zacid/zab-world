@@ -523,3 +523,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Cheese as a gift: the far isle's raiders go for the rack, or a round sent home with hungry guests eases the feud.
   - Cheese in the paddler's and hunter's bag on long days (fewer turning back hungry), or a "Cheesemaker" byname after 200 rounds.
   - Whey fed to the dogs or the pigs; a kid's stomach (rennet) only comes from autumn kills, so a year with no kids killed means no cheese.
+- Rooks and bird-scaring are done (SIM_VERSION 52; w.crow {b birds, n landings, e fields' worth eaten, g, y, st stripped, ys, s scared, wait, cur, up,
+  sc, nm, k}; crowHour/crowEat/crowUp/crowScare/crowYear/learnScare in sim.js, CROW_* constants, crowsDown() exported; task 'scare'; drawRooks()
+  in render.js; `scripts/_crowprobe.mjs [years] [seed|live]`). Sowing now clears f.lost (old crop losses no longer carry onto a resown field).
+  One flock only, so at 300+ people and 500 fields it is a small nuisance (1-3% of the harvest). Answers it invites:
+  - A scarecrow: an old cloak or hides on a cross of poles in a field keeps the flock off it for a season, then they get used to it (a craft
+    the eldest invents after the children grow up or when there are too few of them; a pixel figure in the fields, maybe in a wolf-skin).
+  - Slings: older children (10-13) who scared many flocks learn to sling stones and now and then kill one (rook pie; a "Slinger" byname).
+  - A rookery: the flock's nest trees in the woods could be shown on the map (a ring of black nests), and woodcutters felling them drive the
+    flock off for good, at the cost of timber and a few years of more seed-eating birds.
+  - A second flock (or gulls off the beach) once there are 100+ fields, so the late game feels it too.
+  - Children out scaring can't wade, chase rainbows or mind goats at the same time; a busy spring could show the tension.

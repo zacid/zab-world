@@ -123,6 +123,7 @@ function doing(p) {
     return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
   }
   if (p.task && p.task.k === 'wade') return p.x === p.px && p.y === p.py ? (p.id + Math.floor(w.t / 2)) % 3 ? 'paddling in the shallows' : 'feeling for cockles with their toes' : 'running down to the shallows';
+  if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
   if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
   if (p.task && p.task.k === 'tie') return p.x === p.px && p.y === p.py ? 'roping down the thatch with stones before the storm' : 'carrying stones and rope to a roof';
@@ -1168,6 +1169,12 @@ function frame() {
     }
     if (age < 14) {
       px(sc, X + 1, Y + 1, '#f1c9a5'); px(sc, X, Y + 2, col, 3, 1); px(sc, X + step, Y + 3, '#555', 1, 1); px(sc, X + 2 - step, Y + 3, '#555', 1, 1);
+      if (p.task && p.task.k === 'scare') { // the clapper swung over the head, both arms up; a white tick when it claps
+        const g = Math.floor(now / 200 + p.id) % 4, sx = g < 2 ? X - 1 : X + 3;
+        px(sc, X - 1, Y + 1, '#f1c9a5'); px(sc, X + 3, Y + 1, '#f1c9a5');
+        px(sc, sx, Y - 1, '#9a7a4e', 1, 2); px(sc, sx + (g < 2 ? -1 : 1), Y - 1, '#b49a6a', 1, 2);
+        if (!moving && (g === 1 || g === 3)) px(sc, sx + (g < 2 ? -2 : 2), Y - 2, 'rgba(255,255,255,0.8)');
+      }
       if (p.task && p.task.k === 'snow' && !moving) {
         if (p.task.o != null) { if (Math.floor(now / 400 + p.id) % 2) px(sc, X + ((p.id & 1) ? -1 : 3), Y + 2, SNOW_W); } // patting snow onto the snowman
         else { // a snowball lobbed across the green
@@ -1246,6 +1253,7 @@ function frame() {
   if (track && fpos) moveCam(fpos);
   else if (returning) moveCam(null);
   drawRats(hf, now);
+  const rooks = drawRooks(frac, now);
   drawBees(hf, now);
   const guests = drawIsle(frac, now, fest).concat(drawRaid(frac, now));
   const beasts = drawBeasts(frac, now);
@@ -1389,6 +1397,10 @@ function frame() {
       const partner = p.partner != null ? w.people.find((o) => o.id === p.partner) : null;
       const by = S.byname(p);
       tip.innerHTML = `<b>${p.name}</b>${by ? ` <span class="by">${by}</span>` : ''}<br>${a} yrs · ${doing(p)}${partner ? `<br><span class="m">partner of ${partner.name}</span>` : ''}` + (p.id !== follow ? '<br><span class="m">click to follow</span>' : '');
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (rooks.some((o) => Math.hypot(o.x + 0.2 - mx, o.y + 0.1 - my) < 0.45)) {
+      const s = S.summary(w), f = w.fields.find((o) => o.id === w.crow.cur.f), seed = f && f.stage === 'planted';
+      tip.innerHTML = `<b>Rooks</b><br>${s.crowFlock} walking the rows · ${seed ? 'digging out the seed' : 'stripping the ripe ears'}${f && f.lost ? ` · ${Math.round(f.lost * 100)}% of this field gone` : ''}${s.scarers ? ` · ${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} coming with clappers` : ''}<br><span class="m">${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scared}x since ${esc(w.crow.nm || 'the eldest')} made the first clapper` : ' · nobody has an answer for them yet'}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = whaleAt(mx, my))) {
       const o = best.o, s = S.summary(w);
@@ -1815,6 +1827,48 @@ function drawDogs(frac, now) {
 // rats: render-only. A few dart about the granaries (or the houses) by day; at dusk and through
 // the night the colony comes out in force, one sprite for every six or so, scurrying in short
 // runs along the walls, freezing, then running again. Spilled grain lies under a swarmed granary.
+// rooks: a flock walking the rows of one field, heads bobbing down to the seed; gliding in when they land and
+// scattering up and away, wings beating, when they lift. Returns where each bird is, for the hover.
+const ROOK = '#15151a', ROOK_HI = '#3a3a48', ROOK_BILL = '#b9b3a6';
+function drawRooks(frac, now) {
+  const C = w.crow, out = [];
+  if (!C) return out;
+  const seen = (o) => o && o.t === w.t - 1;
+  const down = C.cur, up = seen(C.up) ? C.up : null;
+  const n = Math.min(18, Math.ceil(C.b / 2));
+  const spot = (i, o) => ({ x: o.x * TILE + 4 + (S.hash(i, o.x, 61) - 0.5) * 13, y: o.y * TILE + 4 + (S.hash(i, o.y, 67) - 0.5) * 10 });
+  if (down) {
+    const k = seen(down) ? Math.min(1, frac / 0.35) : 1; // gliding in on the first part of the hour
+    for (let i = 0; i < n; i++) {
+      const p = spot(i, down);
+      const hop = Math.floor(now / (1400 + S.hash(i, 3, 71) * 1600) + S.hash(i, 4, 71) * 9);
+      const X = Math.round(p.x + (S.hash(i, hop, 73) - 0.5) * 2 + (1 - k) * (i % 2 ? 18 : -14)), Y = Math.round(p.y - (1 - k) * 28);
+      const face = S.hash(i, hop, 79) < 0.5 ? -1 : 1;
+      if (k < 1) { // wings out, coming down
+        const fl = Math.floor(now / 120 + i) % 2;
+        px(sc, X - 1, Y - fl, ROOK); px(sc, X, Y, ROOK); px(sc, X + 1, Y, ROOK); px(sc, X + 2, Y - fl, ROOK);
+      } else {
+        const peck = Math.floor(now / 380 + i * 1.7) % 3 === 0;
+        px(sc, X, Y, ROOK, 3, 2); px(sc, X + 1, Y, ROOK_HI);
+        const hx = face > 0 ? X + 3 : X - 1;
+        px(sc, hx, Y + (peck ? 1 : 0), ROOK); px(sc, hx + face, Y + (peck ? 2 : 1), ROOK_BILL); // head and pale bill, down to the earth when it pecks
+        px(sc, face > 0 ? X - 1 : X + 3, Y + 1, ROOK); // tail
+      }
+      out.push({ x: X / TILE, y: Y / TILE });
+    }
+  }
+  if (up && frac < 0.7) { // scattering: up and away toward the trees, cawing
+    const k = frac / 0.7;
+    for (let i = 0; i < n; i++) {
+      const p = spot(i, up);
+      const X = Math.round(p.x + (S.hash(i, 5, 83) - 0.5) * 60 * k), Y = Math.round(p.y - (20 + S.hash(i, 6, 83) * 30) * k);
+      const fl = Math.floor(now / 110 + i) % 2;
+      px(sc, X - 1, Y - fl, ROOK); px(sc, X, Y, ROOK); px(sc, X + 1, Y, ROOK); px(sc, X + 2, Y - fl, ROOK);
+    }
+  }
+  return out;
+}
+
 const RAT = ['.bbh', 't...'];
 const RCOL = { b: '#6f6862', h: '#57514c', t: '#a08a84' };
 function drawRats(hf, now) {
@@ -1918,6 +1972,7 @@ function updatePanels() {
     ...(s.rusts ? [['rust', 'Rust', `${s.rusted ? `<span class="bad">${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted</span> · ` : ''}<span class="m">${s.rusts} ${s.rusts === 1 ? 'outbreak' : 'outbreaks'} · ${s.rustEver.toLocaleString()} fields spotted · ~${s.rustGrain.toLocaleString()} grain lost · last ${when(w.rust.last)}</span>`]] : []),
     ...(s.rogue ? [['rogue', 'Rogueing', `${s.rogueing ? `<span class="fest">${s.rogueing} pulling rusted grain</span> · ` : ''}<span class="m">${s.rogueEver.toLocaleString()} ${s.rogueEver === 1 ? 'field' : 'fields'} pulled clean · ${s.rogueStopped} ${s.rogueStopped === 1 ? 'outbreak' : 'outbreaks'} stopped before the harvest${w.rogue.nm ? ` · taught by ${esc(w.rogue.nm)}` : ''}</span>`]] : []),
     ...(s.smudge ? [['smudge', 'Smudge', `${s.smudgeFires ? `<span class="fest">${s.smudgeFires} ${s.smudgeFires === 1 ? 'fire' : 'fires'} smouldering in the fields</span> · ` : ''}<span class="m">${s.smudgeNights} ${s.smudgeNights === 1 ? 'night' : 'nights'} lit · ${s.smudgeSaved.toLocaleString()} ${s.smudgeSaved === 1 ? 'field' : 'fields'} saved${s.smudgeYear ? ` (${s.smudgeYear} this year)` : ''}</span>`]] : []),
+    ...(s.crows ? [['rook', 'Rooks', `${s.crowDown ? `<span class="bad">${s.crowFlock} down on the grain</span>${s.scarers ? ` · <span class="fest">${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} with clappers</span>` : ''} · ` : `${s.crowFlock} `}<span class="m">${s.crowDown ? '' : 'in the flock · '}${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scaredYear}x this year` : ''}</span>`]] : []),
     ['gran', 'Granaries',`${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
@@ -2012,7 +2067,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'), n(h.lame, 'goat lame with foot rot', 'goats lame with foot rot'), n(h.rotDied, 'goat dead of foot rot', 'goats dead of foot rot'), n(h.pared, 'hoof pared', 'hooves pared'), n(h.cheese, 'round of cheese pressed', 'rounds of cheese pressed'), n(h.cheeseEaten, 'round of cheese eaten in the cold', 'rounds of cheese eaten in the cold'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'), n(h.held, 'roof held by the storm stones', 'roofs held by the storm stones'), n(h.mucked, 'field mucked', 'fields mucked'), h.muckGrain && `${h.muckGrain} more grain from the muck`,n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'), n(h.lame, 'goat lame with foot rot', 'goats lame with foot rot'), n(h.rotDied, 'goat dead of foot rot', 'goats dead of foot rot'), n(h.pared, 'hoof pared', 'hooves pared'), n(h.cheese, 'round of cheese pressed', 'rounds of cheese pressed'), n(h.cheeseEaten, 'round of cheese eaten in the cold', 'rounds of cheese eaten in the cold'), h.rooks ? `${h.rooks.toLocaleString()} grain to rooks` : '', n(h.scared, 'flock of rooks driven off', 'flocks of rooks driven off'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'), n(h.held, 'roof held by the storm stones', 'roofs held by the storm stones'), n(h.mucked, 'field mucked', 'fields mucked'), h.muckGrain && `${h.muckGrain} more grain from the muck`,n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
@@ -2065,7 +2120,7 @@ const HARD = [
   ['fever', (h) => h.sick || 0, (h) => [h.sick && `${h.sick} fell sick`]],
   ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
   ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
-  ['grain', (h) => (h.rats || 0) + (h.stolen || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`]],
+  ['grain', (h) => (h.rats || 0) + (h.stolen || 0) + (h.rooks || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`, h.rooks && `${h.rooks} grain to rooks`]],
   ['deaths', (h) => h.deaths || 0, (h) => [h.deaths && pl(h.deaths, 'death', 'deaths')]],
 ];
 let hb = null; // layout of the last drawn strip, for hover and click
