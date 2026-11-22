@@ -177,7 +177,7 @@
  {
   "at": "2026-11-21T07:51:19.621Z",
   "title": "Add a Families view: a family tree of every islander",
-  "body": "- New \"⋔ Families\" button (top left, beside Sky and History) opens a tree of every line on the island: each settler couple and their children, grandchildren and so on, with partners beside each name, ages for the living and year and age of death for the dead\n- Living names are links: click one to go back to the island and follow them. The life card gets a \"family tree\" link that opens the tree on that person\n- SIM_VERSION 33 (w.roll): graves now keep the partner (g.pt), and a grave that sinks when the burying ground is full, or an islander who sails to the far isle, is written to a roll of names so old ancestors stay in the tree. Nothing in the step path reads it, so behaviour is unchanged\n- The Sky, History and Families buttons now sit in one row so the life card no longer covers the History button\n- Watch: Hais has 17 living in about 8 lines; the first third generation should appear when Wenra (born Y2) has children"
+  "body": "- New \"\u22d4 Families\" button (top left, beside Sky and History) opens a tree of every line on the island: each settler couple and their children, grandchildren and so on, with partners beside each name, ages for the living and year and age of death for the dead\n- Living names are links: click one to go back to the island and follow them. The life card gets a \"family tree\" link that opens the tree on that person\n- SIM_VERSION 33 (w.roll): graves now keep the partner (g.pt), and a grave that sinks when the burying ground is full, or an islander who sails to the far isle, is written to a roll of names so old ancestors stay in the tree. Nothing in the step path reads it, so behaviour is unchanged\n- The Sky, History and Families buttons now sit in one row so the life card no longer covers the History button\n- Watch: Hais has 17 living in about 8 lines; the first third generation should appear when Wenra (born Y2) has children"
  },
  {
   "at": "2026-11-21T10:05:31.538Z",
@@ -298,5 +298,10 @@
   "at": "2026-11-22T05:07:05.929Z",
   "title": "Island improvements",
   "body": ""
+ },
+ {
+  "at": "2026-11-22T09:38:53.000Z",
+  "title": "Make the page feel live: smooth walking, work at the task, bubbles, a coming-up strip and a welcome back",
+  "body": "- People and animals glide between pixels and walk short legs at a steady pace\n- Axes, sickles, seed, mallets and baskets move at the task\n- Speech bubbles over whoever you follow and now and then over someone at work; the follow card keeps a diary\n- Coming up: a private copy of the island is played 6 hours ahead; deaths are hidden and raids only hinted at\n- While you were away: what happened since your last visit and what is new in the rules\n- An open page reloads itself when the rules change"
  }
 ]
