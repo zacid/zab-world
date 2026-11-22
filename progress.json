@@ -268,5 +268,10 @@
   "at": "2026-11-22T02:11:35.727Z",
   "title": "Speed up late-game years by about 45% with identical results",
   "body": "- Give people, fields and buildings one fixed key order (personShape/fieldShape/buildingShape), rebuilt on every load in migrate()\n- Clear keys with `= undefined` instead of `delete`: almost every villager, field and building had fallen into slow dictionary mode\n- Skip repeat fence/hedge searches within an hour once one finds nothing (reset when a fence or hedge claim is given up)\n- Seed 4242 Y80-83 on a loaded world: ~3.8 -> ~2.1 s per year, same world as before; fingerprint() now hashes keys in sorted order\n- No change to the island itself; new probes: _speedbench, _prof/_profsum, _fastprops, _keys, _tasks"
+ },
+ {
+  "at": "2026-11-22T02:49:49.781Z",
+  "title": "Add squalls that catch the dugout out on the deep water",
+  "body": "- SIM_VERSION 50 (w.squall {n, y, h, s, d, b, cur, last}; squallHour/squallBegins/squallEnds/shoreWatch, SQUALL_* in sim.js; tech 'squall'; task 'shore'; yearly `squalls`): after 5 trips, each afternoon hour at sea has a 0.2% chance of a squall, x2 on hot days, x2 in autumn, x3 the day before a storm\n- The paddler turns for home at half speed; each hour it blows the dugout may roll (20%). Swimmers make for the landing at 2 tiles/h and the sea can keep them (7%/h, double for the old and young); survivors lie up 5 days and the boat is lost 3 times in 5\n- Kin and up to 12 idle adults run down to the landing and stand watching; whoever is there wades out to drag the swimmer in\n- Visible: a black cloud with slanting rain and white caps over the boat, the dugout pitching, a swimmer with an upturned hull, hover text, a Squalls row in the panel, squalls in the Hard-years storms row\n- Watch: Hais (new dugout, Y8) should see its first squall this autumn; on the live world about 0.8 a year, a boat lost every 4-5 years, a drowning every few decades"
  }
 ]

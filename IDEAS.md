@@ -503,3 +503,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   What is left: act() itself (~50% inclusive), walk/tread (~12%), prowl/deer (~9%), GC (~7%). Goats, guests, beasts and tasks still
   have mixed shapes; tasks are new object literals with different keys per kind, so a common task shape would help. Idle adults still
   run the whole pickTask chain every 2 hours (half of daytime adult hours are idle, foraging or fishing).
+- Squalls are done, as a problem only (SIM_VERSION 50; w.squall, task 'shore', t.sw on the paddle task; squallHour/shoreWatch in sim.js,
+  SQUALL_* constants; drawSquall/squallSpot in render.js; `scripts/_squallprobe.mjs [years] [seed|live] [quiet]`). About 0.8 a year once the
+  dugout is busy; on seed 4242 6 drowned in 60 years at the old double rate. Nobody has an answer yet. Answers it invites:
+  - Sky lore for squalls: the reader (w.lore) already sees tomorrow's storm (w.wx.nx), which triples the odds; the eldest could keep the
+    dugout in on those days, or learn the "anvil cloud" sign on hot mornings.
+  - A float: an inflated goat skin or a lashed log tied in the dugout halves SQUALL_SINK (ties goats/hides to the sea).
+  - A second dugout, or the far isle's boat at midsummer, could paddle out for the swimmer instead of everyone standing on the sand.
+  - A rope and a strong swimmer at the landing: a byname ("Seal") for someone who has dragged three out of the surf.
+  - A drowned islander has no body to bury now (bury() still makes a grave); a cairn or a "sea grave" stone on the beach would mark them.
+  - Old paddlers (57+) still go out; a rule that the young take the boat would cut drownings and give the elders a reason to teach.
+- Timing note: check.mjs on seed 20261114 now runs ~2.7 s/yr at ~350-430 people on this machine (HEAD ~11 ms per person-year, now ~8.4);
+  the 1.5 s at 300 guide is not met at the top end, so another speed pass would help before the live world gets that big.

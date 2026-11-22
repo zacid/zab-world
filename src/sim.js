@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 49;
+export const SIM_VERSION = 50;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -74,6 +74,7 @@ export const TECHS = {
   footrot:  { name: 'Foot rot', added: '2026-11-21T22:51Z', desc: 'After days of rain the goat pen turns to a wallow of mud and dung, and the hooves go soft in it. A goat starts holding up a foot and hobbling on three; the hoof is grey and stinking between the claws. Lame goats lie in the straw and will not go out to graze, give no milk and kid no more, and a few never stand up again. It passes from hoof to hoof through the mud, fastest when the pen is wet and crowded, and goes when the ground dries. Nobody yet knows what to do for it.', req: ['goats'] },
   paring:   { name: 'Hoof paring', added: '2026-11-21T23:32Z', desc: 'A little hurdle fold against the goat pen, with a dry straw floor. A day after a goat starts to limp it is caught, the soft grey horn is pared back with a flint to clean hoof, the foot is washed in sea water or the healer\'s willow-bark brew, and the goat is put in the fold until it walks sound. Out of the mud it passes the rot to nobody and mends in days instead of weeks; caught early, an outbreak stops at a goat or two.', req: ['footrot'] },
   cloak:    { name: 'Wolf-skin cloak', added: '2026-11-22T00:06Z', desc: 'The pelt of a lone wolf, bigger and paler than any from the den, scraped, rubbed with ash and brains and worn over the shoulders by the one whose spear killed it. No wolf will single out someone who walks in a wolf\'s skin. When the wearer dies the cloak goes to the eldest child, or to the widow or widower; with nobody to take it, it is laid in the grave.', req: ['lone'] },
+  squall:   { name: 'Squalls', added: '2026-11-22T02:14Z', desc: 'Out past the surf the weather turns faster than anyone on the beach can see. On a hot afternoon, or in autumn, or the day before a storm, a black squall can come down on the deep water in minutes: wind, slanting rain and a short steep sea. The one in the dugout turns for home and fights the paddle; the village runs down to the landing to watch. Some come in through the surf with the catch thrown over the side, some are rolled over and swim for it, and the sea keeps a few. Nobody has an answer for it yet.', req: ['canoe'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -509,7 +510,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -731,7 +732,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -4572,7 +4573,8 @@ function learnCanoe(w, c) {
 function canoeDay(w, c) {
   const K = w.canoe;
   if (!K) { learnCanoe(w, c); return; }
-  if (c.doy === 0) K.y = 0; // last year's catch is already in the history
+  if (c.doy === 0) { K.y = 0; if (w.squall) w.squall.y = 0; } // last year's catch is already in the history
+  if (w.squall && w.squall.cur) squallGone(w);
   K.d = Math.min(DEEP_CAP, K.d + (c.season < 3 ? DEEP_REGEN : 1));
   if (K.ok && K.at == null) {
     const storm = w.wx && w.wx.k === 'storm' && rnd(w) < CANOE_STORM;
@@ -4620,7 +4622,7 @@ function canoeTask(w, p, c) {
   if (c.hour > 8 || K.d < 12 || (w.fauna && w.fauna.fear > w.t) || (w.fest && w.fest.on === c.day)) return null;
   if (!lineOfLand(w, p.x, p.y, K.bx + 0.5, K.by + 0.5)) return null;
   const g = canoeGround(w, K);
-  return { k: 'paddle', key: 'u', x: K.bx, y: K.by, h: CANOE_HOURS, gx: g.x, gy: g.y };
+  return { k: 'paddle', key: 'u', x: K.bx, y: K.by, h: CANOE_HOURS, gx: g.x, gy: g.y, sw: 0 };
 }
 function canoeDig(w, p, c) {
   const K = w.canoe;
@@ -4636,6 +4638,7 @@ function canoeDig(w, p, c) {
 function paddle(w, p, t, c, fx) {
   const K = w.canoe;
   p.asleep = false;
+  if (K && w.squall !== undefined && (K.ok || t.sw) && squallHour(w, p, t, c, fx)) return;
   if (!K || !K.ok) { release(w, p); return; }
   t.h--;
   if (t.h > CANOE_BACK) { moveToward(p, t.gx + 0.5, t.gy + 0.5, CANOE_ROW); return; }
@@ -4648,6 +4651,122 @@ function paddle(w, p, t, c, fx) {
   t.sea = 0; K.at = null;
   release(w, p);
   if (K.t === 1) milestone(w, `${p.name} comes in through the surf in the dugout with ${got} fish in the bottom of it, fat ones the size of a forearm that never come near the beach. The children run down the sand to see.`);
+}
+
+// ---------- squalls ----------
+// Out past the surf the sky can turn in minutes. On a hot afternoon, in autumn, or the day before a storm, a squall may
+// come down on the deep water while the dugout is out. The paddler turns for home at half speed, and each hour it blows
+// the boat may roll over; then they swim for the landing, where the village stands watching. The sea keeps a few.
+// w.squall { n squalls, y this year, h came in through it, s swam ashore, d drowned, b boats lost,
+//   cur { id, nm, h hours it still blows, x, y where it came down, sw in the water, w boat comes in whole, m, f, pt kin, n onlookers } | null,
+//   last { nm, how ('in' | 'swam' | 'drowned' | 'rode'), y } }
+const SQUALL_TRIPS = 5;      // trips made before the first one
+const SQUALL_FROM = 10, SQUALL_TO = 14; // the afternoon hours it can come down in
+const SQUALL_ODDS = 0.002;   // chance per hour at sea in those hours on a mild spring or summer day; x2 in heat, x2 in autumn, x3 before a storm
+const SQUALL_LONG = 2;       // hours it blows, plus up to 2 more
+const SQUALL_ROW = 1.5;      // tiles per hour at the paddle, into the wind
+const SQUALL_TIP = 0.2;      // chance per hour it blows that the dugout rolls over
+const SQUALL_SWIM = 2;       // tiles per hour, swimming
+const SQUALL_SINK = 0.07;    // chance per hour in the water that the sea keeps them (twice that for the old and the young)
+const SQUALL_WHOLE = 0.4;    // chance the rolled dugout comes in on the tide whole
+const SQUALL_HURT = 5;       // days a swimmer lies up afterwards
+const SQUALL_CROWD = 12;     // onlookers on the sand besides the kin
+const himHer = (p) => (p.sex === 'f' ? 'her' : 'him');
+function squallHour(w, p, t, c, fx) {
+  const K = w.canoe;
+  let Q = w.squall && w.squall.cur;
+  if (Q && Q.id !== p.id) { w.squall.cur = Q = null; }
+  if (!Q) {
+    if (t.sw || c.hour < SQUALL_FROM || c.hour > SQUALL_TO || K.t < SQUALL_TRIPS) return false;
+    const wx = w.wx ? w.wx.k : 'clear';
+    const odds = SQUALL_ODDS * (wx === 'heat' ? 2 : 1) * (c.season === 2 ? 2 : 1) * (w.wx && w.wx.nx === 'storm' ? 3 : 1);
+    if (rnd(w) >= odds) return false;
+    Q = squallBegins(w, p, c);
+  }
+  const S = w.squall, bx = K.bx + 0.5, by = K.by + 0.5;
+  if (Q.h > 0) Q.h--;
+  if (Q.sw) { // in the water, swimming for the landing
+    const a = ageY(w, p);
+    if (rnd(w) < SQUALL_SINK * (a > 50 || a < 16 ? 2 : 1) * (Q.h > 0 ? 1 : 0.5)) {
+      S.d++;
+      squallEnds(w, p, Q, 'drowned', c);
+      die(w, p, 'drowned off the landing when a squall rolled the dugout over');
+      log(w, Q.w ? 'The dugout comes in on the evening tide, upside down and empty.' : 'For days after, pieces of the dugout wash up along the beach.', 'bad');
+      return true;
+    }
+    if (!moveToward(p, bx, by, SQUALL_SWIM)) return true;
+    S.s++;
+    const o = w.people.find((q) => !q.dead && q.task && q.task.k === 'shore' && ageY(w, q) >= 14);
+    p.hurt = Math.max(p.hurt || 0, w.t + SQUALL_HURT * TICKS_PER_DAY);
+    squallEnds(w, p, Q, 'swam', c);
+    log(w, `${o ? `${o.name} wades out into the surf and drags ${p.name} up the sand` : `${p.name} crawls up the sand on ${poss(p)} hands and knees`}, half drowned and coughing up sea water. ${Q.w ? 'The dugout washes in after, upside down but whole.' : 'The dugout is gone; only the paddle comes in.'}`, 'good');
+    release(w, p);
+    return true;
+  }
+  t.h = Math.min(t.h - 1, CANOE_BACK); // turn for home
+  if (Q.h > 0 && rnd(w) < SQUALL_TIP) {
+    Q.sw = 1; t.sw = 1; Q.w = rnd(w) < SQUALL_WHOLE ? 1 : 0;
+    const far = Math.round(Math.sqrt((p.x - bx) * (p.x - bx) + (p.y - by) * (p.y - by)));
+    log(w, `A wave comes green over the side and the dugout rolls. ${p.name} is in the water, ${far <= 2 ? 'close in under the surf' : `a long swim from the landing`}.`, 'bad');
+    return true;
+  }
+  if (moveToward(p, bx, by, Q.h > 0 ? SQUALL_ROW : CANOE_ROW)) { // in through the surf
+    const got = Math.min(K.d, ri(w, 6));
+    K.d -= got; K.f += got; K.y += got; K.t++;
+    w.food += got;
+    if (fx && got) fx.push({ x: K.bx + 0.5, y: K.by, text: '+' + got, color: 'fish' });
+    S.h++;
+    squallEnds(w, p, Q, 'in', c);
+    log(w, `${p.name} comes in through the surf half swamped, bailing with both hands. The catch went over the side to keep the dugout up${got ? `, all but ${got} fish` : ''}.`, 'good');
+    t.sea = 0; K.at = null;
+    release(w, p);
+    return true;
+  }
+  if (Q.h === 0) { // it blows over before they are in
+    squallEnds(w, p, Q, 'rode', c);
+    log(w, `The squall blows over as fast as it came. ${p.name} is still afloat, bailing, and paddles on for the landing.`, 'good');
+  }
+  return true;
+}
+function squallBegins(w, p, c) {
+  if (!w.squall) w.squall = { n: 0, y: 0, h: 0, s: 0, d: 0, b: 0, cur: null, last: null };
+  const S = w.squall;
+  S.n++; S.y++;
+  const Q = S.cur = { id: p.id, nm: p.name, h: SQUALL_LONG + ri(w, 3), x: p.x, y: p.y, sw: 0, w: 0, m: p.mother, f: p.father, pt: p.partner, n: 0 };
+  if (!w.techs.includes('squall')) w.techs.push('squall');
+  if (S.n === 1) milestone(w, `Out on the deep water ${p.name} looks up from the line. The sky over the sea has gone black in the time it takes to haul a fish, and a wall of rain is walking across the water toward the dugout. On the beach the shore fishers shout and point, and soon all of ${w.name} is running down to the landing to watch ${himHer(p)} fight the paddle home. Nobody knew the weather out there could turn so fast.`);
+  else log(w, `A squall comes down on the deep water with ${p.name} out in the dugout. Half of ${w.name} runs down to the landing to watch.`, 'bad');
+  return Q;
+}
+function squallEnds(w, p, Q, how, c) {
+  const S = w.squall, K = w.canoe;
+  S.cur = null;
+  S.last = { nm: p.name, how, y: c.year };
+  if ((how === 'swam' || how === 'drowned') && !Q.w && K) { K.ok = 0; K.wk = -1; K.lost++; S.b++; }
+}
+// the paddler is no longer out there (died at sea of something else, or called in): nobody waits on the sand
+function squallGone(w) {
+  const Q = w.squall.cur, o = aliveId(w, Q.id);
+  if (!o || !o.task || !o.task.sea) w.squall.cur = null;
+}
+// while it blows, the paddler's kin and anyone with nothing pressing stand on the landing beach and watch the sea
+function shoreWatch(w, p, a) {
+  squallGone(w);
+  const Q = w.squall.cur, K = w.canoe;
+  if (!Q || !K) return false;
+  if (!p.task || p.task.k !== 'shore') {
+    if (a < 6 || p.sick || p.hurt) return false;
+    const kin = Q.pt === p.id || Q.m === p.id || Q.f === p.id || p.mother === Q.id || p.father === Q.id;
+    const k = p.task ? p.task.k : 'idle';
+    if (!kin && (a < 14 || Q.n >= SQUALL_CROWD || (k !== 'idle' && k !== 'forage' && k !== 'fish'))) return false;
+    if (!kin) Q.n++;
+    release(w, p);
+    const dx = K.bx - K.lx, dy = K.by - K.ly, back = ((p.id * 7) % 5) * 0.2, side = ((p.id * 13) % 9) * 0.1 - 0.4;
+    p.task = { k: 'shore', x: K.bx, y: K.by, h: 99, ox: dx * back + dy * side, oy: dy * back + dx * side };
+  }
+  p.asleep = false;
+  walk(w, p, K.bx + 0.5 + p.task.ox, K.by + 0.5 + p.task.oy);
+  return true;
 }
 
 function forage(w, p) {
@@ -4784,7 +4903,8 @@ function act(w, p, c, fx) {
       return;
     }
   }
-  if (p.task && (p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (w.squall && w.squall.cur && shoreWatch(w, p, a)) return; // the dugout is out in a squall: down to the landing to watch
+  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -5712,6 +5832,10 @@ const MIGRATIONS = {
   48: (w) => {
     if (w.cloak === undefined) w.cloak = null;
   },
+  // v49 -> v50: squalls at sea (w.squall). None yet; an afternoon out in the dugout may be caught by one.
+  49: (w) => {
+    if (w.squall === undefined) w.squall = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5771,6 +5895,11 @@ export function summary(w) {
     canoe: !!w.canoe, canoeOk: !!(w.canoe && w.canoe.ok), canoeDug: w.canoe && !w.canoe.ok && w.canoe.wk >= 0 ? Math.round((w.canoe.wk / CANOE_WORK) * 100) : null,
     canoeOut: (w.canoe && w.canoe.at != null && (aliveId(w, w.canoe.at) || {}).name) || null, canoeTrips: w.canoe ? w.canoe.t : 0,
     canoeFish: w.canoe ? w.canoe.f : 0, canoeYear: w.canoe ? w.canoe.y : 0, canoeDeep: w.canoe ? w.canoe.d : 0, canoeLost: w.canoe ? w.canoe.lost : 0,
+    squall: (w.squall && w.squall.cur && w.squall.cur.nm) || null, squallSwim: !!(w.squall && w.squall.cur && w.squall.cur.sw),
+    squallWatch: w.squall && w.squall.cur ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'shore').length : 0,
+    squalls: w.squall ? w.squall.n : 0, squallYear: w.squall ? w.squall.y : 0, squallIn: w.squall ? w.squall.h : 0,
+    squallSwam: w.squall ? w.squall.s : 0, squallDrowned: w.squall ? w.squall.d : 0, squallBoats: w.squall ? w.squall.b : 0,
+    squallLast: (w.squall && w.squall.last) || null,
     copse: !!w.copse, copseStools: w.copse ? w.copse.s.length : 0, copseReady: w.copse ? w.copse.s.filter((i) => w.wood[i] >= 6).length : 0,
     copseYear: w.copse ? Math.round(w.copse.y) : 0, copseCut: w.copse ? w.copse.n : 0, copseCap: w.copse ? copseCap(w) : 0,
     whales: w.whale ? w.whale.n : 0, whaleMeat: w.whale ? w.whale.g : 0, whaleLeft: w.whale && w.whale.cur ? w.whale.cur.m : null,
