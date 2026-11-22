@@ -43,7 +43,11 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 .ic.blaze { background:#1c1714; box-shadow:inset 2px 0 0 #04070d, inset -2px 0 0 #04070d, inset 0 -3px 0 #e0521f, inset 0 -5px 0 #ffc23d; }
 .ic.by { background:transparent; box-shadow:inset 0 0 0 1px #d9c38a, inset 0 -3px 0 #d9c38a; }
 #badge { display:inline-block; margin-top:6px; border:1px solid var(--muted); color:var(--muted); padding:1px 6px; font-size:12px; }
-#res { left:12px; bottom:12px; min-width:190px; }
+#res { left:12px; bottom:12px; min-width:190px; max-width:min(560px, calc(100% - 380px)); max-height:calc(100% - 130px); overflow:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
+#res .rg { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.12em; margin:8px 0 2px; }
+#res .rg.now { color:var(--accent); }
+#res .rmore { color:var(--muted); font-size:12px; margin-top:6px; cursor:pointer; user-select:none; }
+#res .rmore:hover { color:var(--accent); }
 #res .row { display:flex; align-items:center; gap:8px; }
 #res .row b { margin-left:auto; font-weight:normal; }
 .ic { width:8px; height:8px; display:inline-block; }
@@ -146,13 +150,14 @@ html,body { margin:0; height:100%; background:#04070d; color:var(--fg); font:14p
 #who .diary { margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,.12); }
 #who .dy { padding:1px 0; color:#cfd3d8; }
 @media (max-width: 760px) {
-  #title { font-size:22px; } #top { top:8px; }
+  #title { font-size:22px; } #top { top:46px; }
   #graph { display:none; }
-  #res { left:8px; bottom:8px; min-width:0; font-size:13px; padding:8px 10px; }
-  #nav { left:8px; top:auto; bottom:168px; flex-direction:column-reverse; align-items:flex-start; gap:4px; }
+  #res { left:8px; bottom:8px; min-width:0; max-width:calc(100% - 16px); max-height:42%; font-size:13px; padding:8px 10px; }
+  #nav { left:8px; right:8px; top:8px; justify-content:center; gap:4px; }
+  #nav .btn { padding:5px 9px; font-size:13px; }
   #kwrap { padding-top:54px; }
   #logbtn { display:block; right:8px; bottom:8px; }
-  #who { left:8px; right:8px; top:64px; width:auto; max-height:34%; font-size:12px; }
+  #who { left:8px; right:8px; top:150px; width:auto; max-height:34%; font-size:12px; }
   #chron { display:none; right:8px; left:8px; width:auto; bottom:52px; max-height:55%; }
   #app.logopen #chron { display:flex; }
   #hwrap { padding-top:54px; }

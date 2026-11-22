@@ -2001,13 +2001,49 @@ function glow(c, x, y, r, col) {
 }
 
 // ---------- panels ----------
+// ---------- the stats panel ----------
+// Always shown: the five basics, plus any row with something happening right now (a .bad or .fest part: a storm
+// called, a raid, someone out in the dugout). Everything else is folded into groups behind "more".
+// New rows: add the row's icon key to a group here; a key not listed lands in "Other".
+const RES_CORE = ['pop', 'food', 'wood', 'house', 'field'];
+const RES_GROUPS = [
+  ['Stores & crafts', ['gran', 'pot', 'cheese', 'bee', 'copse', 'path', 'herb']],
+  ['Fields', ['muck', 'frost', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
+  ['Beasts', ['wild', 'lone', 'hunt', 'goat', 'dog']],
+  ['Sea & sky', ['canoe', 'squall', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
+  ['Folk', ['by', 'tale', 'grave']],
+];
+const RES_KEY = 'island.stats';
+let resOpen = (() => { try { return localStorage.getItem(RES_KEY) === 'open'; } catch { return false; } })();
+function resPanel(rows) {
+  const row = ([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`;
+  const live = ([k, , v]) => !RES_CORE.includes(k) && /class="(bad|fest)"/.test(String(v));
+  const core = rows.filter(([k]) => RES_CORE.includes(k)), now = rows.filter(live);
+  const rest = rows.filter((r) => !RES_CORE.includes(r[0]) && !live(r));
+  let html = core.map(row).join('');
+  if (now.length) html += `<div class="rg now">happening now</div>` + now.map(row).join('');
+  if (!rest.length) return html;
+  html += `<div class="rmore" data-more>${resOpen ? '▾ less' : `▸ ${rest.length} more`}</div>`;
+  if (!resOpen) return html;
+  const known = new Set(RES_GROUPS.flatMap(([, ks]) => ks));
+  for (const [name, ks] of [...RES_GROUPS, ['Other', null]]) {
+    const g = rest.filter(([k]) => (ks ? ks.includes(k) : !known.has(k)));
+    if (g.length) html += `<div class="rg">${name}</div>` + g.map(row).join('');
+  }
+  return html;
+}
+function toggleRes() {
+  resOpen = !resOpen;
+  try { localStorage.setItem(RES_KEY, resOpen ? 'open' : 'closed'); } catch {}
+  updatePanels();
+}
 function updatePanels() {
   const s = S.summary(w), c = S.clock(w.t);
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
   const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
   $('when').innerHTML = `Year ${s.year} · ${s.season}, day ${s.day} · ${String(s.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.stormCalled ? ` · <span class="bad">${esc(s.skyReader)} reads the sky: a storm by morning</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
-  $('res').innerHTML = [
+  $('res').innerHTML = resPanel([
     ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
@@ -2049,7 +2085,7 @@ function updatePanels() {
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
-  ].map(([k, l, v]) => `<div class="row"><i class="ic ${k}"></i><span>${l}</span><b>${v}</b></div>`).join('');
+  ]);
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');
   for (const p of w.people) if (!known.has(p.id)) known.set(p.id, { name: p.name, sex: p.sex });
@@ -2642,6 +2678,7 @@ async function boot() {
   }
   $('skybtn').onclick = () => { if (!$('hist').hidden) showHistory(false); if (!$('kin').hidden) showFamilies(false); $('sky').hidden = !$('sky').hidden; $('skybtn').classList.toggle('on', !$('sky').hidden); if (!$('sky').hidden) { drawSky(); loadProgress(); } };
   $('logbtn').onclick = () => app.classList.toggle('logopen');
+  $('res').addEventListener('click', (e) => { if (e.target.closest('[data-more]')) toggleRes(); });
   try {
     const r = await fetch('world/state.json', { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
