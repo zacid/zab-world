@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 48;
+export const SIM_VERSION = 49;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -73,6 +73,7 @@ export const TECHS = {
   muck:     { name: 'Muck', added: '2026-11-21T21:34Z', desc: 'Dung forked out of the goat pen goes on a heap beside it, with the hearth ash and the kitchen scraps, and steams there through the winter. After the harvest it is carried out in baskets and forked over the bare fields, nearest the pen first. A mucked field stands thicker and heavier at its next harvest, by about a third, so the village needs fewer fields and fells less of the wood. The more goats, the bigger the heap.', req: ['goats', 'farming'] },
   footrot:  { name: 'Foot rot', added: '2026-11-21T22:51Z', desc: 'After days of rain the goat pen turns to a wallow of mud and dung, and the hooves go soft in it. A goat starts holding up a foot and hobbling on three; the hoof is grey and stinking between the claws. Lame goats lie in the straw and will not go out to graze, give no milk and kid no more, and a few never stand up again. It passes from hoof to hoof through the mud, fastest when the pen is wet and crowded, and goes when the ground dries. Nobody yet knows what to do for it.', req: ['goats'] },
   paring:   { name: 'Hoof paring', added: '2026-11-21T23:32Z', desc: 'A little hurdle fold against the goat pen, with a dry straw floor. A day after a goat starts to limp it is caught, the soft grey horn is pared back with a flint to clean hoof, the foot is washed in sea water or the healer\'s willow-bark brew, and the goat is put in the fold until it walks sound. Out of the mud it passes the rot to nobody and mends in days instead of weeks; caught early, an outbreak stops at a goat or two.', req: ['footrot'] },
+  cloak:    { name: 'Wolf-skin cloak', added: '2026-11-22T00:06Z', desc: 'The pelt of a lone wolf, bigger and paler than any from the den, scraped, rubbed with ash and brains and worn over the shoulders by the one whose spear killed it. No wolf will single out someone who walks in a wolf\'s skin. When the wearer dies the cloak goes to the eldest child, or to the widow or widower; with nobody to take it, it is laid in the grave.', req: ['lone'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -508,7 +509,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -1538,6 +1539,7 @@ function lone(w, b) {
     if (w.watch && w.watch.hid === p.id) continue; // no wolf comes near the beach fire
     if (p.task && p.task.k === 'smudge') continue; // nor near the smoke in the fields
     if (p.task && p.task.sea) continue; // out on the water in the dugout
+    if (p.cl) continue; // walking in a wolf's skin: no wolf singles them out
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
     bd = dd; best = p;
   }
@@ -1707,6 +1709,7 @@ function loneHunt(w, p) {
     w.lone.cur = null;
     milestone(w, `${who} ${mate ? 'come' : 'comes'} on ${L.nm} asleep in the bracken after ${L.h === 1 ? 'one hunt' : `${L.h} hunts`}${yrs ? ` and ${plural(yrs, 'year', 'years')} of it walking the treeline` : ''}, and ${mate ? 'put' : 'puts'} a spear through it before it is up. The pelt, paler and bigger than any from the den, is pegged out by the hearth, and that night everybody stays up late round the fire.`);
     deed(w, p, 'w'); deed(w, mate, 'w');
+    cloakMade(w, p, L.nm, mate);
   } else if (r < odds + harm) {
     const fatal = rnd(w) < (mate ? 0.1 : 0.3);
     if (fatal) die(w, p, `was killed hunting the lone wolf ${L.nm}`);
@@ -1715,6 +1718,48 @@ function loneHunt(w, p) {
       ? `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${mate ? mate.name + ' brings the body home.' : 'Nobody was there to help.'}`
       : `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${p.sex === 'f' ? 'She' : 'He'} comes home bitten.`, 'bad');
   } else if (L.h % 3 === 1) log(w, `${who} ${mate ? 'find' : 'finds'} the bed where ${L.nm} lies up, the bracken still warm, but the wolf is gone.`, 'info');
+}
+
+// ---------- the wolf-skin cloak ----------
+// The one whose spear kills a lone wolf wears its pelt: p.cl = { nm wolf, y year made, by first wearer, n hands it has passed }.
+// No wolf singles out the wearer (lone()). At death it passes to the eldest grown child, else the partner, else into the grave.
+// w.cloak = { n made, h handed down, g laid in graves }
+function cloakMade(w, p, nm, mate) {
+  if (!p || p.dead) return;
+  const C = w.cloak || (w.cloak = { n: 0, h: 0, g: 0 });
+  if (p.cl && mate && !mate.dead && !mate.cl) {
+    log(w, `${p.name} already wears a wolf's skin, so ${pron(p)} gives the pelt of ${nm} to ${mate.name}, who was at ${poss(p)} side.`, 'good');
+    p = mate;
+  } else if (p.cl) { log(w, `${p.name} already wears a wolf's skin, so the pelt of ${nm} is hung on the wall of the house beside the hearth.`, 'info'); return; }
+  p.cl = { nm, y: clock(w.t).year, by: p.name, n: 0 };
+  C.n++;
+  const first = !w.techs.includes('cloak'), He = pron(p)[0].toUpperCase() + pron(p).slice(1);
+  if (first) w.techs.push('cloak');
+  milestone(w, first
+    ? `${p.name} scrapes the pelt of ${nm} clean, rubs it soft with ash and works it for days by the fire, then throws it over ${poss(p)} shoulders, the head hanging down ${poss(p)} back. ${He} wears it everywhere now. The wolves at the treeline smell one of their own on ${p.sex === 'f' ? 'her' : 'him'} and keep away. ${w.name} learns to make a wolf-skin cloak.`
+    : `${p.name} works the pelt of ${nm} soft by the fire and wears it over ${poss(p)} shoulders from now on.`);
+}
+function cloakPass(w, p) {
+  const c = p.cl;
+  if (!c) return;
+  const C = w.cloak || (w.cloak = { n: 0, h: 0, g: 0 });
+  let heir = null;
+  for (const o of w.people) {
+    if (o.dead || o.cl || (o.mother !== p.id && o.father !== p.id) || ageY(w, o) < 14) continue;
+    if (!heir || o.born < heir.born) heir = o;
+  }
+  if (!heir && p.partner != null) { const o = w.people.find((q) => q.id === p.partner && !q.dead && !q.cl); if (o) heir = o; }
+  const yrs = clock(w.t).year - c.y;
+  if (heir) {
+    p.cl = null;
+    heir.cl = { nm: c.nm, y: c.y, by: c.by, n: c.n + 1 };
+    C.h++;
+    const old = yrs >= 2 ? `, ${yrs} years after ${c.by} took it,` : '';
+    milestone(w, `${heir.name} takes the wolf-skin cloak of ${c.nm} down from the peg where ${p.name} hung it every night${old} and wears it to the burying ground. ${c.n ? `It has passed through ${c.n + 2} pairs of hands now, and the fur is wearing thin at the shoulders.` : `The teeth of ${c.nm} still hang at the hood.`}`);
+  } else {
+    C.g++;
+    log(w, `There is nobody to take the wolf-skin cloak of ${c.nm}, so ${p.name} is laid in the earth wrapped in it.`, 'info');
+  }
 }
 
 function edge(w, b) {
@@ -3899,6 +3944,7 @@ function bury(w, p, why) {
   const g = { id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why, m: p.mother, f: p.father, s };
   if (p.partner != null) g.pt = p.partner;
   if (p.dd && p.dd.by) { g.by = byname(p); g.dd = deedsText(p.dd); }
+  if (p.cl) g.cl = p.cl.nm; // nobody to hand the wolf-skin cloak to: buried in it
   w.graves.push(g);
   Y.n++;
   // the morning after, the family stands at the graveside
@@ -4000,6 +4046,7 @@ function die(w, p, why) {
     const tale = deedsText(p.dd);
     milestone(w, `${p.name} ${by} ${why}, aged ${Math.floor(ageY(w, p))}. In ${poss(p)} life ${pron(p)} ${tale.replace(/; ([^;]*)$/, ' and $1').replace(/; /g, ', ')}. ${w.name} will tell of ${p.sex === 'f' ? 'her' : 'him'} at the fire.`);
   } else log(w, `${p.name} ${why}, aged ${Math.floor(ageY(w, p))}.`, 'death');
+  cloakPass(w, p);
   bury(w, p, why);
   for (const o of w.people) if (o.partner === p.id) o.partner = null;
 }
@@ -5614,6 +5661,10 @@ const MIGRATIONS = {
   47: (w) => {
     if (w.pare === undefined) w.pare = null;
   },
+  // v48 -> v49: the wolf-skin cloak (p.cl, w.cloak). None yet; the one who kills the next lone wolf will wear its pelt.
+  48: (w) => {
+    if (w.cloak === undefined) w.cloak = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5690,6 +5741,7 @@ export function summary(w) {
     lone: (w.lone && w.lone.cur && w.lone.cur.nm) || null, loneCame: w.lone ? w.lone.n : 0, loneGoats: (w.lone && w.lone.cur && w.lone.cur.g) || 0,
     loneBit: (w.lone && w.lone.cur && w.lone.cur.b) || 0, loneHunts: (w.lone && w.lone.cur && w.lone.cur.h) || 0,
     loneKilled: w.lone ? w.lone.dead : 0, loneLast: (w.lone && w.lone.last) || null,
+    cloaks: w.people.filter((p) => !p.dead && p.cl).map((p) => `${p.name} (${p.cl.nm})`), cloaksMade: w.cloak ? w.cloak.n : 0,
     rainbows: w.bow ? w.bow.n : 0, rainbowYear: w.bow ? w.bow.y : 0, rainbow: bowOn(w, c), rainbowReached: w.bow ? w.bow.k : 0,
     rainbowChasers: bowOn(w, c) ? w.people.filter((p) => p.task && p.task.k === 'bow').length : 0,
     lore: !!w.lore, skyReader: w.lore ? w.lore.rd : null, stormCalled: !!(w.lore && w.lore.on === c.day + 1 && c.hour >= LORE_READ),

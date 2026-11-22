@@ -258,5 +258,10 @@
   "at": "2026-11-22T00:04:26.893Z",
   "title": "Add hoof paring and a sick fold against foot rot",
   "body": "- SIM_VERSION 48 (w.pare {n, y, s, nm, at, f fold tile, wash}; g.pf; PARE_* in sim.js; tech 'paring'; task 'pare', key v<goatId>; yearly `pared`): learned when an outbreak ends once foot rot has killed 2+ goats. The grown herder, the healer or the eldest puts up a hurdle fold on a tile against the pen wall (or across a corner of the pen if there is no room)\n- 2 days after a goat starts to limp, an idle adult catches it, pares the hoof (2 hours) and puts it in the fold. Folded goats pass the rot to nobody, heal at 12% a day from day 4, wet or dry, and die half as often\n- Visible: a straw-floored hurdle fold with the lame goats bedded in it, a flint and bowl beside it while someone pares; hover text for the fold, goats and parers; \"in the fold\" and \"hooves pared\" on the Goats row; a History line\n- Test seeds: outbreaks fall from 9-18 lame goats to 1-4, and almost none die after it is learned\n- Watch: Hais should lose 2 goats in its first outbreak (wet spring Y9), with Seran teaching paring that summer; after that most outbreaks stop at 1-3 goats"
+ },
+ {
+  "at": "2026-11-22T00:54:39.219Z",
+  "title": "Add wolf-skin cloaks for whoever kills a lone wolf",
+  "body": "- SIM_VERSION 49 (p.cl {nm, y, by, n}; w.cloak {n, h, g}; cloakMade/cloakPass in sim.js; tech 'cloak'; grave g.cl): the hunter whose spear kills a lone wolf wears its pelt. If they already have one, it goes to the partner on the hunt\n- No wolf singles out a cloak wearer (lone() skips them). At death the cloak goes to the eldest grown child, else the partner, else into the grave\n- Visible: a pelt across the shoulders with two hood ears on the sprite, coloured by wolf (Pale-Eye is near white); \"wears the pelt of ...\" on the islander card; \"buried in the pelt of ...\" on graves\n- Watch: on Hais, Duten and Hamor should kill Pale-Eye this spring (Y8), and Duten will wear the first cloak. Expect it to pass to one of his children decades later"
  }
 ]

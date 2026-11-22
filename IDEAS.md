@@ -482,3 +482,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A wet year with two outbreaks at once, or a herd past GOAT_MAX, could fill the fold (cap it at 4 and leave the rest in the mud).
   - Goat numbers drift down late game on the test seeds (grass near the pen is ploughed or grows over): a second pen or a summer shieling
     on far grass would keep the herd (and the muck heap) up.
+- Wolf-skin cloaks are done (SIM_VERSION 49; p.cl {nm, y, by, n hands passed}, w.cloak {n, h, g}, grave g.cl; cloakMade/cloakPass in sim.js;
+  CLOAK_FUR in render.js; `scripts/_cloakprobe.mjs [years] [seed|live]`). On Hais 4 cloaks are made in 60 years, and on seed 20261114
+  one is still worn after 76 years and 6 wearers. Answers it invites:
+  - Cloaks never wear out. One that has passed through 5+ pairs of hands could fall apart one winter, with a line about who wore it first.
+  - Spare pelts hang on the house wall (log only). They could be shown on the house sprite, or given as a midsummer gift to the far isle.
+  - Lone wolf names repeat, so two "Pale-Eye" cloaks can be worn at once. More names, or "the second Pale-Eye", would fix the chronicle.
+  - A cloak wearer could get warmth in hard frost (frail old wearers die of cold less), which matters more as the cloak passes to the old.
+  - Snowmen already dress up as the Wolf-slayer; they could wear a little grey cloak drawn on the sprite too.
+- Speed has slipped again: `node scripts/_lonebench.mjs 4242 80 85` shows the committed code at 3.0-3.6 s/yr at 171 people on the
+  test machine, and check.mjs 100 averages 1.8-3.0 s/yr. That is well over the 1.5 s budget at 300 people. A profiling pass over the
+  newer daily/hourly hooks (rot, pare, muck, lore, bow, lone, wade, smudge) is due before more systems are added.

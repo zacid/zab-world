@@ -169,6 +169,7 @@ function drawWho() {
   if (deeds) kin.push(['so far', esc(deeds)]);
   const dog = w.dogs && w.dogs.d.find((d) => d.own === p.id && w.t - d.b >= S.TICKS_PER_YEAR);
   if (dog) kin.push(['dog', esc(dog.nm)]);
+  if (p.cl) kin.push(['wears', esc(`the pelt of ${p.cl.nm}` + (p.cl.by !== p.name ? `, killed by ${p.cl.by} in year ${p.cl.y}` : `, killed in year ${p.cl.y}`))]);
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
     `<b>${esc(p.name)}</b>${by ? ` <span class="by">${esc(by)}</span>` : ''} <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
     (w.heal && w.heal.id === p.id ? ` <span class="herb">${p.sex === 'f' ? 'herb-woman' : 'herb-man'}</span>` : '') +
@@ -873,7 +874,9 @@ function graveAt(mx, my) {
   return best;
 }
 const when = (t) => { const c = S.clock(t); return `Y${c.year} ${S.SEASONS[c.season]}`; };
-const graveText = (g) => `${g.n}${g.by ? ' ' + g.by : ''} ${g.why}, aged ${Math.floor((g.d - g.b) / S.TICKS_PER_YEAR)}`;
+// pelt colours of the lone wolves (sim.js LONE_NAMES)
+const CLOAK_FUR = { 'One-Ear': '#8a8d93', Greyback: '#a9abaf', 'Pale-Eye': '#d2d4d8', Longshank: '#9c8a70', 'Scar-Muzzle': '#77797e' };
+const graveText = (g) => `${g.n}${g.by ? ' ' + g.by : ''} ${g.why}, aged ${Math.floor((g.d - g.b) / S.TICKS_PER_YEAR)}${g.cl ? `, buried in the pelt of ${g.cl}` : ''}`;
 
 // ---------- time ----------
 function nowTickF() { return (Date.now() - w.epoch) / S.TICK_MS; }
@@ -1160,6 +1163,10 @@ function frame() {
     if (p.task && !moving && age >= 14) {
       if (p.task.k === 'shape') { px(sc, X + 3, Y + 2, JAR_WET, 2, 2); if (Math.floor(now / 450 + p.id) % 2) px(sc, X + 3, Y + 1, '#f1c9a5'); } // coiling a jar, hands on the rim
       else if (p.task.k === 'clay' && Math.floor(now / 320 + p.id) % 2) px(sc, X + 3, Y + 3, '#857e72', 2, 1); // digging at the bank
+    }
+    if (p.cl && age >= 14) { // the wolf-skin cloak: pelt over the shoulders and down the back, the ears of the hood up
+      const fur = CLOAK_FUR[p.cl.nm] || '#9a9ca2';
+      px(sc, X, Y + 1, fur, 3, 1); px(sc, X - 1, Y + 1, fur, 1, 2); px(sc, X, Y - 1, fur); px(sc, X + 2, Y - 1, fur);
     }
     if (p.hurt && age >= 14) px(sc, X + 1, Y + 1, '#c8433a'); // a bloodied bandage
     if (p.task && p.task.k === 'search') { // a pitch torch held high, flickering
