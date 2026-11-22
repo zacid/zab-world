@@ -540,3 +540,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Harvest and births grow with the population, so late years always look best. Per-head rows (harvest / pop) would make a small
     good year stand out.
   - A tale on the longest night could name the best year ("the year of the eleven births") the way the hard year could be named.
+- Fog signs are done (SIM_VERSION 53; w.lore.fl/fnm/fg/fn/fh/fm/ff/fk/fc; fogRead/fogKept (exported)/learnFog in sim.js, FOG_* constants;
+  w.wx.gl counts goats taken in this fog spell; `scripts/_fogprobe.mjs [years] [seed|live]`). Calls ~70% of fogs; on a kept day the goats
+  stay penned and strays are mostly stopped. Penned goats get no extra food and give milk as usual. Answers it invites:
+  - Kept-in goats could eat hay or spare grain (a cost), and a long fog spell could leave them hungry and bleating.
+  - Woodcutters and foragers still go out to the treeline in fog; on a called day they could work in pairs or stay by the fields.
+  - The beach watch could be doubled on a called fog night in a lean raid year (raiders favour fog).
+  - The reader's skill (FOG_HIT, LORE_HIT) could grow with years of right calls, with a byname ("Weather-eye").
+  - Heat and frost are still uncalled; the same evening fire could call them next.

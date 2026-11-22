@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 52;
+export const SIM_VERSION = 53;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -78,6 +78,7 @@ export const TECHS = {
   squall:   { name: 'Squalls', added: '2026-11-22T02:14Z', desc: 'Out past the surf the weather turns faster than anyone on the beach can see. On a hot afternoon, or in autumn, or the day before a storm, a black squall can come down on the deep water in minutes: wind, slanting rain and a short steep sea. The one in the dugout turns for home and fights the paddle; the village runs down to the landing to watch. Some come in through the surf with the catch thrown over the side, some are rolled over and swim for it, and the sea keeps a few. Nobody has an answer for it yet.', req: ['canoe'] },
   crows:    { name: 'Rooks', added: '2026-11-22T03:27Z', desc: 'A flock of rooks from the woods that comes down by day on new-sown fields to dig out the seed, and on the ripe grain to strip the ears. A field picked bare of its seed has to be sown again. The flock grows a little every year with the fields.', req: ['farming'] },
   scaring:  { name: 'Bird-scaring', added: '2026-11-22T03:27Z', desc: 'Two flat boards tied loosely with a thong, swung so they clap like a breaking branch. When the rooks come down on the grain the children run out with clappers and stones and shout until the flock lifts and goes back to the trees for a while. A flock driven off often enough in a year loses some of its birds to other woods.', req: ['crows'] },
+  foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -128,6 +129,15 @@ const LORE_FALSE = 0.025;    // chance, on an evening before rain or fog, of cal
 const LORE_LATE = 23;        // on a warned night the work goes on until this hour
 const LORE_HOLD = 0.85;      // chance a stone-weighted roof holds through a gust that would have torn it
 const LORE_REAP = 2;         // hours to cut a ripe field by firelight, all hands
+// fog signs: once the fog has cost the village (a wolf out of it, someone lost in it), a long fog that ends teaches the
+// reader its signs. w.lore gains fl (tick learned), fnm (who), fg (day fog is called for), fn calls, fh right, fm missed,
+// ff false, fk days the goats were kept in, fc strays kept by the houses.
+const FOG_LEARN = 2;         // days a fog must last before its signs are put together
+const FOG_HIT = 0.7;         // chance a coming fog is read right (fog gives fewer signs than a storm)
+const FOG_FALSE = 0.004;    // chance, on an evening before a clear day, of calling a fog that never comes
+const FOG_HEED = 0.85;       // chance, while the fog is kept, that a child or old one who would stray stays by the houses
+const FOG_FRESH = () => ({ fl: null, fnm: null, fg: -1, fn: 0, fh: 0, fm: 0, ff: 0, fk: 0, fc: 0 });
+const FOG_SIGNS = ['the wind has died away and the sea lies flat and oily', 'the far isle stands up sharp and close, every tree on it plain', 'the dew is down on the grass before dark', 'the sea is warm and the air above it cold and still', 'the hearth smoke hangs in a flat sheet over the roofs'];
 const LORE_SIGNS = ['the sky in the west is red as an ember and mares\' tails stand high up', 'a long swell rolls in under a sea as flat as a plate', 'the gulls are coming in off the sea in a hurry', 'the hearth smoke beats down and creeps along the ground', 'a ring stands round the sun as it goes down'];
 
 // ---------- creatures ----------
@@ -908,6 +918,7 @@ function weather(w, c) {
     endSpell(w, s);
     if (s.k === 'storm') whaleStorm(w, c, s.n);
     if (s.fk || s.fs) frostTold(w, s);
+    if (s.k === 'fog' && w.lore && w.lore.fl == null && s.n >= FOG_LEARN && w.goats && ((w.fauna && w.fauna.fa) || (w.lost && w.lost.n) || s.gl)) learnFog(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
     if ((s.k === 'rain' || s.k === 'storm') && s.n >= BOW_RAIN && (next === 'clear' || next === 'heat') && c.season < 3) bowComes(w, c, s);
     if (next === 'storm' && w.lore) { /* told in loreMorning */ }
@@ -929,7 +940,7 @@ const stormDays = (w) => (w.hist.yearly || []).reduce((n, r) => n + (r.storms ||
 function learnLore(w) {
   const who = elder(w);
   if (!who || ageY(w, who) < LORE_AGE || stormDays(w) < LORE_STORMS) return;
-  w.lore = { nm: who.name, at: w.t, n: 0, h: 0, m: 0, f: 0, s: 0, y: 0, g: 0, on: -1, rd: who.name };
+  w.lore = { nm: who.name, at: w.t, n: 0, h: 0, m: 0, f: 0, s: 0, y: 0, g: 0, on: -1, rd: who.name, ...FOG_FRESH() };
   if (!w.techs.includes('lore')) w.techs.push('lore');
   milestone(w, `The wind drops and ${who.name} climbs up to look at the torn thatch. ${who.name} has sat out ${stormDays(w)} days of storm on ${w.name}, and says every one of them was told the evening before, for anyone who could read it: ` +
     `a red sky in the west, mares' tails high up, the gulls coming in off the sea, the hearth smoke beating down. From now on, at the evening fire, the eldest will look out over the sea and say what the morning will bring. ${w.name} learns to read the sky.`);
@@ -943,13 +954,46 @@ function loreRead(w, c) {
   let call = false;
   if (nx === 'storm') { if (rnd(w) < LORE_HIT) call = true; else L.m++; }
   else if ((nx === 'rain' || nx === 'fog') && rnd(w) < LORE_FALSE) call = true;
-  if (!call) return;
+  if (!call) { if (L.fl != null && w.wx.k !== 'fog') fogRead(w, c, L, who, nx); return; }
   L.on = c.day + 1; L.n++; L.rd = who.name;
   log(w, `At the evening fire ${who.name} looks out to sea: ${LORE_SIGNS[c.day % LORE_SIGNS.length]}. "A storm by morning." The ripe grain is cut by firelight and stones are hung on the thatch.`, 'info');
+}
+// the same evening fire: no storm, but is a fog coming in off the sea?
+function fogRead(w, c, L, who, nx) {
+  let call = false;
+  if (nx === 'fog') { if (rnd(w) < FOG_HIT) call = true; else L.fm++; }
+  else if (nx === 'clear' && rnd(w) < FOG_FALSE) call = true;
+  if (!call) return;
+  L.fg = c.day + 1; L.fn++; L.rd = who.name;
+  log(w, `At the evening fire ${who.name} looks out to sea: ${FOG_SIGNS[c.day % FOG_SIGNS.length]}. "Fog by morning." ${w.goats ? 'The goats will stay in the pen tomorrow, and the' : 'The'} little ones by the houses.`, 'info');
+}
+// the goats stay in and the little ones by the houses: on a fog day that was called, or once it has lain a day already
+export function fogKept(w) {
+  const L = w.lore;
+  return !!(L && L.fl != null && w.wx && w.wx.k === 'fog' && (w.wx.n >= 2 || L.fg === clock(w.t).day));
+}
+function learnFog(w, s) {
+  const who = elder(w);
+  if (!who) return;
+  const L = w.lore, lostN = (w.lost && w.lost.n) || 0, bit = (w.fauna && w.fauna.fa) || 0;
+  L.fl = w.t; L.fnm = who.name;
+  if (!w.techs.includes('foglore')) w.techs.push('foglore');
+  const fogDead = (w.graves || []).filter((g) => /fog/.test(g.why)).map((g) => g.n);
+  const cost = [bit && (bit === 1 ? 'a wolf has come out of it' : `wolves have come out of it ${bit} times`), lostN && (lostN === 1 ? 'one of the village has been lost in it' : `${lostN} have been lost in it`), fogDead.length && `${fogDead.slice(0, 3).join(' and ')} did not come home from it`].filter(Boolean);
+  const len = spellLen(s.n);
+  milestone(w, `${len} of fog ${len.startsWith('A ') ? 'lifts' : 'lift'}, and ${who.name} sits on by the evening fire long after the others have gone in. ${cost.length ? `On ${w.name} ${cost.length > 1 ? cost.slice(0, -1).join(', ') + ' and ' + cost[cost.length - 1] : cost[0]}. ` : ''}` +
+    `Thinking back over every grey morning, ${pron(who)} finds the sign was always there the night before: the wind dropping away, the sea lying flat and oily, the far isle standing up sharp and close, the dew down early on the grass. ` +
+    `From now on, when the eldest says "fog by morning", the goats stay in the pen and the small ones by the houses. ${w.name} learns the fog signs.`);
 }
 // first thing in the morning: was the reading right? The stones come off once the wind has gone
 function loreMorning(w, c, was, next) {
   const L = w.lore;
+  if (L.fl != null && L.fg === c.day) {
+    if (next === 'fog') {
+      L.fh++;
+      if (L.fh === 1) milestone(w, `Grey fog lies over ${w.name} at first light, just as ${L.rd} said it would. The pen gate stays shut and the children are kept in. Out in the white a wolf howls, and finds nothing to take.`);
+    } else { L.ff++; log(w, `${L.rd} called a fog, but the morning comes in ${next === 'clear' ? 'bright and clear' : next === 'rain' ? 'wet' : 'grey but open'}. The goats are let out late.`, 'info'); }
+  }
   if (L.on === c.day) {
     L.on = -1;
     if (next === 'storm') {
@@ -3720,6 +3764,7 @@ function takeGoat(w, b, g) {
   }
   G.herd = G.herd.filter((o) => o !== g);
   G.lost++; G.yl++;
+  if (w.wx && w.wx.k === 'fog') w.wx.gl = (w.wx.gl || 0) + 1;
   b.rest = w.t + 48;
   const L = b.k === 'lone' && w.lone.cur;
   if (L) {
@@ -3812,7 +3857,9 @@ function penRaid(w, b) {
 function goatHour(w, c) {
   const G = w.goats, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
   const fest = w.fest && w.fest.on === c.day && h >= FEST_FROM;
-  const out = G.herd.length > 0 && h >= GOAT_OUT && h < GOAT_HOME && wx !== 'storm' && wx !== 'snow' && !(c.season === 3 && wx === 'cold') && !fest;
+  const kept = wx === 'fog' && fogKept(w);
+  if (kept && h === GOAT_OUT && G.herd.length) w.lore.fk++;
+  const out = G.herd.length > 0 && h >= GOAT_OUT && h < GOAT_HOME && wx !== 'storm' && wx !== 'snow' && !(c.season === 3 && wx === 'cold') && !fest && !kept;
   const herder = G.hid != null ? aliveId(w, G.hid) : null;
   const minded = !!(herder && !herder.sick && !herder.hurt && (h === GOAT_OUT || (herder.task && herder.task.k === 'herd')));
   const m = penMid(G);
@@ -4052,7 +4099,13 @@ function strays(w) {
 }
 function lostHour(w, c) {
   const S = w.lost, L = S.cur, h = c.hour, fog = !!(w.wx && w.wx.k === 'fog');
-  if (!L) { if (fog && h >= 9 && h <= 15 && rnd(w) < LOST_ODDS) strays(w); return; }
+  if (!L) {
+    if (fog && h >= 9 && h <= 15 && rnd(w) < LOST_ODDS) {
+      if (fogKept(w) && rnd(w) < FOG_HEED) w.lore.fc++; // kept by the houses, as the eldest said
+      else strays(w);
+    }
+    return;
+  }
   const p = aliveId(w, L.id);
   if (!p) { S.cur = null; for (const o of w.people) if (o.task && o.task.k === 'search') release(w, o); return; } // the wolves found them first; the chronicle has it
   const first = S.n === 1, hn = w.t - L.t, hrs = plural(hn, 'hour', 'hours');
@@ -6081,6 +6134,10 @@ const MIGRATIONS = {
   51: (w) => {
     if (w.crow === undefined) w.crow = null;
   },
+  // v52 -> v53: fog signs. Not learned yet; a sky reader who has seen the fog cost the village learns them when a long fog lifts.
+  52: (w) => {
+    if (w.lore) for (const [k, v] of Object.entries(FOG_FRESH())) if (w.lore[k] === undefined) w.lore[k] = v;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6172,6 +6229,9 @@ export function summary(w) {
     lore: !!w.lore, skyReader: w.lore ? w.lore.rd : null, stormCalled: !!(w.lore && w.lore.on === c.day + 1 && c.hour >= LORE_READ),
     loreCalls: w.lore ? w.lore.n : 0, loreRight: w.lore ? w.lore.h : 0, loreMissed: w.lore ? w.lore.m : 0, loreFalse: w.lore ? w.lore.f : 0,
     loreHeld: w.lore ? w.lore.s : 0, loreHeldYear: w.lore ? w.lore.y : 0, loreReaped: w.lore ? w.lore.g : 0,
+    fogLore: !!(w.lore && w.lore.fl != null), fogCalled: !!(w.lore && w.lore.fl != null && w.lore.fg === c.day + 1 && c.hour >= LORE_READ), fogKept: fogKept(w),
+    fogCalls: w.lore ? w.lore.fn || 0 : 0, fogRight: w.lore ? w.lore.fh || 0 : 0, fogMissed: w.lore ? w.lore.fm || 0 : 0, fogFalse: w.lore ? w.lore.ff || 0 : 0,
+    fogPenned: w.lore ? w.lore.fk || 0 : 0, fogStayed: w.lore ? w.lore.fc || 0 : 0,
     roofsTied: w.buildings.filter((b) => b.tie).length, roping: w.people.filter((p) => p.task && (p.task.k === 'tie' || p.task.eve)).length,
     muck: !!w.muck, muckHeap: w.muck ? Math.floor(w.muck.h / MUCK_FIELD) : 0, mucked: w.fields.filter((f) => f.mk).length,
     muckYear: w.muck ? w.muck.y : 0, muckEver: w.muck ? w.muck.n : 0, muckGrain: w.muck ? w.muck.g : 0, muckGrainYear: w.muck ? w.muck.yg : 0,
