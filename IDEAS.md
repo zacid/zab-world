@@ -515,3 +515,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Old paddlers (57+) still go out; a rule that the young take the boat would cut drownings and give the elders a reason to teach.
 - Timing note: check.mjs on seed 20261114 now runs ~2.7 s/yr at ~350-430 people on this machine (HEAD ~11 ms per person-year, now ~8.4);
   the 1.5 s at 300 guide is not met at the top end, so another speed pass would help before the live world gets that big.
+- Cheese is done (SIM_VERSION 51; w.cheese {r, p, c, n, y, e, ye, d, f, nm, mk, at, told}; rackSite/learnCheese/cheeseMilk/cheeseDay/
+  cheeseTask/cheeseDone/cheeseFed in sim.js, CHEESE_* constants; drawRack/rackAt in render.js; `scripts/_cheeseprobe.mjs [years] [seed|live]`).
+  The rack (60) sits full most of the year on Hais; only a long cold spell at 40+ people empties it. Answers it invites:
+  - Rats get at the rack (the potter's jars could hold cheese too, or a cat comes ashore); a bad rat year leaves the frail without.
+  - A second rack, or a cool cheese cave dug into the clay bank, once the village outgrows one rack.
+  - Cheese as a gift: the far isle's raiders go for the rack, or a round sent home with hungry guests eases the feud.
+  - Cheese in the paddler's and hunter's bag on long days (fewer turning back hungry), or a "Cheesemaker" byname after 200 rounds.
+  - Whey fed to the dogs or the pigs; a kid's stomach (rennet) only comes from autumn kills, so a year with no kids killed means no cheese.

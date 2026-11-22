@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 50;
+export const SIM_VERSION = 51;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -71,6 +71,7 @@ export const TECHS = {
   lone:     { name: 'The lone wolf', added: '2026-11-21T16:37Z', desc: 'Years of spears have kept the pack at the den down to two, and a young wolf driven out of it has no pack to run with. It stays near the village, lies up in a thicket by the fields and walks the treeline by day, when the pack sleeps. It takes goats that stray and springs on anyone working alone. While it lives every hunt goes after it, and the pack at the den is left to grow. If nobody kills it, in a few years it moves on.', req: ['hunting'] },
   lore:     { name: 'Sky lore', added: '2026-11-21T20:43Z', desc: 'The eldest has sat out a lifetime of storms and at dusk reads the sky over the sea: a red sky in the west with mares\' tails high up, a long swell under a flat sea, gulls coming in off the water, hearth smoke that beats down instead of rising. When the signs say a storm by morning the village works on into the dark: the ripe grain is cut by firelight, and ropes weighted with stones are thrown over every roof so the wind cannot lift the thatch. The signs are not always right, and some storms come without any.', req: ['fire', 'shelter'] },
   muck:     { name: 'Muck', added: '2026-11-21T21:34Z', desc: 'Dung forked out of the goat pen goes on a heap beside it, with the hearth ash and the kitchen scraps, and steams there through the winter. After the harvest it is carried out in baskets and forked over the bare fields, nearest the pen first. A mucked field stands thicker and heavier at its next harvest, by about a third, so the village needs fewer fields and fells less of the wood. The more goats, the bigger the heap.', req: ['goats', 'farming'] },
+  cheese:   { name: 'Cheese', added: '2026-11-22T02:52Z', desc: 'Half the summer milk goes into the pails instead of the cups. It is curdled, pressed in a wicker basket under a stone and set out on a rack of hazel rods by the goat pen, where the rounds dry and harden and keep for months. On the bitter days of winter, and whenever the woodpile is bare, rounds come down off the rack and are shared out by the fire among the small children and the old, and the cold reaches them less than half as hard.', req: ['goats'] },
   footrot:  { name: 'Foot rot', added: '2026-11-21T22:51Z', desc: 'After days of rain the goat pen turns to a wallow of mud and dung, and the hooves go soft in it. A goat starts holding up a foot and hobbling on three; the hoof is grey and stinking between the claws. Lame goats lie in the straw and will not go out to graze, give no milk and kid no more, and a few never stand up again. It passes from hoof to hoof through the mud, fastest when the pen is wet and crowded, and goes when the ground dries. Nobody yet knows what to do for it.', req: ['goats'] },
   paring:   { name: 'Hoof paring', added: '2026-11-21T23:32Z', desc: 'A little hurdle fold against the goat pen, with a dry straw floor. A day after a goat starts to limp it is caught, the soft grey horn is pared back with a flint to clean hoof, the foot is washed in sea water or the healer\'s willow-bark brew, and the goat is put in the fold until it walks sound. Out of the mud it passes the rot to nobody and mends in days instead of weeks; caught early, an outbreak stops at a goat or two.', req: ['footrot'] },
   cloak:    { name: 'Wolf-skin cloak', added: '2026-11-22T00:06Z', desc: 'The pelt of a lone wolf, bigger and paler than any from the den, scraped, rubbed with ash and brains and worn over the shoulders by the one whose spear killed it. No wolf will single out someone who walks in a wolf\'s skin. When the wearer dies the cloak goes to the eldest child, or to the widow or widower; with nobody to take it, it is laid in the grave.', req: ['lone'] },
@@ -195,6 +196,19 @@ export const MUCK_FIELD = 100; // heap it takes to muck one field
 export const MUCK_CAP = 40;        // the heap holds at most this many fields' worth
 const MUCK_GAIN = 0.3;       // extra yield at the next harvest
 const MUCK_WORK = 3;         // hours to fork a field over
+
+// ---------- cheese ----------
+// Summer milk curdled, pressed under a stone and dried on a rack by the pen. The rounds keep, and come
+// down off the rack on the bitter days of winter for the small children and the old.
+const CHEESE_YEARS = 3;      // years of goats before someone sees the milk turn in the sun
+const CHEESE_FIND = 0.05;    // daily chance on a warm summer day, once 4+ goats are in milk
+const CHEESE_SHARE = 0.5;    // share of each day's milk set aside for the press
+const CHEESE_PAIL = 24;      // milk the pails hold; whatever does not fit is drunk
+export const CHEESE_MILK = 8; // milk for one round
+const CHEESE_WORK = 3;       // hours to curd, press and set out a round
+export const CHEESE_RACK = 60; // rounds the rack holds
+const CHEESE_FRAIL = 6;      // a round a day feeds this many of the small and the old
+const CHEESE_GUARD = 0.4;    // on a day they have cheese, the cold reaches the frail this much as hard
 
 // ---------- midsummer ----------
 const FEST_DAY = 135;        // day of the year (summer day 46); rain puts it off a few days, a storm until it passes
@@ -510,7 +524,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -732,7 +746,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -758,6 +772,7 @@ function daily(w, c, fx) {
     if (w.lore) w.lore.y = 0;
     if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
     if (w.pare) w.pare.y = 0;
+    if (w.cheese) { w.cheese.y = 0; w.cheese.ye = 0; }
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -3283,8 +3298,8 @@ function goatDay(w, c) {
   let grown = 0;
   for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR && g.lm == null) grown++; // a lame goat gives no milk and does not kid
   if (c.season < 2 && grown) {
-    const milk = Math.round(grown * GOAT_MILK * 10) / 10;
-    w.food = Math.round((w.food + milk) * 100) / 100; G.ym = Math.round((G.ym + milk) * 10) / 10; G.milk = Math.round((G.milk + milk) * 10) / 10;
+    const milk = Math.round(grown * GOAT_MILK * 10) / 10, kept = w.cheese ? cheeseMilk(w, milk) : 0;
+    w.food = Math.round((w.food + milk - kept) * 100) / 100; G.ym = Math.round((G.ym + milk) * 10) / 10; G.milk = Math.round((G.milk + milk) * 10) / 10;
   }
   if (c.season === 3 && n) { // winter: grain from the stores, if there is grain to spare
     const need = n * GOAT_FODDER;
@@ -3317,7 +3332,85 @@ function goatDay(w, c) {
       log(w, `${plural(kill.length, 'goat is', 'goats are')} killed before winter. Meat for the smoke, ${kill.length === 1 ? 'a hide' : 'hides'} for the doorways.`, 'info');
     }
   }
+  cheeseDay(w, c, grown);
   rotDay(w, c);
+}
+// ---------- cheese ----------
+// w.cheese { r rack tile or null, p milk in the pails, c rounds on the rack, n made ever, y this year, e eaten ever,
+// ye this year, d bitter days it was eaten, f last day it was eaten, nm who saw it, mk who pressed the first, at tick, told }.
+// The rack stands against the pen wall nearest the village (not the gate, muck heap or fold side);
+// with no room it goes in a corner of the pen.
+function rackSite(w) {
+  const G = w.goats, m = penMid(G);
+  const dx = m.x - (w.fire.x + 0.5), dy = m.y - (w.fire.y + 0.5);
+  const gate = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'w' : 'e') : dy > 0 ? 'n' : 's';
+  const heap = Math.abs(dx) <= Math.abs(dy) ? 'e' : 's';
+  const cand = [];
+  for (let k = 0; k < PEN_W; k++) { cand.push(['n', G.pen.x + k, G.pen.y - 1]); cand.push(['s', G.pen.x + k, G.pen.y + PEN_H]); }
+  for (let k = 0; k < PEN_H; k++) { cand.push(['w', G.pen.x - 1, G.pen.y + k]); cand.push(['e', G.pen.x + PEN_W, G.pen.y + k]); }
+  let best = null, bd = 1e9;
+  for (const [s, x, y] of cand) {
+    if (s === gate || s === heap || !inMap(x, y)) continue;
+    const t = tile(w, x, y), i = idx(x, y);
+    if ((t !== T.GRASS && t !== T.FOREST) || isStool(w, i)) continue;
+    const dd = d2(x + 0.5, y + 0.5, w.fire.x + 0.5, w.fire.y + 0.5);
+    if (dd < bd) { bd = dd; best = { x, y }; }
+  }
+  return best;
+}
+function learnCheese(w, c, grown) {
+  const G = w.goats, wx = w.wx ? w.wx.k : 'clear';
+  if (c.season !== 1 || (wx !== 'clear' && wx !== 'heat') || grown < 4 || !w.learned || w.learned.goats == null ||
+    w.t - w.learned.goats < CHEESE_YEARS * TICKS_PER_YEAR || rnd(w) >= CHEESE_FIND) return;
+  const h = aliveId(w, G.hid), old = elder(w), who = h || old;
+  if (!who) return;
+  const mk = ageY(w, who) >= 14 ? who : old;
+  const r = rackSite(w);
+  if (r) { const i = idx(r.x, r.y); w.timber += w.wood[i]; w.wood[i] = 0; setTile(w, i, T.BUILD); }
+  w.cheese = { r, p: 0, c: 0, n: 0, y: 0, e: 0, ye: 0, d: 0, f: -1, nm: who.name, mk: mk ? mk.name : who.name, at: w.t, told: 0 };
+  w.techs.push('cheese');
+  const M = mk && mk !== who ? mk.name : Cap(pron(who));
+  milestone(w, `${who.name} takes the morning milk out to the grazing in a bag sewn from the stomach of a kid killed last autumn, and leaves it hanging on a thorn in the sun. By noon it has gone to soft white curd in thin green whey. ` +
+    `${M} tastes it and does not spit it out. The curd is tipped into a wicker basket with a flat stone on top, the whey runs out through the weave, and in a few days there is a firm pale round with a rind on it. A rack of hazel rods goes up ${r ? 'against the pen wall' : 'in a corner of the pen'}, out of the rain, to dry the rounds. Half the summer milk goes to the press now, to be eaten when the frost comes. ${w.name} learns to make cheese.`);
+}
+// half of each day's milk goes into the pails, as far as they hold; returns what was kept back
+function cheeseMilk(w, milk) {
+  const C = w.cheese, k = Math.max(0, Math.min(CHEESE_PAIL - C.p, Math.round(milk * CHEESE_SHARE * 10) / 10));
+  C.p = Math.round((C.p + k) * 10) / 10;
+  return k;
+}
+const dayNo = (w) => Math.floor(w.t / TICKS_PER_DAY);
+function cheeseFed(w) { return !!(w.cheese && w.cheese.f === dayNo(w)); }
+// on a bitter winter day, or with the woodpile bare, rounds come down off the rack for the small children and the old
+function cheeseDay(w, c, grown) {
+  if (!w.cheese) { learnCheese(w, c, grown); return; }
+  const C = w.cheese, wx = w.wx ? w.wx.k : 'clear';
+  if (!(w.stats.cold || (wx === 'cold' && c.season === 3)) || C.c <= 0) return;
+  let frail = 0;
+  for (const p of w.people) { const a = ageY(w, p); if (!p.dead && (a < 6 || a > 55)) frail++; }
+  if (!frail) return;
+  const eat = Math.min(C.c, Math.ceil(frail / CHEESE_FRAIL));
+  C.c -= eat; C.e += eat; C.ye += eat; C.d++; C.f = dayNo(w);
+  if (!C.told) {
+    C.told = 1;
+    milestone(w, `The frost bites hard and the smoke hangs low over the roofs. ${plural(eat, 'round comes', 'rounds come')} down off the rack by the goat pen and ${eat === 1 ? 'is' : 'are'} cut into wedges by the fire, one for each of the little ones and the old. The summer milk has kept, and it keeps them going. ${plural(C.c, 'round is', 'rounds are')} left on the rack.`);
+  } else if (!C.c) log(w, 'The last round of cheese comes down off the rack by the goat pen.', 'info');
+}
+function cheeseTask(w) {
+  const C = w.cheese;
+  if (!C || !w.goats || C.p < CHEESE_MILK || C.c >= CHEESE_RACK || w.res.zc != null) return null;
+  C.p = Math.round((C.p - CHEESE_MILK) * 10) / 10; // the pail is poured into the pot; spilt if the work is broken off
+  const at = C.r || w.goats.pen;
+  return { k: 'cheese', key: 'zc', x: at.x, y: at.y, h: CHEESE_WORK };
+}
+function cheeseDone(w, p, pop) {
+  const C = w.cheese;
+  if (!C || C.c >= CHEESE_RACK) return;
+  C.c++; C.n++; C.y++;
+  pop('cheese', 'muted');
+  if (C.n === 1) log(w, `${p.name} turns the first round of cheese out of the basket and sets it on the rack to dry.`, 'good');
+  else if (C.c === CHEESE_RACK) log(w, `The cheese rack by the goat pen is full: ${CHEESE_RACK} rounds drying on the rods. The rest of the milk is drunk.`, 'good');
+  else if (C.n === 100 || C.n === 500 || C.n === 2000) log(w, `${C.n} rounds of cheese have been pressed by the goat pen.`, 'good');
 }
 // ---------- foot rot ----------
 // A long wet spell turns a full pen into a wallow of mud and dung, and the hooves go soft in it. One goat
@@ -4095,6 +4188,7 @@ function lifeAndDeath(w, c) {
   const pop = w.people.length;
   const wx = w.wx ? w.wx.k : 'clear';
   const bitter = wx === 'cold' && c.season === 3; // a deep frost reaches the frail even by the fire
+  const fed = cheeseFed(w) ? CHEESE_GUARD : 1; // a wedge of cheese by the fire on the bitter days
   for (const p of w.people) {
     if (p.dead) continue;
     const a = ageY(w, p);
@@ -4102,8 +4196,8 @@ function lifeAndDeath(w, c) {
     let risk = 0.00003;
     if (a > 45) { const k = (a - 45) / 30; risk += k * k * k * 0.012; }
     if (a < 2) risk += 0.0002;
-    if (w.stats.cold && frail) risk += 0.006;
-    if (bitter && frail) risk += 0.0008;
+    if (w.stats.cold && frail) risk += 0.006 * fed;
+    if (bitter && frail) risk += 0.0008 * fed;
     if (wx === 'heat' && a > 65) risk += 0.0006;
     if (p.hunger > 12) risk += 0.0015 * (p.hunger - 12) * (a < 6 || a > 60 ? 2 : 1);
     if (rnd(w) < risk) {
@@ -4346,6 +4440,9 @@ function pickTask(w, p, c) {
   // hawthorn slips along the fields by the woods, in autumn and winter
   const qk = hedgeTask(w, p, c);
   if (qk) return qk;
+  // the summer milk in the pails: curdled, pressed and set out on the rack
+  const zk = cheeseTask(w);
+  if (zk) return zk;
   // muck from the heap by the pen, forked over the bare fields after the harvest
   const mk = muckTask(w, p);
   if (mk) return mk;
@@ -5010,6 +5107,8 @@ function finish(w, p, t, c, fx) {
     pareDone(w, p, t, pop);
   } else if (t.k === 'muck') {
     muckDone(w, p, t, pop);
+  } else if (t.k === 'cheese') {
+    cheeseDone(w, p, pop);
   } else if (t.k === 'hedge') {
     const f = w.fields.find((o) => 'q' + o.id === t.key);
     if (!f || f.hg != null || !w.hedge) return;
@@ -5836,6 +5935,10 @@ const MIGRATIONS = {
   49: (w) => {
     if (w.squall === undefined) w.squall = null;
   },
+  // v50 -> v51: cheese (w.cheese). Not learned yet; a warm summer day, once goats have been kept three years, turns the milk.
+  50: (w) => {
+    if (w.cheese === undefined) w.cheese = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5935,6 +6038,9 @@ export function summary(w) {
     paring: !!w.pare, pared: w.pare ? w.pare.n : 0, paredYear: w.pare ? w.pare.y : 0, rotHeld: w.pare ? w.pare.s : 0,
     folded: w.goats ? w.goats.herd.filter((g) => g.lm != null && g.pf != null).length : 0,
     paringNow: w.pare ? w.people.filter((p) => p.task && p.task.k === 'pare').length : 0,
+    cheese: !!w.cheese, cheeseRack: w.cheese ? w.cheese.c : 0, cheesePail: w.cheese ? Math.floor(w.cheese.p) : 0, cheeseMade: w.cheese ? w.cheese.n : 0,
+    cheeseYear: w.cheese ? w.cheese.y : 0, cheeseEaten: w.cheese ? w.cheese.e : 0, cheeseDays: w.cheese ? w.cheese.d : 0, cheeseFed: cheeseFed(w),
+    cheeseMaking: w.cheese ? w.people.filter((p) => p.task && p.task.k === 'cheese').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
