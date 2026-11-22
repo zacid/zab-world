@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 47;
+export const SIM_VERSION = 48;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -72,6 +72,7 @@ export const TECHS = {
   lore:     { name: 'Sky lore', added: '2026-11-21T20:43Z', desc: 'The eldest has sat out a lifetime of storms and at dusk reads the sky over the sea: a red sky in the west with mares\' tails high up, a long swell under a flat sea, gulls coming in off the water, hearth smoke that beats down instead of rising. When the signs say a storm by morning the village works on into the dark: the ripe grain is cut by firelight, and ropes weighted with stones are thrown over every roof so the wind cannot lift the thatch. The signs are not always right, and some storms come without any.', req: ['fire', 'shelter'] },
   muck:     { name: 'Muck', added: '2026-11-21T21:34Z', desc: 'Dung forked out of the goat pen goes on a heap beside it, with the hearth ash and the kitchen scraps, and steams there through the winter. After the harvest it is carried out in baskets and forked over the bare fields, nearest the pen first. A mucked field stands thicker and heavier at its next harvest, by about a third, so the village needs fewer fields and fells less of the wood. The more goats, the bigger the heap.', req: ['goats', 'farming'] },
   footrot:  { name: 'Foot rot', added: '2026-11-21T22:51Z', desc: 'After days of rain the goat pen turns to a wallow of mud and dung, and the hooves go soft in it. A goat starts holding up a foot and hobbling on three; the hoof is grey and stinking between the claws. Lame goats lie in the straw and will not go out to graze, give no milk and kid no more, and a few never stand up again. It passes from hoof to hoof through the mud, fastest when the pen is wet and crowded, and goes when the ground dries. Nobody yet knows what to do for it.', req: ['goats'] },
+  paring:   { name: 'Hoof paring', added: '2026-11-21T23:32Z', desc: 'A little hurdle fold against the goat pen, with a dry straw floor. A day after a goat starts to limp it is caught, the soft grey horn is pared back with a flint to clean hoof, the foot is washed in sea water or the healer\'s willow-bark brew, and the goat is put in the fold until it walks sound. Out of the mud it passes the rot to nobody and mends in days instead of weeks; caught early, an outbreak stops at a goat or two.', req: ['footrot'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -507,7 +508,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -704,7 +705,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -729,6 +730,7 @@ function daily(w, c, fx) {
     if (w.bow) w.bow.y = 0;
     if (w.lore) w.lore.y = 0;
     if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
+    if (w.pare) w.pare.y = 0;
     raidYear(w, c);
     if (w.hides) w.hides = Math.floor(w.hides * 0.6); // hides crack and wear out over a year of use
     let rot = 0; // wattle rots at the stakes over a wet year
@@ -3250,7 +3252,7 @@ function rotDay(w, c) {
     return;
   }
   let lame = 0;
-  for (const g of G.herd) if (g.lm != null) lame++;
+  for (const g of G.herd) if (g.lm != null && !folded(g)) lame++; // the folded stand on dry straw and pass it to nobody
   // spread through the mud, hoof to hoof
   if (lame && lame < n) {
     const odds = (wet ? ROT_SPREAD : ROT_SPREAD_DRY) * lame / n * Math.min(1, n / 10); // a small herd has room to keep its feet out of the mud
@@ -3260,9 +3262,10 @@ function rotDay(w, c) {
   const dead = [];
   for (const g of G.herd) {
     if (g.lm == null || g.lm === w.t) continue;
-    const kid = w.t - g.b < TICKS_PER_YEAR;
-    if (rnd(w) < ROT_DIE * (kid ? 2 : 1)) { dead.push(g); continue; }
-    if (w.t - g.lm >= ROT_MIN * TICKS_PER_DAY && rnd(w) < (wet ? ROT_HEAL_WET : ROT_HEAL)) { g.lm = null; g.im = w.t + ROT_IMM * TICKS_PER_DAY; }
+    const kid = w.t - g.b < TICKS_PER_YEAR, fd = folded(g);
+    if (rnd(w) < ROT_DIE * (kid ? 2 : 1) * (fd ? PARE_DIE : 1)) { dead.push(g); continue; }
+    if (fd ? w.t - g.pf >= PARE_MIN * TICKS_PER_DAY && rnd(w) < PARE_HEAL
+      : w.t - g.lm >= ROT_MIN * TICKS_PER_DAY && rnd(w) < (wet ? ROT_HEAL_WET : ROT_HEAL)) { g.lm = null; g.im = w.t + ROT_IMM * TICKS_PER_DAY; }
   }
   if (dead.length) {
     G.herd = G.herd.filter((g) => !dead.includes(g));
@@ -3272,7 +3275,76 @@ function rotDay(w, c) {
       : `${dead.length} lame goats die in the straw. Their hides are kept; the carcasses are dragged off and burnt.`, 'bad');
   }
   if (!G.herd.some((g) => g.lm != null)) rotEnds(w);
+  for (const g of G.herd) if (g.lm == null && g.pf != null) delete g.pf; // walked sound out of the sick fold
 }
+// ---------- hoof paring and the sick fold ----------
+// After foot rot has killed PARE_LEARN goats, the herder (or the healer) sees that the lame ones on dry ground mend
+// and the ones left in the mud pass it on. A hurdle fold with a dry floor is put up against the pen wall, and once a
+// goat has limped for PARE_SEEN, an idle adult catches it, pares the rotten horn back with a flint, washes the hoof
+// (in willow-bark brew if there is a healer) and puts it in the fold. A folded goat passes it to nobody, heals at
+// PARE_HEAL a day wet or dry and dies half as often. g.pf tick folded (cleared when it walks sound).
+// w.pare { n pared ever, y this year, s outbreaks held to 3 or fewer, nm who saw it, at, f fold tile {x, y} | null
+// (a hurdle across a corner inside the pen), wash 1 if the healer's brew is used }.
+const PARE_LEARN = 2;       // goats dead of foot rot before anyone thinks of it
+export const PARE_SEEN = 2 * TICKS_PER_DAY; // a goat limps this long before it is noticed
+const PARE_WORK = 2;        // hours to catch, pare and wash one goat
+const PARE_HEAL = 0.12;     // daily chance a folded goat walks sound (after PARE_MIN days)
+const PARE_MIN = 4;
+const PARE_DIE = 0.5;       // folded goats die this much as often
+const PARE_TIMBER = 2;      // hurdles for the fold
+function foldSite(w) {
+  const G = w.goats, m = penMid(G);
+  const dx = m.x - (w.fire.x + 0.5), dy = m.y - (w.fire.y + 0.5);
+  const gate = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'w' : 'e') : dy > 0 ? 'n' : 's';
+  const heap = Math.abs(dx) <= Math.abs(dy) ? 'e' : 's'; // where render.js stands the muck heap
+  const cand = [];
+  for (let k = 0; k < PEN_W; k++) { cand.push(['n', G.pen.x + k, G.pen.y - 1]); cand.push(['s', G.pen.x + k, G.pen.y + PEN_H]); }
+  for (let k = 0; k < PEN_H; k++) { cand.push(['w', G.pen.x - 1, G.pen.y + k]); cand.push(['e', G.pen.x + PEN_W, G.pen.y + k]); }
+  let best = null, bd = -1;
+  for (const [s, x, y] of cand) {
+    if (s === gate || s === heap || !inMap(x, y)) continue;
+    const t = tile(w, x, y), i = idx(x, y);
+    if ((t !== T.GRASS && t !== T.FOREST) || isStool(w, i)) continue;
+    const dd = d2(x + 0.5, y + 0.5, w.fire.x + 0.5, w.fire.y + 0.5); // the far side, out of the way
+    if (dd > bd) { bd = dd; best = { x, y }; }
+  }
+  return best;
+}
+function learnPare(w) {
+  const G = w.goats, h = aliveId(w, G.hid), healer = w.heal && aliveId(w, w.heal.id);
+  const herder = h && ageY(w, h) >= 14 ? h : null, who = herder || healer || elder(w);
+  const f = foldSite(w);
+  if (f) {
+    const i = idx(f.x, f.y);
+    w.timber += w.wood[i]; w.wood[i] = 0;
+    setTile(w, i, T.BUILD);
+  }
+  w.timber = Math.max(0, w.timber - PARE_TIMBER);
+  w.pare = { n: 0, y: 0, s: 0, nm: who ? who.name : null, at: w.t, f, wash: healer ? 1 : 0 };
+  if (!w.techs.includes('paring')) w.techs.push('paring');
+  const N = who ? who.name : 'The herder';
+  milestone(w, `${N} has buried ${plural(w.rot.d, 'goat', 'goats')} that the foot rot took, and has watched the rest. The lame ones that limped up onto the dry bank mended; the ones left lying in the mud gave it to the others. ` +
+    `${N} weaves hurdles into a little fold ${f ? 'against the pen wall' : 'across a corner of the pen'} and lays it with dry straw. Next time a goat limps it will be caught, the rotten horn pared back to clean hoof with a flint, the foot washed${healer ? ` in ${healer === who ? '' : healer.name + '\'s '}willow-bark brew` : ' in sea water'}, and the goat put in the fold until it walks sound. ${w.name} learns to pare hooves.`);
+}
+function pareTask(w, p) {
+  if (!w.pare || !w.goats || !w.rot || !w.rot.cur) return null;
+  const G = w.goats;
+  let best = null;
+  for (const g of G.herd) if (g.lm != null && g.pf == null && w.t - g.lm >= PARE_SEEN && w.res['v' + g.id] == null && (!best || g.lm < best.lm)) best = g;
+  if (!best) return null;
+  return { k: 'pare', key: 'v' + best.id, x: Math.floor(penMid(G).x), y: G.pen.y + PEN_H, h: PARE_WORK };
+}
+function pareDone(w, p, t, pop) {
+  const G = w.goats, P = w.pare;
+  const g = G && G.herd.find((o) => 'v' + o.id === t.key);
+  if (!g || g.lm == null || g.pf != null || !P) return;
+  g.pf = w.t; P.n++; P.y++;
+  if (w.rot.cur) w.rot.cur.f = (w.rot.cur.f || 0) + 1;
+  pop('pared', 'muted');
+  if (P.n === 1) milestone(w, `${p.name} catches the limping goat by the horns, sits on it in the straw and pares the soft grey horn away with a flint until the hoof shows pink and clean. ` +
+    `The foot is washed${P.wash ? ' in willow-bark brew' : ''}, the goat is lifted over the hurdles into the dry fold, and it stands there on three legs, bleating at the others. The first hoof is pared on ${w.name}.`);
+}
+const folded = (g) => g.pf != null && g.lm != null;
 function rotBegins(w, c, g) {
   const first = !w.rot;
   if (first) w.rot = { n: 0, k: 0, d: 0, y: 0, yd: 0, yr: 0, last: 0, cur: null };
@@ -3290,7 +3362,14 @@ function rotEnds(w) {
   const R = w.rot, C = R.cur;
   R.cur = null;
   const text = `The pen dries out and the last lame goat walks sound again. The foot rot laid ${plural(C.n, 'goat', 'goats')} lame${C.d ? ` and killed ${C.d}` : ', and every one came through'}.`;
-  if (R.n === 1) milestone(w, text); else log(w, text, C.d ? 'bad' : 'info');
+  const P = w.pare;
+  if (P && C.f) {
+    if (C.n <= 3) P.s++;
+    const t2 = `The last goat is let out of the sick fold. The foot rot laid ${plural(C.n, 'goat', 'goats')} lame${C.d ? ` and killed ${C.d}` : ''}; ${plural(C.f, 'hoof was', 'hooves were')} pared.`;
+    if (C.n <= 3 && P.s === 1) milestone(w, `${t2} ${P.nm || 'The herder'} was right: caught early and kept out of the mud, it went no further.`);
+    else log(w, t2, C.d ? 'bad' : 'good');
+  } else if (R.n === 1) milestone(w, text); else log(w, text, C.d ? 'bad' : 'info');
+  if (!P && R.d >= PARE_LEARN && w.goats.herd.length) learnPare(w);
 }
 // someone close enough to shout, wave a stick and bring the herd together
 function goatGuard(w, g) {
@@ -3435,7 +3514,8 @@ function goatHour(w, c) {
     g.px = g.x; g.py = g.y;
     if (!out || g.lm != null) { // back into the pen, each to its corner of the straw; the lame stay bedded down
       g.tx = null;
-      const sx = G.pen.x + 0.35 + (k % 4) * 0.42, sy = G.pen.y + 0.45 + (Math.floor(k / 4) % 4) * 0.4;
+      const F = w.pare && g.pf != null && g.lm != null && (w.pare.f || { x: G.pen.x, y: G.pen.y }), fk = g.id % 4;
+      const sx = F ? F.x + 0.25 + (fk % 2) * 0.45 : G.pen.x + 0.35 + (k % 4) * 0.42, sy = F ? F.y + 0.4 + (fk >> 1) * 0.4 : G.pen.y + 0.45 + (Math.floor(k / 4) % 4) * 0.4;
       if (moveToward(g, sx, sy, g.lm != null ? GOAT_SPEED / 2 : SPEED)) g.out = 0;
       continue;
     }
@@ -4107,6 +4187,9 @@ function pickTask(w, p, c) {
   // rust in the grain: pull the spotted plants before it travels
   const rk = rogueTask(w, p);
   if (rk) return rk;
+  // a limping goat: catch it, pare the hoof and put it in the fold
+  const vk = pareTask(w, p);
+  if (vk) return vk;
   // a whale on the beach: knives out before it turns
   const wk = whaleTask(w, p);
   if (wk) return wk;
@@ -4709,6 +4792,8 @@ function finish(w, p, t, c, fx) {
     if (w.fauna.fences === 1) milestone(w, `${p.name} ties off the last hazel rod. The first fence on ${w.name} stands between the grain and the woods.`);
   } else if (t.k === 'rogue') {
     rogueDone(w, p, t, pop);
+  } else if (t.k === 'pare') {
+    pareDone(w, p, t, pop);
   } else if (t.k === 'muck') {
     muckDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
@@ -5525,6 +5610,10 @@ const MIGRATIONS = {
   46: (w) => {
     if (w.rot === undefined) w.rot = null;
   },
+  // v47 -> v48: hoof paring. Not learned yet; once foot rot has killed 2 goats, the end of that outbreak teaches it (g.pf, w.pare).
+  47: (w) => {
+    if (w.pare === undefined) w.pare = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -5611,6 +5700,9 @@ export function summary(w) {
     muckYear: w.muck ? w.muck.y : 0, muckEver: w.muck ? w.muck.n : 0, muckGrain: w.muck ? w.muck.g : 0, muckGrainYear: w.muck ? w.muck.yg : 0,
     mucking: w.muck ? w.people.filter((p) => p.task && p.task.k === 'muck').length : 0,
     lame: w.goats ? w.goats.herd.filter((g) => g.lm != null).length : 0, rots: w.rot ? w.rot.n : 0, rotLame: w.rot ? w.rot.k : 0, rotDied: w.rot ? w.rot.d : 0,
+    paring: !!w.pare, pared: w.pare ? w.pare.n : 0, paredYear: w.pare ? w.pare.y : 0, rotHeld: w.pare ? w.pare.s : 0,
+    folded: w.goats ? w.goats.herd.filter((g) => g.lm != null && g.pf != null).length : 0,
+    paringNow: w.pare ? w.people.filter((p) => p.task && p.task.k === 'pare').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

@@ -473,3 +473,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Herbs for goats: the healer learns that the same willow-bark wash helps hooves.
   - Thinning: a smaller herd stays sound (the spread is scaled by herd size), so the village might choose to kill more for the pot in autumn.
   - A Hard-years cell for goats (lame + dead of rot + lost to wolves) would show bad herd years.
+- Hoof paring and the sick fold are done (SIM_VERSION 48; w.pare {n, y, s outbreaks held to <= 3, nm, at, f fold tile | null, wash}, g.pf;
+  foldSite/learnPare/pareTask/pareDone in sim.js, PARE_* constants; foldRect/drawFold/foldAt in render.js; `scripts/_pareprobe.mjs [years] [seed|live]`).
+  Learned at the end of an outbreak once foot rot has killed 2 goats. Afterwards outbreaks are 1-4 goats and almost none die, so foot rot is
+  mostly answered. What is left:
+  - The fold is a second weak spot: a wolf at the pen in winter could go for the fold, where the lame goats cannot run.
+  - A child herder cannot pare; a herder grown into the job could get a byname ("Goat-foot") after many hooves pared.
+  - A wet year with two outbreaks at once, or a herd past GOAT_MAX, could fill the fold (cap it at 4 and leave the rest in the mud).
+  - Goat numbers drift down late game on the test seeds (grass near the pen is ploughed or grows over): a second pen or a summer shieling
+    on far grass would keep the herd (and the muck heap) up.
