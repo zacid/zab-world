@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 54;
+export const SIM_VERSION = 55;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -80,6 +80,7 @@ export const TECHS = {
   scaring:  { name: 'Bird-scaring', added: '2026-11-22T03:27Z', desc: 'Two flat boards tied loosely with a thong, swung so they clap like a breaking branch. When the rooks come down on the grain the children run out with clappers and stones and shout until the flock lifts and goes back to the trees for a while. A flock driven off often enough in a year loses some of its birds to other woods.', req: ['crows'] },
   foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
   drought:  { name: 'Dry spring', added: '2026-11-22T04:45Z', desc: 'The spring by the village is fed by the rain. A hot, dry summer draws it down, and the more mouths there are the faster it goes, until one morning there is only cracked mud between the stones. Then the water comes from a deep pool in the woods, a long walk each way with a skin bag, or a jar once there is a potter. On a day with too few carries the small children and the old go thirsty and some sicken, and the goats give less milk. The autumn rains fill the spring again. Nobody has an answer for it yet.', req: ['fire'] },
+  bear:     { name: 'The bear', added: '2026-11-24T20:06Z', desc: 'Some summers, when the bees are heavy with comb, a brown bear wades over the sand bar from the far isle at low tide and lies up in a thicket near the village until the first frosts. On quiet nights it comes out of the trees for the honey logs and the cheese rack: it tears the comb out with its claws, sometimes knocks a log over and splits it, and pulls the rounds off the rods. If a dog barks or someone sleeping nearby wakes, they run out with a burning brand and shout it back into the dark, and now and then it turns and swipes before it goes. A bear nobody kills comes back. Nobody has an answer for it yet.', req: ['bees'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -163,6 +164,26 @@ const LONE_YEARS = 3;        // a lone wolf nobody kills moves on after this lon
 const LONE_HUNT = 0.1;     // chance the hunters corner it at its bed (a pair; alone it is half that)
 const LONE_NAMES = [['One-Ear', 'one ear torn half away'], ['Greyback', 'a back gone grey as ash'], ['Pale-Eye', 'one eye milky and blind'],
   ['Longshank', 'legs as long as a deer\'s'], ['Scar-Muzzle', 'an old white scar across its muzzle']];
+
+// ---------- the bear ----------
+// Once the village keeps honey or cheese, now and then a summer brings a bear over the bar from the far isle.
+const BEAR_YEAR = 5;         // the first summer one can come
+const BEAR_DAY = 150;        // the day of the year it may wade over (late summer, the comb heavy in the logs)
+const BEAR_LEAVE = 282;      // the day it goes back over the bar (the first frosts)
+const BEAR_ODDS = 0.5;       // chance that summer
+const BEAR_GAP = 3;          // years at least between two visits
+const BEAR_BACK = 0.6;       // chance the bear that comes is the one that came before
+const BEAR_NIGHT = 0.12;     // chance per quiet night it comes out of the trees
+const BEAR_SPEED = 2.5;      // tiles per hour
+const BEAR_COMB = 7;         // comb it eats each hour at a log
+const BEAR_SPLIT = 0.18;     // chance per night at the hives that it knocks a log over and splits it (the hive dies)
+const BEAR_CHEESE = 3;       // rounds it pulls off the rack each hour
+const BEAR_WAKE = 0.22;      // chance per hour that someone sleeping near wakes and runs out with a brand
+const BEAR_BARK = 0.65;      // the same with a grown dog near
+const BEAR_NEAR = 100;       // a house this close (squared) is close enough to hear it
+const BEAR_SWIPE = 0.12;     // chance it turns and swipes at whoever drives it off (a wound, never worse)
+const BEAR_NAMES = [['Old Brown', 'a coat the colour of wet bark'], ['Honey-Paw', 'one forepaw pale as a peeled stick'], ['the Grey Sow', 'a grizzled back and a sow\'s heavy belly'],
+  ['Broad-Back', 'shoulders as wide as a doorway'], ['Notch-Ear', 'a notch bitten out of one ear']];
 
 // ---------- hunting ----------
 const HUNT_GAP = 6;          // days between hunts
@@ -555,7 +576,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -778,7 +799,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -794,6 +815,7 @@ function daily(w, c, fx) {
     if (w.lost) w.lost.y = 0;
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
+    if (w.bear) w.bear.yr = 0;
     if (w.wade) w.wade.y = 0;
     if (w.smudge) w.smudge.y = 0;
     w.stats.yfr = 0;
@@ -1621,6 +1643,7 @@ function wilds(w, c) {
   else if (!F.mead || tile(w, F.mead.x, F.mead.y) !== T.GRASS) findMeadow(w);
   deerDay(w, c);
   if (w.lone !== undefined) loneDay(w, c);
+  if (w.bear !== undefined) bearDay(w, c);
   if (c.doy !== 45 && c.doy !== 300) return;
   let forest = 0;
   for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] === T.FOREST) forest++;
@@ -1698,6 +1721,7 @@ function prowl(w, c) {
     if (b.k === 'wolf') wolf(w, b, wolfOut && b.rest <= w.t);
     else if (b.k === 'lone') loneWolf(w, b, !storm && h >= 6 && h < 19 && b.rest <= w.t);
     else if (b.k === 'deer') deer(w, b, deerOut);
+    else if (b.k === 'bear') bear(w, b, c, storm);
     else boar(w, b, boarOut);
   }
   if (h === 6 && !F.hit && F.turned && !F.held) {
@@ -1962,6 +1986,143 @@ function loneHunt(w, p) {
       ? `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${mate ? mate.name + ' brings the body home.' : 'Nobody was there to help.'}`
       : `${L.nm} doubles back on its own trail and comes at ${p.name} from behind. ${p.sex === 'f' ? 'She' : 'He'} comes home bitten.`, 'bad');
   } else if (L.h % 3 === 1) log(w, `${who} ${mate ? 'find' : 'finds'} the bed where ${L.nm} lies up, the bracken still warm, but the wolf is gone.`, 'info');
+}
+
+// ---------- the bear ----------
+// w.bear = { n visits, y year the last one came, r nights it raided, yr this year, hc comb eaten, cc cheese rounds eaten,
+// k logs split, dv nights driven off, m swipes, last { nm, look, y, how } the bear that went last,
+// cur: { id beast, nm, look, at {x, y} bed, t came, r, hc, cc, k, dv, m this visit, back came before } | null }.
+// While it is out for the night the beast carries b.raid ('hive' | 'rack'), b.tx/ty the target tile, b.hv the log,
+// b.eat hours at it, b.hc/b.cc eaten tonight, b.sp log split tonight. A split log is h.tp (stood up again when the bear goes).
+const BEAR_FRESH = () => ({ n: 0, y: 0, r: 0, yr: 0, hc: 0, cc: 0, k: 0, dv: 0, m: 0, last: null, cur: null });
+const bearSweet = (w) => beesAlive(w) > 0 || !!(w.cheese && w.cheese.r && w.cheese.c > 0);
+// what it goes for tonight: the heaviest log, or the cheese rack
+function bearPrey(w) {
+  let hive = null, bc = 12;
+  if (w.bees) for (let i = 0; i < w.bees.h.length; i++) { const h = w.bees.h[i]; if (h.a && h.c > bc) { bc = h.c; hive = { k: 'hive', i, x: h.x, y: h.y }; } }
+  const R = w.cheese, rack = R && R.r && R.c > 0 ? { k: 'rack', i: -1, x: R.r.x, y: R.r.y } : null;
+  if (hive && rack) return rnd(w) < 0.6 ? hive : rack;
+  return hive || rack;
+}
+// once a day: late in summer it may wade over the bar, and with the first frosts it goes back
+function bearDay(w, c) {
+  const B = w.bear;
+  if (B && B.cur) {
+    const C = B.cur, b = w.beasts.find((o) => o.id === C.id);
+    if (!b) { B.cur = null; return; }
+    if (!C.at || tile(w, C.at.x, C.at.y) !== T.FOREST) C.at = loneBed(w) || C.at;
+    if (c.doy === BEAR_LEAVE) bearGoes(w, b, c);
+    return;
+  }
+  if (c.doy !== BEAR_DAY || c.year < BEAR_YEAR || !w.fauna || !bearSweet(w)) return;
+  if (B && B.n && c.year < B.y + BEAR_GAP) return;
+  if (rnd(w) >= BEAR_ODDS) return;
+  const at = loneBed(w);
+  if (!at) return;
+  const who = w.people.filter((p) => !p.dead && ageY(w, p) >= 14);
+  if (!who.length) return;
+  const p = who[ri(w, who.length)];
+  const B0 = B || (w.bear = BEAR_FRESH());
+  let nm, look, back = 0;
+  if (B0.last && B0.last.how === 'gone' && rnd(w) < BEAR_BACK) { nm = B0.last.nm; look = B0.last.look; back = 1; }
+  else {
+    let k = ri(w, BEAR_NAMES.length);
+    if (B0.last && BEAR_NAMES[k][0] === B0.last.nm) k = (k + 1) % BEAR_NAMES.length;
+    [nm, look] = BEAR_NAMES[k];
+  }
+  const b = addBeast(w, 'bear');
+  b.x = b.px = at.x + 0.5; b.y = b.py = at.y + 0.5;
+  B0.n++; B0.y = c.year;
+  B0.cur = { id: b.id, nm, look, at, t: w.t, r: 0, hc: 0, cc: 0, k: 0, dv: 0, m: 0, back };
+  const first = !w.techs.includes('bear'), Nm = Cap(nm), sweet = beesAlive(w) ? 'the honey' : 'the cheese';
+  if (first) w.techs.push('bear');
+  if (first) milestone(w, `${p.name} comes up from the beach at first light white in the face. In the wet sand below the tide line there are prints as long as a forearm, five claws pressed deep in front of each, coming in off the bar from the far isle and going straight up into the woods. ` +
+    `At dusk something big breaks through the bracken at the edge of the trees, stands up on its hind legs to sniff the wind, and drops down again: a bear, with ${look}. Nobody alive on ${w.name} has ever seen one. It has smelled ${sweet} from across the water. The islanders call it ${nm}.`);
+  else if (back) milestone(w, `The great clawed prints are in the sand below the tide line again, coming in off the bar. ${Nm} is back for ${sweet}, and the children are kept by the houses after dark.`);
+  else milestone(w, `Clawed prints come in off the bar at low tide again, but this bear is a stranger, with ${look}. It goes up into the woods by the village. The islanders call it ${nm}.`);
+}
+// the first frosts: it goes back over the bar
+function bearGoes(w, b, c) {
+  const B = w.bear, C = B.cur;
+  w.beasts = w.beasts.filter((o) => o !== b);
+  B.last = { nm: C.nm, look: C.look, y: c.year, how: 'gone' };
+  B.cur = null;
+  let split = 0;
+  if (w.bees) for (const h of w.bees.h) if (h.tp != null) { h.tp = undefined; split++; }
+  const took = [C.hc >= 1 && `${Math.round(C.hc)} comb from the logs`, C.cc && `${plural(C.cc, 'round', 'rounds')} of cheese off the rack`].filter(Boolean);
+  const Nm = Cap(C.nm);
+  milestone(w, `The first frost is white on the grass, and the prints of ${C.nm} go down onto the sand at low tide and out along the bar towards the far isle. ` +
+    (C.r ? `${Nm} came into the village on ${plural(C.r, 'night', 'nights')} and took ${took.length ? took.join(' and ') : 'little'}${C.k ? `, and split ${plural(C.k, 'log', 'logs')} open` : ''}; ${C.dv ? `it was driven off with brands ${plural(C.dv, 'time', 'times')}` : 'nobody ever woke to drive it off'}. ` : `${Nm} never once came out of the trees. `) +
+    (split ? `The split ${split === 1 ? 'log is' : 'logs are'} stood up again and bound with withies for a swarm next spring. ` : '') + `It will remember the way.`);
+}
+// every hour: lie up by day; on a quiet night go for the logs or the rack until driven off or the dawn
+function bear(w, b, c, storm) {
+  const C = w.bear && w.bear.cur;
+  if (!C) return;
+  const h = c.hour, home = C.at || { x: Math.floor(b.x), y: Math.floor(b.y) };
+  if (h === 22 && !b.raid && !storm && (b.rest || 0) <= w.t && rnd(w) < BEAR_NIGHT) {
+    const g = bearPrey(w);
+    if (g) {
+      b.raid = g.k; b.tx = g.x; b.ty = g.y; b.hv = g.i; b.eat = 0; b.hc = 0; b.cc = 0; b.sp = 0;
+      if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; }
+    }
+  }
+  if (!b.raid) {
+    if (b.out && moveBeast(b, home.x + 0.5, home.y + 0.5, BEAR_SPEED)) b.out = 0;
+    return;
+  }
+  if (h >= 5 && h < 22) { bearNightEnds(w, b, null, null); return; } // dawn: back to the trees
+  const tx = b.tx + 0.5, ty = b.ty + 1.2; // it stands at the foot of the log or the rack
+  if (!moveBeast(b, tx, ty, BEAR_SPEED)) return;
+  b.eat++;
+  if (b.raid === 'hive') {
+    const hv = w.bees && w.bees.h[b.hv];
+    if (!hv || !hv.a) { bearNightEnds(w, b, null, null); return; }
+    if (b.eat === 1 && rnd(w) < BEAR_SPLIT) { // over it goes: the log splits and the comb spills out
+      b.hc += hv.c; hv.c = 0; hv.a = 0; hv.tp = w.t; b.sp = 1;
+      bearNightEnds(w, b, null, null);
+      return;
+    }
+    const e = Math.min(BEAR_COMB, Math.round((hv.c - 1) * 100) / 100);
+    if (e <= 0) { bearNightEnds(w, b, null, null); return; }
+    hv.c = Math.round((hv.c - e) * 100) / 100; b.hc += e;
+  } else {
+    const R = w.cheese;
+    if (!R || !R.c) { bearNightEnds(w, b, null, null); return; }
+    const e = Math.min(BEAR_CHEESE, R.c);
+    R.c -= e; b.cc += e;
+  }
+  const p = waker(w, tx, ty, BEAR_NEAR), bark = dogNear(w, tx, ty, BEAR_NEAR);
+  if (p && rnd(w) < (bark ? BEAR_BARK : BEAR_WAKE)) bearNightEnds(w, b, p, bark);
+  else if (b.raid === 'rack' && !w.cheese.c) bearNightEnds(w, b, null, null);
+}
+// the night is over: it is driven off, or it has had its fill, or the dawn sends it back to the trees
+function bearNightEnds(w, b, p, bark) {
+  const B = w.bear, C = B.cur, what = b.raid, hc = Math.round(b.hc), cc = b.cc;
+  b.raid = null; b.rest = w.t + 48; b.tx = null; b.ty = null;
+  if (!b.eat && !p) return; // the dawn came before it got there
+  C.r++; B.r++; B.yr = (B.yr || 0) + 1;
+  C.hc += hc; B.hc += hc; C.cc += cc; B.cc += cc;
+  if (b.sp) { C.k++; B.k++; }
+  const first = B.r === 1, tail = !first ? '' : p ? ` Nobody on ${w.name} sleeps soundly after that.` : ` Nobody on ${w.name} has an answer for it yet.`;
+  let text;
+  if (p) {
+    const swipe = rnd(w) < BEAR_SWIPE, P = Cap(pron(p));
+    C.dv++; B.dv++;
+    deed(w, p, 'u');
+    if (bark) w.dogs.p++;
+    text = `In the dead of night ${bark ? `${bark.nm} starts up barking ${what === 'hive' ? 'at the bee logs' : 'by the goat pen'} and will not stop` : what === 'hive' ? 'the bees roar in the dark' : 'the goats scream in the pen'}. ` +
+      `${p.name} runs out with a burning brand and finds ${C.nm} ${what === 'hive' ? 'up on its hind legs with its head in a log, eating the comb' : 'pulling the cheese off the rods'}. ${P} shouts and swings the brand, and the bear drops down and lumbers off into the trees${what === 'hive' ? ', swatting at the bees' : ''}.`;
+    if (swipe) {
+      C.m++; B.m++;
+      p.hurt = w.t + WOUND_DAYS * TICKS_PER_DAY;
+      text += ` Before it goes it turns and swipes once, and ${p.name} is carried home with ${poss(p)} shoulder torn open.`;
+    }
+  } else if (what === 'hive') {
+    text = b.sp ? `In the morning a bee log lies on its side in the grass, split from end to end, the comb torn out and the bees crawling dazed in the dew. ${Cap(C.nm)} has been in the village in the night.`
+      : `In the morning the stone is off the top of a bee log and there are claw marks down its side: ${hc} comb is gone. ${Cap(C.nm)} has been at the hives in the night.`;
+  } else text = `In the morning the cheese rack by the goat pen is dragged half down and ${plural(cc, 'round is', 'rounds are')} gone. In the mud below it are the prints of ${C.nm}.`;
+  if (first) milestone(w, text + tail); else log(w, text, 'bad');
 }
 
 // ---------- the wolf-skin cloak ----------
@@ -4449,6 +4610,7 @@ export function deedsText(d) {
   if (d.h) out.push('helped raise ' + n(d.h, 'roof', 'roofs'));
   if (d.l) out.push('found ' + n(d.l, 'lost one', 'lost ones') + ' in the fog');
   if (d.p) out.push('drove ' + n(d.p, 'wolf', 'wolves') + ' from the goat pen');
+  if (d.u) out.push('drove the bear off with a brand ' + n(d.u, 'time', 'times'));
   if (d.n) out.push('tended the sick ' + n(d.n, 'time', 'times'));
   return out.join('; ');
 }
@@ -6279,6 +6441,10 @@ const MIGRATIONS = {
   53: (w) => {
     if (w.spring === undefined) w.spring = null;
   },
+  // v54 -> v55: the bear (w.bear). None yet; a late summer with honey or cheese in the village may bring one over the bar.
+  54: (w) => {
+    if (w.bear === undefined) w.bear = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6364,6 +6530,9 @@ export function summary(w) {
     lone: (w.lone && w.lone.cur && w.lone.cur.nm) || null, loneCame: w.lone ? w.lone.n : 0, loneGoats: (w.lone && w.lone.cur && w.lone.cur.g) || 0,
     loneBit: (w.lone && w.lone.cur && w.lone.cur.b) || 0, loneHunts: (w.lone && w.lone.cur && w.lone.cur.h) || 0,
     loneKilled: w.lone ? w.lone.dead : 0, loneLast: (w.lone && w.lone.last) || null,
+    bear: w.bear && w.bear.cur ? w.bear.cur.nm : null, bearRaid: (w.bear && w.bear.cur && (w.beasts.find((b) => b.id === w.bear.cur.id) || {}).raid) || null,
+    bearVisits: w.bear ? w.bear.n : 0, bearNights: w.bear ? w.bear.r : 0, bearYear: w.bear ? w.bear.yr || 0 : 0, bearComb: w.bear ? w.bear.hc : 0,
+    bearCheese: w.bear ? w.bear.cc : 0, bearSplit: w.bear ? w.bear.k : 0, bearDriven: w.bear ? w.bear.dv : 0, bearSwipes: w.bear ? w.bear.m : 0,
     cloaks: w.people.filter((p) => !p.dead && p.cl).map((p) => `${p.name} (${p.cl.nm})`), cloaksMade: w.cloak ? w.cloak.n : 0,
     rainbows: w.bow ? w.bow.n : 0, rainbowYear: w.bow ? w.bow.y : 0, rainbow: bowOn(w, c), rainbowReached: w.bow ? w.bow.k : 0,
     rainbowChasers: bowOn(w, c) ? w.people.filter((p) => p.task && p.task.k === 'bow').length : 0,

@@ -548,3 +548,16 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The beach watch could be doubled on a called fog night in a lean raid year (raiders favour fog).
   - The reader's skill (FOG_HIT, LORE_HIT) could grow with years of right calls, with a byname ("Weather-eye").
   - Heat and frost are still uncalled; the same evening fire could call them next.
+- The bear is done (SIM_VERSION 55; w.bear {n, y, r, yr, hc, cc, k, dv, m, last {nm, look, y, how}, cur {id, nm, look, at, t, r, hc, cc, k, dv, m,
+  back}}; beast k 'bear' with b.raid/hv/eat/hc/cc/sp; bearDay/bearGoes/bear/bearNightEnds/bearPrey in sim.js, BEAR_* constants; h.tp a split log;
+  deed 'u'; yearly `bear`; BEAR/BEAR_UP sprites and HIVE_DOWN in render.js). From year 5, once there is honey or cheese, a late summer
+  (doy 150, 50%, 3+ years apart) may bring a named bear over the bar; it lies up in a thicket (loneBed) and on ~12% of quiet nights goes for the
+  heaviest log or the cheese rack until a waker (dog makes it likely) drives it off; it may split a log (hive dies) or swipe (a wound only).
+  It leaves at doy 282, and often the same bear comes back. Answers it invites:
+  - A bear hunt: hunters with spears and dogs at its thicket in autumn; a bearskin (a warmer bed than hides), claws as a necklace, a byname
+    ("Bear-killer"). It should be dangerous: a real chance someone dies. A bear killed never comes back by name.
+  - Logs raised on a platform or hung in a tree, or a thorn ring round the bee garden (the hedge craft), so it can't reach the comb.
+  - A bear pit dug on its path, with a sharpened stake; or the beach watch fire moved up by the hives in bear summers.
+  - Leaving it a gift (a comb on a stone at the edge of the woods) so it stays out of the village: a superstition the tale-teller tells.
+  - The cheese could go in the potter's jars or a clay-sealed pit by the houses, out of its reach.
+  - The bear and the lone wolf could meet; the wolves keep away from its thicket.

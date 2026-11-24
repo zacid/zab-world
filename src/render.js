@@ -717,10 +717,14 @@ function drawKiln(pal) {
 // an empty log has moss on its stone and nothing at the door
 const HIVE = ['..ssss..', '.sSSSSs.', '..lLLl..', '..lLlL..', '..lLLl..', '..lmml..', '..lLLl..', '........'];
 const HCOLS = { s: '#77746b', S: '#9a978d', l: '#5e4630', L: '#8a6a44', m: '#1a120c' };
+// a log the bear knocked over: lying split in the grass, the stone rolled off and torn comb about it
+const HIVE_DOWN = ['........', '........', '........', '.sS.....', 'lLLlLLLm', 'mlmmlLlm', '.c.cc..c', '........'];
+const HDCOLS = { ...HCOLS, c: '#c9a23a' };
 function drawHives(pal) {
   if (!w.bees) return;
   for (const h of w.bees.h) {
     const X = h.x * TILE, Y = h.y * TILE;
+    if (h.tp != null && !h.a) { sprite(tc, HIVE_DOWN, X, Y, HDCOLS); if (pal.snow) px(tc, X + 1, Y + 4, '#eef3f7', 6, 1); continue; }
     sprite(tc, HIVE, X, Y, HCOLS);
     if (pal.snow) px(tc, X + 2, Y, '#eef3f7', 4, 1);
     else if (!h.a) { px(tc, X + 2, Y + 1, '#4f7a3a', 2, 1); px(tc, X + 5, Y, '#4f7a3a'); }
@@ -1437,7 +1441,9 @@ function frame() {
         ? (beast.prey != null ? 'stalking someone' : beast.goat != null ? 'running at the goats' : still ? 'watching the village' : 'prowling the treeline')
         : beast.k === 'deer' ? (beast.run ? 'bounding away' : still ? 'grazing' : 'wandering the meadow')
         : (beast.f != null && still ? 'rooting in the grain' : 'trotting through the dark');
-      tip.innerHTML = L ? `<b>${esc(L.nm)}</b><br><span class="m">lone wolf · ${what}${L.g || L.b ? ` · ${[L.g && `${L.g} ${L.g === 1 ? 'goat' : 'goats'} taken`, L.b && `${L.b} bitten`].filter(Boolean).join(' · ')}` : ''}</span>`
+      const R = beast.k === 'bear' && w.bear && w.bear.cur;
+      tip.innerHTML = R ? `<b>${esc(R.nm)}</b><br><span class="m">bear · ${beast.raid && beast.eat ? `<span class="bad">${beast.raid === 'hive' ? 'tearing the comb out of a bee log' : 'pulling the cheese off the rack'}</span>` : beast.raid ? 'coming out of the trees for the village' : 'going back to the trees'}${R.r ? ` · ${R.r} ${R.r === 1 ? 'night' : 'nights'} in the village this year` : ''}</span>`
+        : L ? `<b>${esc(L.nm)}</b><br><span class="m">lone wolf · ${what}${L.g || L.b ? ` · ${[L.g && `${L.g} ${L.g === 1 ? 'goat' : 'goats'} taken`, L.b && `${L.b} bitten`].filter(Boolean).join(' · ')}` : ''}</span>`
         : `<b>${beast.k === 'wolf' ? 'Grey wolf' : beast.k === 'deer' ? 'Red deer' : 'Wild boar'}</b><br><span class="m">${what}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (best) {
@@ -1500,7 +1506,7 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = hiveAt(mx, my))) {
       const s = S.summary(w), B = w.bees, c = clockNow();
-      const state = !best.a ? 'an empty log: the bees died in it' : c.season === 3 || c.doy < 20 ? 'the bees are clustered inside for the winter'
+      const state = !best.a && best.tp != null ? `<span class="bad">knocked over and split open by ${esc((w.bear && w.bear.cur && w.bear.cur.nm) || 'the bear')} ${when(best.tp)}</span>` : !best.a ? 'an empty log: the bees died in it' : c.season === 3 || c.doy < 20 ? 'the bees are clustered inside for the winter'
         : best.c >= 50 ? 'a strong hive, heavy with comb' : best.c >= 20 ? 'a busy hive' : 'a weak hive, little comb';
       tip.innerHTML = `<b>${best.a ? 'Bee log' : 'Empty bee log'}</b><br>${state}<br><span class="m">${s.hives} ${s.hives === 1 ? 'hive' : 'hives'} · ${s.honey} honey kept · ${s.honeyEver.toLocaleString()} taken in all${s.swarms ? ` · ${s.swarms} ${s.swarms === 1 ? 'swarm' : 'swarms'} caught` : ''} · first found by ${esc(B.nm)} ${when(B.at)}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
@@ -1768,6 +1774,11 @@ const DEER = ['....e.', '....hn', 'tbbbb.', '.bbbb.', '.l..l.'];
 const DEER_RUN = ['....e.', '....hn', 'tbbbb.', '.bbbb.', 'l....l'];
 const DEER_GRAZE = ['......', '......', 'tbbbb.', '.bbbbh', '.l..ln'];
 const DCOL = { b: '#9a6a3c', h: '#8a5c32', e: '#6e4a2a', n: '#2a1d15', t: '#efe6d2', l: '#5a3d22' };
+// the bear: 8x5 and heavy, a hump over the shoulders and round ears; at a log or the rack it rears up on its hind legs
+const BEAR = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', '.dd..dd.'];
+const BEAR_RUN = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', 'dd....dd'];
+const BEAR_UP = ['..e.e.', '..bbb.', '.pbnbp', '..hbb.', '..bbb.', '..bbb.', '..d.d.'];
+const RCOL = { b: '#5e4129', h: '#46301d', e: '#3a2818', n: '#1a120c', d: '#2a1d13', p: '#3a2818' };
 const facing = new Map();
 function drawBeasts(frac, now) {
   const out = [];
@@ -1784,9 +1795,10 @@ function drawBeasts(frac, now) {
     if (b.k === 'wolf') rows = moving && stepF ? WOLF_RUN : WOLF;
     else if (b.k === 'lone') rows = moving ? (stepF ? LONE_RUN : LONE) : LONE_SIT;
     else if (b.k === 'deer') rows = moving ? (stepF ? DEER_RUN : DEER) : Math.floor(now / 900 + b.id * 1.7) % 4 ? DEER_GRAZE : DEER;
+    else if (b.k === 'bear') rows = !moving && b.raid && b.eat ? BEAR_UP : moving && stepF ? BEAR_RUN : BEAR;
     else rows = !moving && b.f != null ? (Math.floor(now / 380 + b.id) % 2 ? BOAR_ROOT : BOAR) : moving && stepF ? BOAR_RUN : BOAR;
-    const map = b.k === 'wolf' ? WCOL : b.k === 'lone' ? LCOL : b.k === 'deer' ? DCOL : BCOL;
-    const Yr = b.k === 'lone' ? Y - 1 : Y, wd = rows[0].length; // the lone wolf stands a pixel taller
+    const map = b.k === 'wolf' ? WCOL : b.k === 'lone' ? LCOL : b.k === 'deer' ? DCOL : b.k === 'bear' ? RCOL : BCOL;
+    const Yr = b.k === 'lone' ? Y - 1 : b.k === 'bear' ? Y - rows.length + 4 : Y, wd = rows[0].length; // the lone wolf stands a pixel taller, the bear reared up three
     for (let r = 0; r < rows.length; r++) for (let k = 0; k < wd; k++) {
       const ch = rows[r][k];
       if (ch !== '.' && map[ch]) px(sc, face > 0 ? X + k : X + wd - 1 - k, Yr + r, map[ch]);
@@ -2011,7 +2023,7 @@ const RES_CORE = ['pop', 'food', 'wood', 'house', 'field'];
 const RES_GROUPS = [
   ['Stores & crafts', ['gran', 'pot', 'cheese', 'bee', 'copse', 'path', 'herb']],
   ['Fields', ['muck', 'frost', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
-  ['Beasts', ['wild', 'lone', 'hunt', 'goat', 'dog']],
+  ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
   ['Sea & sky', ['canoe', 'squall', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
   ['Folk', ['by', 'tale', 'grave']],
 ];
@@ -2062,6 +2074,7 @@ function updatePanels() {
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
       : s.loneLast ? [['lone', 'Lone wolf', `<span class="m">${esc(s.loneLast.nm)} ${s.loneLast.how === 'killed' ? `killed by ${esc(s.loneLast.by)}` : 'moved on'}</span>`]] : []),
+    ...(s.bearVisits ? [['bear', 'Bear', `${s.bear ? `<span class="bad">${esc(s.bear)} ${s.bearRaid === 'hive' ? 'is at the bee logs' : s.bearRaid === 'rack' ? 'is at the cheese rack' : 'lies up in the woods'}</span> · ` : ''}<span class="m">${s.bearVisits} ${s.bearVisits === 1 ? 'summer' : 'summers'} · ${s.bearNights} ${s.bearNights === 1 ? 'night' : 'nights'} in the village${s.bearYear ? ` (${s.bearYear} this year)` : ''} · ${s.bearComb.toLocaleString()} comb · ${s.bearCheese.toLocaleString()} cheese${s.bearSplit ? ` · ${s.bearSplit} ${s.bearSplit === 1 ? 'log' : 'logs'} split` : ''} · driven off ${s.bearDriven}x${s.bearSwipes ? ` · ${s.bearSwipes} hurt` : ''}${!s.bear && w.bear.last ? ` · ${esc(w.bear.last.nm)} went back over the bar in year ${w.bear.last.y}` : ''}</span>`]] : []),
     ...(s.lore ? [['lore', 'Sky lore', `${s.stormCalled ? `<span class="bad">${esc(s.skyReader)} calls a storm by morning</span>${s.roping ? ` · <span class="fest">${s.roping} at work by firelight</span>` : ''} · ` : s.roofsTied ? `<span class="fest">${s.roofsTied} ${s.roofsTied === 1 ? 'roof' : 'roofs'} roped with stones</span> · ` : ''}<span class="m">${s.loreRight} of ${s.loreRight + s.loreMissed} storms called · ${s.loreFalse} false ${s.loreFalse === 1 ? 'alarm' : 'alarms'} · ${s.loreHeld} ${s.loreHeld === 1 ? 'roof' : 'roofs'} held${s.loreHeldYear ? ` (${s.loreHeldYear} this year)` : ''}${s.loreReaped ? ` · ${s.loreReaped} ${s.loreReaped === 1 ? 'field' : 'fields'} cut by firelight` : ''}</span>`]] : []),
     ...(s.fogLore ? [['fogl', 'Fog signs', `${s.fogCalled ? `<span class="fest">${esc(s.skyReader)} calls fog by morning</span> · ` : s.fogKept ? '<span class="fest">goats and little ones kept in from the fog</span> · ' : ''}<span class="m">${s.fogRight} of ${s.fogRight + s.fogMissed} fogs called · ${s.fogFalse} false · ${s.fogPenned} ${s.fogPenned === 1 ? 'day' : 'days'} the herd kept in${s.fogStayed ? ` · ${s.fogStayed} kept from straying` : ''}</span>`]] : []),
     ...(s.rainbows ? [['bow', 'Rainbows', `${s.rainbows} <span class="m">seen${s.rainbowYear ? ` · ${s.rainbowYear} this year` : ''} · the children reached the end of ${s.rainbowReached}</span>${s.rainbow ? ' · <span class="fest">one stands now</span>' : ''}`]] : []),
@@ -2153,7 +2166,7 @@ function drawHistory() {
     if (h) {
       st = `${h.pop} people · <span class="up">+${h.births} born</span> · <span class="dn">−${h.deaths} died</span> · ${h.harvest} grain harvested`;
       const n = (k, one, many) => k && `${k} ${k === 1 ? one : many}`;
-      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'), n(h.lame, 'goat lame with foot rot', 'goats lame with foot rot'), n(h.rotDied, 'goat dead of foot rot', 'goats dead of foot rot'), n(h.pared, 'hoof pared', 'hooves pared'), n(h.cheese, 'round of cheese pressed', 'rounds of cheese pressed'), n(h.cheeseEaten, 'round of cheese eaten in the cold', 'rounds of cheese eaten in the cold'), h.rooks ? `${h.rooks.toLocaleString()} grain to rooks` : '', n(h.scared, 'flock of rooks driven off', 'flocks of rooks driven off'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bows, 'rainbow', 'rainbows'), n(h.held, 'roof held by the storm stones', 'roofs held by the storm stones'), n(h.mucked, 'field mucked', 'fields mucked'), h.muckGrain && `${h.muckGrain} more grain from the muck`,n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
+      const xs = [n(h.storms, 'storm day', 'storm days'), n(h.wolves, 'wolf attack', 'wolf attacks'), n(h.raids, 'boar raid', 'boar raids'), n(h.hunted, 'beast hunted', 'beasts hunted'), h.sick && `${h.sick} fell sick`, h.rats >= 50 && `${h.rats} grain eaten by rats`, h.goats && `${h.goats} goats`, n(h.goatsLost, 'goat lost to wolves', 'goats lost to wolves'), n(h.pens, 'night a wolf came to the pen', 'nights wolves came to the pen'), n(h.lame, 'goat lame with foot rot', 'goats lame with foot rot'), n(h.rotDied, 'goat dead of foot rot', 'goats dead of foot rot'), n(h.pared, 'hoof pared', 'hooves pared'), n(h.cheese, 'round of cheese pressed', 'rounds of cheese pressed'), n(h.cheeseEaten, 'round of cheese eaten in the cold', 'rounds of cheese eaten in the cold'), h.rooks ? `${h.rooks.toLocaleString()} grain to rooks` : '', n(h.scared, 'flock of rooks driven off', 'flocks of rooks driven off'),n(h.lost, 'search in the fog', 'searches in the fog'), n(h.dogs, 'dog', 'dogs'), h.stolen && `${h.stolen} grain carried off by raiders`, n(h.jars, 'jar in the stores', 'jars in the stores'), h.given && `${h.given} grain sent home with hungry guests`, n(h.snowmen, 'snowman', 'snowmen'), n(h.burnt, 'acre burnt by wildfire', 'acres burnt by wildfire'), n(h.deep, 'fish landed from the dugout', 'fish landed from the dugout'), n(h.copse, 'timber cut from the coppice', 'timber cut from the coppice'), n(h.hedgesNew, 'hedge planted', 'hedges planted'), n(h.frosted, 'field killed by a late frost', 'fields killed by late frost'), n(h.smudged, 'field saved by smudge fires', 'fields saved by smudge fires'), n(h.rusted, 'field spotted with rust', 'fields spotted with rust'), n(h.rogued, 'rusted field pulled clean', 'rusted fields pulled clean'), h.honey && `${h.honey} honey from ${n(h.hives, 'hive', 'hives') || 'the hives'}`, n(h.lone, 'attack by the lone wolf', 'attacks by the lone wolf'), n(h.bear, 'night the bear came into the village', 'nights the bear came into the village'),n(h.bows, 'rainbow', 'rainbows'), n(h.held, 'roof held by the storm stones', 'roofs held by the storm stones'), n(h.mucked, 'field mucked', 'fields mucked'), h.muckGrain && `${h.muckGrain} more grain from the muck`,n(h.cockles, 'cockle dug by the children', 'cockles dug by the children')].filter(Boolean);
       if (xs.length) st += `<br>${xs.join(' · ')}`;
     } else if (now) {
       st = `${s.pop} people so far · <span class="up">+${w.stats.yb} born</span> · <span class="dn">−${w.stats.yd} died</span> · now ${s.season.toLowerCase()}, day ${s.day}`;
@@ -2204,7 +2217,7 @@ const HARD = [
   ['storms', (h) => (h.storms || 0) + (h.squalls || 0), (h) => [h.storms && pl(h.storms, 'storm day', 'storm days'), h.flattened && pl(h.flattened, 'field flattened', 'fields flattened'), h.squalls && pl(h.squalls, 'squall at sea', 'squalls at sea')]],
   ['fog', (h) => h.fog || 0, (h) => [h.fog && pl(h.fog, 'fog day', 'fog days'), h.lost && pl(h.lost, 'search in the fog', 'searches in the fog')]],
   ['fever', (h) => h.sick || 0, (h) => [h.sick && `${h.sick} fell sick`]],
-  ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
+  ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0) + (h.bear || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.bear && pl(h.bear, 'night the bear came in', 'nights the bear came in'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
   ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
   ['grain', (h) => (h.rats || 0) + (h.stolen || 0) + (h.rooks || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`, h.rooks && `${h.rooks} grain to rooks`]],
   ['deaths', (h) => h.deaths || 0, (h) => [h.deaths && pl(h.deaths, 'death', 'deaths')]],
