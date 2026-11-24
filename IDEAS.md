@@ -576,4 +576,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A pup taken in by the children as a pet that follows them into the shallows; or a "Seal" byname for someone who swam ashore twice.
   - Orca or a shark chasing the herd in once a decade (the seals scatter and the dugout stays in).
   - Spare skins go to w.hides (winter warmth); hides already wear out 40% a year, so the effect is small.
-- Housekeeping: scripts/.deerpeek.mjs is an old committed probe and can go.
+- Housekeeping: scripts/.deerpeek.mjs is an old committed probe and can go, and so can scripts/_bear.mjs, _sea.mjs, _seal.mjs,
+  _seal2.mjs, _st.mjs and _race.mjs (the last visit could not delete files).
+- The midsummer race is done (SIM_VERSION 57; w.fest.race {d, sx/sy start, ex/ey stake, lx/ly lane step, rs [[id, share run by 18:00]], win, nm},
+  w.fest.rn, w.fest.rl {nm, y, a}; raceCourse/raceStart/racePos/raceEnd/raceWed in sim.js, RACE_* constants, raceNow() exported; deed 'r' and
+  byname "the Swift"; raceStake() and OAK wreath in render.js). Positions are set by the hour (not walked), so runners do not wear paths.
+  Answers it invites:
+  - Other games at the same fire: a spear throw at a straw boar (the winner joins the next hunt), or a tug of war between the two ends of the village.
+  - Far-isle guests could run too; a guest who beats the island's Swift is a story, and a rivalry for the next summer.
+  - A fall on the course (a twisted ankle: a few days laid up), or an old Swift who keeps running past 30 and is beaten by a child.
+  - The Swift as a runner in the sim: sent to call the hunters or the dugout home when a storm is called, or to wake the village in a raid.
+  - The course runs over open grass; late game, when fields fill the land near the hearth, raceCourse may find no clear run and the race lapses.
+    A kept green (no fields within N tiles of the fire) would save it and the dancing ground.

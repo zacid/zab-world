@@ -313,5 +313,10 @@
   "at": "2026-11-24T21:10:51.566Z",
   "title": "Add seals that eat the deep fish, and sealskin floats",
   "body": "- SIM_VERSION 56 (w.seal; techs 'seals' and 'sealing'; task 'seal'; yearly `seals`, `sealsTaken`, `sealFish`): after 40 dugout trips a herd of 5 grey seals hauls out on a quiet sand beach, eats from the dugout's deep-water fish all year and pups every early winter\n- Once the seals have eaten 500 fish, a hunter goes down with a club when the pups are on the sand: meat, blubber for the fire, a skin. After each try the herd keeps off for 9 days, and it is never taken below 8\n- The first skin becomes a float in the dugout once the island has seen a squall: a swimmer who holds on to it drowns about a third as often. It perishes after 5 years\n- Visible: seals hauled out by day (heads lift, white pups), heads bobbing offshore at night or when someone comes near, the club, a seal carried home, the float in the dugout and in a swimmer's arms, a Seals row and tooltip\n- Watch: Hais (canoe trips 249) should find its seals this spring or summer (Y11) and start sealing in the Y12 winter; expect the dugout catch to fall from ~900 to ~300-480 fish a year"
+ },
+ {
+  "at": "2026-11-24T21:49:45.002Z",
+  "title": "Add a midsummer footrace with an oak wreath for the winner",
+  "body": "- SIM_VERSION 57 (w.fest.race {d, sx/sy, ex/ey, lx/ly, rs, win, nm}, rn, rl; tech 'race'; task 'race'; deed 'r', byname \"the Swift\" at 3 wins)\n- At 17:00 on midsummer up to 8 islanders aged 9-30 line up by the bonfire, run out to a hazel stake 6-9 tiles away over open grass and back by 19:00; the winner is crowned at 20:00. The first race needs a runner under 16\n- Speed comes from age, a fixed \"quick legs\" per islander and luck, so some win again and again. A single winner of 17+ is pledged that night 70% of the time\n- Visible: the stake with a red rag, runners with pumping arms in a pale colour, a green oak wreath on the winner while the dance goes on, top-line note, a Race row under Folk\n- Watch: Hais runs its first race at the Y11 midsummer (summer day 46, 4 runners); on the probe Anfen became the Swift by Y14"
  }
 ]

@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 56;
+export const SIM_VERSION = 57;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -46,6 +46,7 @@ export const TECHS = {
   hunting:  { name: 'Hunting',   added: '2026-11-14T22:21Z', desc: 'Ash spears with flint points. Pairs of hunters track boars to their lair and, in winter, the wolves to their den. Meat for the pot, hides for the doorways.', req: ['gather', 'woodcut'] },
   fencing:  { name: 'Fences',    added: '2026-11-15T00:13Z', desc: 'Hazel rods woven between stakes around the fields by the woods. Most nights they turn the boars away; they rot, blow down and must be mended.', req: ['farming', 'woodcut'] },
   midsummer: { name: 'Midsummer', added: '2026-11-15T00:30Z', desc: 'On the longest day work stops early. A great bonfire, a feast from the stores, a ring dance until late, and couples pledged in the firelight.', req: ['fire', 'farming'] },
+  race:     { name: 'Midsummer race', added: '2026-11-24T21:12Z', desc: 'Before the feast the young of the island, from nine to thirty, line up by the bonfire, run out to a hazel stake across the open grass, slap it and run back. The whole village shouts them home. The winner wears an oak-leaf wreath for the rest of the night, and a single winner of age seldom goes home unpledged. Win three times and the island calls you the Swift.', req: ['midsummer'] },
   paths:    { name: 'Footpaths', added: '2026-11-15T01:30Z', desc: 'Nobody lays them out: the grass the islanders cross every day is trodden down to bare earth. Walking is quicker on a path, and the woods cannot creep back over it. Unused paths grass over.', req: ['shelter'] },
   burial:   { name: 'Burying ground', added: '2026-11-15T01:59Z', desc: 'A low ring of stones near the village where the dead are laid in rows, each under a mound and a marker. The morning after a death the family stands at the graveside.', req: ['shelter'] },
   herbs:    { name: 'Herb lore', added: '2026-11-15T05:00Z', desc: 'Willow bark and bitter leaves from the edge of the woods, dried in bundles under the eaves. One healer goes from bed to bed: a tended fever is half as deadly, a tended wound closes sooner. The basket passes on when the healer dies or grows old.', req: ['gather'] },
@@ -272,6 +273,11 @@ const FEST_LEARN = 10;       // people on the island before anyone thinks to kee
 const FEST_WOOD = 12;        // timber heaped on the bonfire (at most a quarter of the pile)
 const FEST_FEAST = 2;        // extra food each person eats, if the stores can spare it
 const FEST_PAIR = 0.4;       // chance a single woman finds a partner in the firelight
+const RACE_FROM = 17;        // midsummer race: line up at 17:00, out to the stake at 18:00, back at 19:00, winner crowned at 20:00
+const RACE_MIN = 9, RACE_MAX = 30; // who runs: the young, from nine to thirty
+const RACE_N = 8;            // at most this many on the line; the rest cheer from the ring
+const RACE_LEN = [9, 8, 7, 6]; // tiles out to the turning stake, longest clear run first
+const RACE_PAIR = 0.7;       // chance a single winner of 17+ is pledged that night (the wreath helps)
 // ---------- the longest night ----------
 const TALE_DAY = 315;        // day of the year (winter day 46); a storm or snow puts it off a few days
 const TALE_LAST = 330;       // after this the nights are drawing out again and the year goes without
@@ -2361,8 +2367,95 @@ function festSpot(w) {
   const r = 2.5 + Math.min(ring, 5), [ux, uy] = RING[ring === 0 ? j * 2 : (j + ring) % 24];
   return { k: 'fest', x: Math.round((w.fire.x + ux * r) * 1000) / 1000, y: Math.round((w.fire.y + uy * r) * 1000) / 1000, h: 99, r: ring };
 }
+// ---------- the midsummer race ----------
+// Before the feast the young run out from the bonfire to a hazel stake and back (w.fest.race for the day:
+// d day, sx/sy start line, ex/ey stake, lx/ly lane step, rs [[id, share of the course run by 18:00]], win id, nm;
+// w.fest.rn races run, w.fest.rl last winner {nm, y, a}). The positions are set by the hour, not walked.
+const raceOn = (w, c) => !!(w.fest && w.fest.race && w.fest.race.d === c.day && c.hour >= RACE_FROM && c.hour < FEST_TO);
+export const raceNow = (w, c) => !!(raceOn(w, c) && c.hour < RACE_FROM + 3);
+const racer = (w, p, a) => !p.dead && !p.sick && !p.hurt && a >= RACE_MIN && a <= RACE_MAX && !(w.horn && w.horn.hid === p.id);
+// the longest clear run of grass from the fire, in one of eight directions (no water, no buildings, no woods)
+function raceCourse(w) {
+  let best = null, bs = -1;
+  for (const L of RACE_LEN) {
+    for (let k = 0; k < 24; k += 3) {
+      const [vx, vy] = RING[k];
+      let sc = 0, ok = true;
+      for (let q = 2; q <= L * 2 && ok; q++) {
+        const x = Math.floor(w.fire.x + 0.5 + vx * q / 2), y = Math.floor(w.fire.y + 0.5 + vy * q / 2);
+        const t = inMap(x, y) ? w.tiles[idx(x, y)] : T.WATER;
+        if (t === T.WATER || t === T.BUILD || t === T.FOREST) ok = false;
+        else sc += t === T.GRASS ? 2 : t === T.SAND ? 1 : 0;
+      }
+      if (ok && sc > bs) { bs = sc; best = { L, vx, vy }; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+function raceStart(w, c, fx) {
+  const F = w.fest;
+  const able = w.people.filter((p) => racer(w, p, ageY(w, p)));
+  if (able.length < 3 || (!w.techs.includes('race') && !able.some((p) => ageY(w, p) < 16))) return; // the children start it
+  const co = raceCourse(w);
+  if (!co) return;
+  const keen = (p) => Math.abs(ageY(w, p) - 17);
+  const run = able.length > RACE_N ? able.slice().sort((a, b) => keen(a) - keen(b) || a.id - b.id).slice(0, RACE_N) : able;
+  const sp = run.map((p) => {
+    const a = ageY(w, p);
+    const base = a < 12 ? 5 : a < 14 ? 6.5 : a < 16 ? 7.5 : a < 25 ? 8.5 : 7.5;
+    const legs = (((p.id * 2654435761) >>> 0) % 3) * 0.6; // some are just born quick
+    return [p.id, base + legs + rnd(w) * 4];
+  });
+  const top = Math.max(...sp.map((q) => q[1]));
+  const r3 = (v) => Math.round(v * 1000) / 1000;
+  const fx0 = w.fire.x + 0.5, fy0 = w.fire.y + 0.5;
+  F.race = {
+    d: c.day, sx: r3(fx0 + co.vx * 1.6), sy: r3(fy0 + co.vy * 1.6), ex: r3(fx0 + co.vx * co.L), ey: r3(fy0 + co.vy * co.L),
+    lx: r3(-co.vy * 0.45), ly: r3(co.vx * 0.45),
+    rs: sp.map(([id, s]) => [id, r3(Math.max(0.55, s / top))]), win: null, nm: null,
+  };
+  if (fx) fx.push({ x: fx0, y: fy0 - 2, text: 'the race', color: 'food' });
+}
+// where a runner is at the end of hour h: lined up, out toward the stake, then back toward the fire
+function racePos(R, i, h) {
+  const r = R.rs[i][1], u = h <= RACE_FROM ? 0 : h === RACE_FROM + 1 ? r : Math.min(2, r * 2);
+  const lane = i - (R.rs.length - 1) / 2;
+  const f = u <= 1 ? u : 2 - u;
+  return [Math.round((R.sx + (R.ex - R.sx) * f + R.lx * lane) * 1000) / 1000, Math.round((R.sy + (R.ey - R.sy) * f + R.ly * lane) * 1000) / 1000];
+}
+function raceEnd(w, c) {
+  const F = w.fest, R = F.race;
+  let best = null;
+  for (const [id, r] of R.rs) { const p = aliveId(w, id); if (p && (!best || r > best[1])) best = [p, r]; }
+  if (!best) return;
+  const p = best[0], a = Math.floor(ageY(w, p)), first = !w.techs.includes('race');
+  R.win = p.id; R.nm = p.name;
+  F.rn = (F.rn || 0) + 1; F.rl = { nm: p.name, y: c.year, a };
+  const big = R.rs.filter(([id]) => { const q = aliveId(w, id); return q && ageY(w, q) >= 16; }).length;
+  const n = R.rs.length;
+  if (first) {
+    w.techs.push('race');
+    const who = elder(w);
+    milestone(w, `All summer the children of ${w.name} have been racing each other down to the beach and back. On midsummer evening ${who ? who.name : 'the eldest'} drives a hazel stake into the grass out past the bonfire and says that whoever slaps it and is back at the fire first will wear the oak wreath. ${n} line up, the whole village shouts, and ${p.name}, ${a}, comes in first. From now on the young run at every midsummer.`);
+  } else if (a < 14 && big >= 2) log(w, `Midsummer race: ${p.name}, only ${a}, leaves ${big} grown runners behind at the stake and wears the oak wreath. The old ones shake their heads and laugh.`, 'good');
+  else log(w, `Midsummer race: ${n} run out to the stake and back, and ${p.name} wears the oak wreath.`, 'good');
+  deed(w, p, 'r');
+}
+function raceWed(w, F) {
+  const p = F.race && F.race.win != null ? aliveId(w, F.race.win) : null;
+  if (!p || p.partner != null || ageY(w, p) < 17 || rnd(w) >= RACE_PAIR) return;
+  const f = p.sex === 'f' ? p : w.people.find((o) => !o.dead && o.sex === 'f' && o.partner == null && ageY(w, o) >= 17 && matches(w, o, p));
+  const m = p.sex === 'f' ? mate(w, p) : p;
+  if (!f || !m) return;
+  f.partner = m.id; m.partner = f.id; f.wants = true;
+  F.pairs.push(`${f.name} and ${m.name}`);
+  log(w, `${p.name}, still in the oak wreath, is pledged to ${p === f ? m.name : f.name} in the firelight.`, 'love');
+}
 function midsummer(w, c, fx) {
   const F = w.fest, h = c.hour, pop = w.people.length;
+  if (h === RACE_FROM) raceStart(w, c, fx);
+  else if (h === RACE_FROM + 3 && F.race && F.race.d === c.day) raceEnd(w, c);
   if (h === ISLE_SAIL) boatComes(w, c); // on the far isle they know the day, and the smoke of the fire-building
   if (h === FEST_FROM) {
     F.k = 0; F.pairs = [];
@@ -2375,6 +2468,7 @@ function midsummer(w, c, fx) {
     w.food = Math.round((w.food - F.feast) * 100) / 100;
     if (F.feast >= pop) for (const p of w.people) p.hunger = 0;
   } else if (h === 21) { // late in the dance, the unpaired find each other
+    if (F.race && F.race.d === c.day) raceWed(w, F); // the wreath first
     for (const f of w.people) {
       if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= (F.mead ? MEAD_PAIR : FEST_PAIR)) continue;
       const m = mate(w, f);
@@ -4593,6 +4687,7 @@ const DEEDS = [
   { k: 'h', mark: 10, by: 'the Builder' },
   { k: 'f', mark: 3000, by: 'the Fisher' },
   { k: 'g', mark: 30000, by: 'the Reaper' },
+  { k: 'r', mark: 3, by: 'the Swift' },       // midsummer races won
 ];
 const ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth', 'eleventh', 'twelfth'];
 const thou = (n) => (n >= 1000 ? `${Math.floor(n / 1000)},${String(n % 1000).padStart(3, '0')}` : String(n));
@@ -4615,6 +4710,7 @@ export function deedsText(d) {
   if (d.p) out.push('drove ' + n(d.p, 'wolf', 'wolves') + ' from the goat pen');
   if (d.u) out.push('drove the bear off with a brand ' + n(d.u, 'time', 'times'));
   if (d.n) out.push('tended the sick ' + n(d.n, 'time', 'times'));
+  if (d.r) out.push('won the midsummer race ' + n(d.r, 'time', 'times'));
   return out.join('; ');
 }
 function deed(w, p, k, v = 1) {
@@ -4645,6 +4741,7 @@ function nameThem(w, p, e, n) {
     h: `${p.name} has had a hand in raising ${n} roofs on ${w.name}. People call ${him} ${full}, and come to ${him} first when a beam will not sit.`,
     f: `${p.name} has pulled ${thou(n)} fish out of the shallows. The others call ${him} ${full} and watch where ${he} casts.`,
     g: `${p.name} has cut and carried ${thou(n)} measures of grain in ${poss(p)} life. At harvest the others fall in behind ${full}.`,
+    r: `${p.name} slaps the hazel stake and is back at the bonfire first for the ${ORD[n] || `${n}th`} midsummer, and the oak wreath goes on ${poss(p)} head before ${he} has caught ${poss(p)} breath. From now on the children call ${him} ${full}, and race each other along the paths to be next.`,
   }[e.k];
   milestone(w, text);
 }
@@ -4711,10 +4808,10 @@ function lifeAndDeath(w, c) {
 }
 
 const sibling = (a, b) => (a.mother != null && a.mother === b.mother) || (a.father != null && a.father === b.father);
+const matches = (w, f, o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
+  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id;
 function mate(w, f) {
-  const fa = ageY(w, f);
-  return w.people.find((o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
-    Math.abs(ageY(w, o) - fa) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id);
+  return w.people.find((o) => matches(w, f, o));
 }
 function pairing(w) {
   for (const f of w.people) {
@@ -5562,6 +5659,18 @@ function act(w, p, c, fx) {
   const evening = h >= (afraid ? 16 : 18) && h < 21;
   const storm = w.wx && w.wx.k === 'storm';
   if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
+    const R = raceNow(w, c) ? w.fest.race : null, ri = R ? R.rs.findIndex((q) => q[0] === p.id) : -1;
+    if (ri >= 0) { // on the line, out to the stake, home to the fire
+      if (!p.task || p.task.k !== 'race') { // keep the place in the ring for afterwards
+        const ring = p.task && p.task.k === 'fest' ? p.task : null;
+        if (!ring) release(w, p);
+        p.task = { k: 'race', x: Math.floor(R.ex), y: Math.floor(R.ey), h: 99, f: ring };
+      }
+      p.asleep = false;
+      [p.x, p.y] = racePos(R, ri, h);
+      return;
+    }
+    if (p.task && p.task.k === 'race') p.task = p.task.f; // back to the same place in the ring
     if (p.task && p.task.k !== 'fest') release(w, p);
     if (!p.task) p.task = festSpot(w);
     p.asleep = false;
@@ -5624,7 +5733,7 @@ function act(w, p, c, fx) {
     }
   }
   if (w.squall && w.squall.cur && shoreWatch(w, p, a)) return; // the dugout is out in a squall: down to the landing to watch
-  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -5817,7 +5926,7 @@ const SNOW_MELT = { clear: 0.45, rain: 0.7, heat: 1, fog: 0.3, storm: 0.6, cold:
 const SNOW_PROP = [ // what the children give a snowman named after someone, by byname
   ['Wolf-slayer', 'with a wolf pelt of dead bracken over its shoulders'], ['Hunter', 'with an ash stick for a spear'],
   ['Finder', 'with a burnt stick held up like a torch'], ['Builder', 'with a stone axe stuck in its belly'],
-  ['Fisher', 'with a dried fish for a nose'], ['Reaper', 'with a crown of straw'], ['', 'with a beard of dry grass'],
+  ['Fisher', 'with a dried fish for a nose'], ['Reaper', 'with a crown of straw'], ['Swift', 'with a wreath of holly where the oak leaves should be'], ['','with a beard of dry grass'],
 ];
 const snowOk = (w, c) => c.season === 3 && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'fog';
 function learnSnow(w, c) {
@@ -6587,6 +6696,10 @@ const MIGRATIONS = {
   55: (w) => {
     if (w.seal === undefined) w.seal = null;
   },
+  // v56 -> v57: the midsummer race (w.fest.race, rn, rl). Not run yet; the children start it at the next midsummer.
+  56: (w) => {
+    if (w.fest) { if (w.fest.race === undefined) w.fest.race = null; if (w.fest.rn === undefined) w.fest.rn = 0; if (w.fest.rl === undefined) w.fest.rl = null; }
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6622,6 +6735,8 @@ export function summary(w) {
     boarsTaken: (w.fauna && w.fauna.sb) || 0, wolvesTaken: (w.fauna && w.fauna.sw) || 0,
     deer: (w.beasts || []).filter((b) => b.k === 'deer').length, deerTaken: (w.fauna && w.fauna.sd) || 0,
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
+    race: !!(w.fest && w.fest.rn), racing: raceNow(w, c) ? w.fest.race.rs.length : 0, raceWin: (raceOn(w, c) && w.fest.race.nm) || null,
+    races: (w.fest && w.fest.rn) || 0, raceLast: (w.fest && w.fest.rl) || null,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
