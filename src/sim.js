@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 55;
+export const SIM_VERSION = 56;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -81,6 +81,8 @@ export const TECHS = {
   foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
   drought:  { name: 'Dry spring', added: '2026-11-22T04:45Z', desc: 'The spring by the village is fed by the rain. A hot, dry summer draws it down, and the more mouths there are the faster it goes, until one morning there is only cracked mud between the stones. Then the water comes from a deep pool in the woods, a long walk each way with a skin bag, or a jar once there is a potter. On a day with too few carries the small children and the old go thirsty and some sicken, and the goats give less milk. The autumn rains fill the spring again. Nobody has an answer for it yet.', req: ['fire'] },
   bear:     { name: 'The bear', added: '2026-11-24T20:06Z', desc: 'Some summers, when the bees are heavy with comb, a brown bear wades over the sand bar from the far isle at low tide and lies up in a thicket near the village until the first frosts. On quiet nights it comes out of the trees for the honey logs and the cheese rack: it tears the comb out with its claws, sometimes knocks a log over and splits it, and pulls the rounds off the rods. If a dog barks or someone sleeping nearby wakes, they run out with a burning brand and shout it back into the dark, and now and then it turns and swipes before it goes. A bear nobody kills comes back. Nobody has an answer for it yet.', req: ['bees'] },
+  seals:    { name: 'Seals', added: '2026-11-24T20:41Z', desc: 'Grey seals that followed the dugout in from the deep water. They haul out on a quiet beach out of sight of the village, lie on the sand groaning to each other, and slide into the sea when anyone comes near. They eat from the same deep water as the dugout all year round, and every early winter they pup on the sand, so the herd grows and the catch out past the surf grows thin.', req: ['canoe'] },
+  sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
 };
 
@@ -190,7 +192,7 @@ const HUNT_GAP = 6;          // days between hunts
 const HUNT_WORK = 3;         // hours spent tracking and closing in at the lair
 const HUNT_REACH = 24 * 24;  // a lair farther than this from the hearth is out of a day's reach
 const HUNT_KEEP = 3;         // hunters leave the last two of a herd, so it can breed again
-const MEAT = { boar: 45, wolf: 12, deer: 30 };
+const MEAT = { boar: 45, wolf: 12, deer: 30, seal: 60 }; // a seal is carried home for the pot like any kill
 // ---------- deer ----------
 const DEER_SPEED = 1.5;      // tiles per hour, grazing along
 const DEER_FLEE = 4;         // bounding away
@@ -576,7 +578,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -799,7 +801,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -893,6 +895,7 @@ function daily(w, c, fx) {
   if (w.pot !== undefined) potDay(w, c);
   if (w.bees !== undefined) beeDay(w, c);
   if (w.canoe !== undefined) canoeDay(w, c);
+  if (w.seal !== undefined) sealDay(w, c);
   if (w.copse !== undefined) copseDay(w, c);
   if (w.whale) whaleDay(w, c);
   if (w.fever) fever(w, c, fx);
@@ -4916,6 +4919,9 @@ function pickTask(w, p, c) {
   // the hunt
   const hk = hunt(w, p, c);
   if (hk) return hk;
+  // in early winter, down to the seals on the sand with a club
+  const sk = sealTask(w, p, c);
+  if (sk) return sk;
   // fences around the grain by the woods
   const gk = fenceTask(w, p, c);
   if (gk) return gk;
@@ -5270,9 +5276,10 @@ function squallHour(w, p, t, c, fx) {
   const S = w.squall, bx = K.bx + 0.5, by = K.by + 0.5;
   if (Q.h > 0) Q.h--;
   if (Q.sw) { // in the water, swimming for the landing
-    const a = ageY(w, p);
-    if (rnd(w) < SQUALL_SINK * (a > 50 || a < 16 ? 2 : 1) * (Q.h > 0 ? 1 : 0.5)) {
+    const a = ageY(w, p), fl = !!(w.seal && w.seal.fl != null);
+    if (rnd(w) < SQUALL_SINK * (a > 50 || a < 16 ? 2 : 1) * (Q.h > 0 ? 1 : 0.5) * (fl ? FLOAT_SINK : 1)) {
       S.d++;
+      if (fl) w.seal.fl = null; // the float went with them
       squallEnds(w, p, Q, 'drowned', c);
       die(w, p, 'drowned off the landing when a squall rolled the dugout over');
       log(w, Q.w ? 'The dugout comes in on the evening tide, upside down and empty.' : 'For days after, pieces of the dugout wash up along the beach.', 'bad');
@@ -5283,7 +5290,8 @@ function squallHour(w, p, t, c, fx) {
     const o = w.people.find((q) => !q.dead && q.task && q.task.k === 'shore' && ageY(w, q) >= 14);
     p.hurt = Math.max(p.hurt || 0, w.t + SQUALL_HURT * TICKS_PER_DAY);
     squallEnds(w, p, Q, 'swam', c);
-    log(w, `${o ? `${o.name} wades out into the surf and drags ${p.name} up the sand` : `${p.name} crawls up the sand on ${poss(p)} hands and knees`}, half drowned and coughing up sea water. ${Q.w ? 'The dugout washes in after, upside down but whole.' : 'The dugout is gone; only the paddle comes in.'}`, 'good');
+    if (fl) w.seal.fs++;
+    log(w, `${o ? `${o.name} wades out into the surf and drags ${p.name} up the sand` : `${p.name} crawls up the sand on ${poss(p)} hands and knees`}, half drowned and coughing up sea water${fl ? ', still hugging the sealskin float' : ''}. ${Q.w ? 'The dugout washes in after, upside down but whole.' : 'The dugout is gone; only the paddle comes in.'}`, 'good');
     release(w, p);
     return true;
   }
@@ -5351,6 +5359,134 @@ function shoreWatch(w, p, a) {
   p.asleep = false;
   walk(w, p, K.bx + 0.5 + p.task.ox, K.by + 0.5 + p.task.oy);
   return true;
+}
+
+// ---------- seals ----------
+// Once the dugout has been out on the deep water for a while, grey seals follow the fish in and take to a quiet
+// beach out of sight of the village to haul out. They eat from the same deep water as the dugout, and every
+// winter they pup on the sand, so the herd grows and the catch shrinks. Once the paddlers have seen what the
+// seals cost them, the hunters go down in the winter with clubs: meat for the pot, blubber for the fire and a
+// skin. A sealskin sewn up and blown full like a bladder rides in the dugout; whoever a squall rolls into the
+// sea hangs on to it, and the sea keeps far fewer.
+// w.seal { x, y haul-out (a sand tile), dx, dy toward the sea, n herd, p pups this winter, e fish eaten ever,
+//   ye this year, k taken ever, yk taken this winter, d day last tried, s skins kept, fl tick the float was sewn
+//   (null: none in the boat), fn floats sewn, fs swimmers it kept up, b bites, nm who first saw them, at tick,
+//   h tick the hunters first went down (null: not yet), hn who led them }
+const SEAL_TRIPS = 40;       // trips out before the seals have followed the dugout in
+const SEAL_SPARK = 0.03;     // daily chance in spring and summer after that
+const SEAL_FIRST = 5;        // in the first herd
+const SEAL_MAX = 16;         // the beach holds no more
+const SEAL_EAT = 5;          // seals that eat one fish a day between them from the deep water
+const SEAL_PUP = 285;        // the day of the year the pups are born on the sand (early winter)
+const SEAL_WHITE = 330;      // and the day their white coats are gone
+const SEAL_NOTICE = 500;     // fish eaten before the paddlers see what the seals cost them
+const SEAL_KEEP = 8;         // the hunters never take the herd below this, or it would not come back
+const SEAL_TAKE = 0.4;       // chance the hunter gets one before they all flop into the sea
+const SEAL_WARY = 9;         // days the herd keeps to the water after anyone has come at it with a club
+const SEAL_BITE = 0.07;     // chance an old bull rears and bites
+const SEAL_HURT = 6;         // days a bite takes to mend
+const SEAL_OIL = 4;          // timber's worth of blubber for the fires
+const SEAL_SKINS = 2;        // skins kept for floats; the rest go to the drying rack as hides
+const FLOAT_SINK = 0.35;     // share of the sea's pull on a swimmer who hangs on to a float
+const FLOAT_YEARS = 5;       // years before a float perishes and must be sewn again
+const SEAL_SITE_R2 = 26 * 26;
+function sealSite(w) {
+  const K = w.canoe, fx = w.fire.x + 0.5, fy = w.fire.y + 0.5;
+  let best = null, bd = -1;
+  for (const i of w.shore || []) {
+    const x = i % MAP, y = (i - x) / MAP;
+    if (w.tiles[i] !== T.SAND) continue;
+    const dd = d2(x + 0.5, y + 0.5, fx, fy);
+    if (dd > SEAL_SITE_R2 || dd < 100 || d2(x, y, K.bx, K.by) < 64 || dd <= bd) continue;
+    if (!DIRS4.some(([a, b]) => tile(w, x + a, y + b) === T.WATER) || !lineOfLand(w, fx, fy, x + 0.5, y + 0.5)) continue;
+    bd = dd; best = { x, y };
+  }
+  return best;
+}
+function sealsCome(w, c) {
+  const K = w.canoe;
+  if (!K || K.t < SEAL_TRIPS || c.season > 1 || rnd(w) >= SEAL_SPARK) return;
+  const at = sealSite(w);
+  if (!at) return;
+  const [dx, dy] = DIRS4.find(([a, b]) => tile(w, at.x + a, at.y + b) === T.WATER);
+  const who = aliveId(w, K.hid) || elder(w);
+  w.seal = { x: at.x, y: at.y, dx, dy, n: SEAL_FIRST, p: 0, e: 0, ye: 0, k: 0, yk: 0, d: -1, s: 0, fl: null, fn: 0, fs: 0, b: 0, nm: who ? who.name : null, at: w.t, h: null, hn: null };
+  w.techs.push('seals');
+  const side = sideOf(w, at.x, at.y);
+  milestone(w, `For days now round dark heads have come up in the swell behind the dugout, watching with big wet eyes, and sinking without a ripple when anyone looks back. This evening ${who ? who.name : 'someone'} walks the ${side} beach and finds them: ${SEAL_FIRST} grey seals hauled up on the sand, fat as sacks of grain, groaning to each other. They have followed the fish in. ${w.name} has seals.`);
+}
+function learnSealing(w, c) {
+  const W = w.seal;
+  if (W.h != null || W.e < SEAL_NOTICE || c.doy < SEAL_PUP || !w.techs.includes('hunting') || rnd(w) >= 0.25) return;
+  let who = null, bs = -1;
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || a < 16 || a > 55 || p.sick || p.hurt) continue;
+    const sc = ((p.dd && p.dd.f) || 0) + ((p.dd && p.dd.b) || 0) * 50;
+    if (sc > bs) { bs = sc; who = p; }
+  }
+  if (!who) return;
+  W.h = w.t; W.hn = who.name;
+  w.techs.push('sealing');
+  const K = w.canoe, P = pron(who), Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, `${who.name} has watched the seals take ${W.e.toLocaleString()} fish out of the deep water in front of the dugout, and the catch grow thin. Now there are pups on the sand, white as snow, and the herd is ${W.n}. ${Pc} cuts a short club of blackthorn and walks out to the ${sideOf(w, W.x, W.y)} beach at low tide, keeping between the seals and the sea. From now on, when the pups are on the sand, the hunters go down to the seals: meat for the pot, blubber for the fires, and skins${K ? ' for whatever the dugout needs' : ''}. ${w.name} learns to take seals.`);
+}
+function sealDay(w, c) {
+  const W = w.seal;
+  if (!W) { sealsCome(w, c); return; }
+  if (c.doy === 0) { W.yk = 0; W.ye = 0; if (W.fl != null && w.t - W.fl > FLOAT_YEARS * TICKS_PER_YEAR) { W.fl = null; log(w, 'The sealskin float in the dugout has gone stiff and split at the seams. It will hold no more air.', 'info'); } }
+  const K = w.canoe;
+  if (K) { // the herd eats from the deep water, all year
+    const eat = Math.min(K.d, Math.floor((W.n + (c.day % SEAL_EAT)) / SEAL_EAT));
+    K.d -= eat; W.e += eat; W.ye += eat;
+  }
+  if (c.doy === SEAL_PUP && W.n >= 2) {
+    W.p = Math.min(SEAL_MAX - W.n, Math.max(1, Math.floor(W.n / 3)));
+    W.n += W.p;
+    if (W.p > 0) log(w, `${plural(W.p, 'white pup lies', 'white pups lie')} on the sand among the seals on the ${sideOf(w, W.x, W.y)} beach. The herd is ${W.n} now.`, 'info');
+  }
+  if (c.doy === SEAL_WHITE) W.p = 0;
+  if (W.h == null) learnSealing(w, c);
+  sealFloat(w);
+}
+// a skin in store and a squall remembered: it is sewn up and blown full, and goes in the dugout
+function sealFloat(w) {
+  const W = w.seal;
+  if (W.fl != null || W.s < 1 || !w.squall || !w.squall.n || !w.canoe) return;
+  W.s--; W.fl = w.t; W.fn++;
+  if (W.fn > 1) { log(w, 'A new sealskin float is sewn up, blown full and tied into the dugout.', 'good'); return; }
+  const S = w.squall, Lt = S.last, who = aliveId(w, w.canoe.hid) || elder(w);
+  milestone(w, `${who ? who.name : 'The paddler'} turns the first sealskin over by the fire and thinks of ${!Lt ? 'the squalls out on the deep water' : who && Lt.nm === who.name ? `${poss(who)} own fight with the squall in year ${Lt.y}` : `${Lt.nm} in the squall of year ${Lt.y}`}. The skin is sewn up tight with sinew, all but one leg, which is blown into until the whole thing is round and hard as a drum, and tied off. It goes in the bottom of the dugout on a thong. Whoever the sea rolls out of the boat now has something to hang on to.`);
+}
+const sealCap = (W) => 1 + Math.floor(W.n / 3);
+function sealTask(w, p, c) {
+  const W = w.seal;
+  if (!W || W.h == null || c.doy < SEAL_PUP || c.hour > 11 || c.day < W.d || W.n <= SEAL_KEEP || W.yk >= sealCap(W) || w.res.zs != null || p.hurt || p.haul) return null;
+  const a = ageY(w, p), wx = w.wx ? w.wx.k : 'clear';
+  if (a < 16 || a > 55 || wx === 'storm' || wx === 'fog') return null;
+  if (!lineOfLand(w, p.x, p.y, W.x + 0.5, W.y + 0.5)) return null;
+  return { k: 'seal', key: 'zs', x: W.x, y: W.y, h: 2 };
+}
+function sealDone(w, p, c, pop) {
+  const W = w.seal;
+  if (!W || W.n <= SEAL_KEEP || c.day < W.d) return;
+  W.d = c.day + SEAL_WARY;
+  if (rnd(w) < SEAL_BITE) {
+    W.b++;
+    p.hurt = Math.max(p.hurt || 0, w.t + SEAL_HURT * TICKS_PER_DAY);
+    log(w, `An old bull seal rears up off the sand as ${p.name} comes in with the club, and bites ${himHer(p)} through the leg before the herd goes into the sea.`, 'bad');
+    pop('bitten', 'meat');
+    return;
+  }
+  if (rnd(w) >= SEAL_TAKE) { pop('into the sea', 'muted'); return; }
+  W.n--; W.k++; W.yk++;
+  if (W.p > 0) W.p--;
+  p.haul = 'seal';
+  w.timber = Math.round((w.timber + SEAL_OIL) * 100) / 100;
+  if (W.s < SEAL_SKINS) W.s++; else w.hides = (w.hides || 0) + 1;
+  pop('a seal', 'meat');
+  if (W.k === 1) log(w, `${p.name} comes up from the ${sideOf(w, W.x, W.y)} beach bent under the first seal: meat for the pot, a slab of blubber for the fire, and a thick grey skin pegged out to dry.`, 'good');
+  sealFloat(w);
 }
 
 function forage(w, p) {
@@ -5647,6 +5783,8 @@ function finish(w, p, t, c, fx) {
     wadeDone(w, p, c, pop);
   } else if (t.k === 'whale') {
     whaleCut(w, p, pop);
+  } else if (t.k === 'seal') {
+    sealDone(w, p, c, pop);
   } else if (t.k === 'dig') {
     const got = canoeDig(w, p, c);
     if (got) pop(got, 'build');
@@ -6445,6 +6583,10 @@ const MIGRATIONS = {
   54: (w) => {
     if (w.bear === undefined) w.bear = null;
   },
+  // v55 -> v56: seals (w.seal). None yet; once the dugout has made enough trips they follow the fish in to a quiet beach.
+  55: (w) => {
+    if (w.seal === undefined) w.seal = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6562,6 +6704,10 @@ export function summary(w) {
     springDays: w.spring ? w.spring.k : 0, springFailed: w.spring ? w.spring.f : 0, springDryYear: w.spring ? w.spring.yd : 0,
     springThirstYear: w.spring ? w.spring.yt : 0, springThirstEver: w.spring ? w.spring.th : 0, springDied: w.spring ? w.spring.d : 0,
     springLoads: w.spring ? w.spring.n : 0, springCarrying: w.spring && w.spring.dry ? w.people.filter((p) => p.task && p.task.k === 'water').length : 0,
+    seals: w.seal ? w.seal.n : 0, sealsCame: !!w.seal, sealPups: w.seal ? w.seal.p : 0, sealFish: w.seal ? w.seal.e : 0, sealFishYear: w.seal ? w.seal.ye : 0,
+    sealing: !!(w.seal && w.seal.h != null), sealsTaken: w.seal ? w.seal.k : 0, sealsYear: w.seal ? w.seal.yk : 0, sealSkins: w.seal ? w.seal.s : 0,
+    sealBites: w.seal ? w.seal.b : 0, sealFloat: !!(w.seal && w.seal.fl != null), floatSaves: w.seal ? w.seal.fs : 0,
+    sealer: (w.seal && (w.people.find((p) => !p.dead && p.task && p.task.k === 'seal') || {}).name) || null,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

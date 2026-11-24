@@ -561,3 +561,19 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Leaving it a gift (a comb on a stone at the edge of the woods) so it stays out of the village: a superstition the tale-teller tells.
   - The cheese could go in the potter's jars or a clay-sealed pit by the houses, out of its reach.
   - The bear and the lone wolf could meet; the wolves keep away from its thicket.
+- Seals are done (SIM_VERSION 56; w.seal {x, y haul-out sand tile, dx, dy, n, p pups, e/ye fish eaten, k/yk taken, d wary until day, s skins,
+  fl float tick, fn, fs, b bites, nm, at, h, hn}; sealSite/sealsCome/learnSealing/sealDay/sealFloat/sealTask/sealDone in sim.js, SEAL_* and
+  FLOAT_* constants; task 'seal' (key zs), haul 'seal'; techs 'seals' and 'sealing'; yearly `seals`, `sealsTaken`, `sealFish`; drawSeals/sealSand
+  and the float on the dugout in render.js). After 40 dugout trips a herd of 5 hauls out on the sand beach farthest from the hearth (within 26
+  tiles); it eats 1 deep fish per 5 seals a day, all year, and pups at doy 285. Once 500 fish are gone the best fisher/hunter learns to take them
+  in early winter (40%, then the herd keeps off for 9 days, never below 8). Test runs: herd swings 11-16, ~3 taken a winter, dugout catch falls
+  from ~900 to ~300-480 a year. The first skin becomes a float once a squall has been seen: a swimmer's chance of drowning drops to 35%.
+  Answers it invites:
+  - The dugout catch stays low for good with 12+ seals. A second dugout, nets (a craft that lands more per trip), or a bolder cull rule
+    once the catch fails (keep 5 instead of 8) would answer it. Or the seals could move on if they are taken every winter for years.
+  - Seal oil: blubber rendered in the potter's jars into lamp oil for the longest night (a warm light in the windows), or to proof the dugout.
+  - Sealskin for more than floats: boots for the winter woodcutters, a skin boat (a curragh) once timber is scarce late game.
+  - A pup taken in by the children as a pet that follows them into the shallows; or a "Seal" byname for someone who swam ashore twice.
+  - Orca or a shark chasing the herd in once a decade (the seals scatter and the dugout stays in).
+  - Spare skins go to w.hides (winter warmth); hides already wear out 40% a year, so the effect is small.
+- Housekeeping: scripts/.deerpeek.mjs is an old committed probe and can go.

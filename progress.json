@@ -308,5 +308,10 @@
   "at": "2026-11-24T20:36:26.086Z",
   "title": "Add a bear that raids the bee logs and cheese rack",
   "body": "- SIM_VERSION 55 (w.bear; beast k 'bear'; BEAR_* in sim.js; tech 'bear'; yearly `bear`): from year 5, once there is honey or cheese, a late summer may bring a named bear over the bar from the far isle; it lies up in a thicket until the first frosts (doy 282)\n- On about one quiet night in eight it walks in for the heaviest bee log or the cheese rack and eats until a sleeper wakes (a dog makes it likely) and drives it off with a brand; it may split a log (the hive dies) or swipe at the one with the brand (a wound, never a death)\n- Shown on the map at night (it rears up at the log), with a split-log sprite, a tooltip, a Bear row in Beasts and in the hard-years strip\n- Often the same bear comes back; nothing stops it yet, so a later visit can add a hunt, raised hives or a thorn ring"
+ },
+ {
+  "at": "2026-11-24T21:10:51.566Z",
+  "title": "Add seals that eat the deep fish, and sealskin floats",
+  "body": "- SIM_VERSION 56 (w.seal; techs 'seals' and 'sealing'; task 'seal'; yearly `seals`, `sealsTaken`, `sealFish`): after 40 dugout trips a herd of 5 grey seals hauls out on a quiet sand beach, eats from the dugout's deep-water fish all year and pups every early winter\n- Once the seals have eaten 500 fish, a hunter goes down with a club when the pups are on the sand: meat, blubber for the fire, a skin. After each try the herd keeps off for 9 days, and it is never taken below 8\n- The first skin becomes a float in the dugout once the island has seen a squall: a swimmer who holds on to it drowns about a third as often. It perishes after 5 years\n- Visible: seals hauled out by day (heads lift, white pups), heads bobbing offshore at night or when someone comes near, the club, a seal carried home, the float in the dugout and in a swimmer's arms, a Seals row and tooltip\n- Watch: Hais (canoe trips 249) should find its seals this spring or summer (Y11) and start sealing in the Y12 winter; expect the dugout catch to fall from ~900 to ~300-480 fish a year"
  }
 ]

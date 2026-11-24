@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
 // the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
 const KILN = ['..kkkk..', '.kKKKKk.', 'kKKKKKKk', 'kKKKKKKk', 'kKKmmKKk', 'kKmmmmKk', 'kkmmmmkk', '........'];
@@ -112,6 +112,7 @@ function doing(p) {
   if (p.task && p.task.sea && w.squall && w.squall.cur && w.squall.cur.id === p.id) return 'fighting the paddle home through a squall';
   if (p.task && p.task.k === 'paddle') return !p.task.sea ? 'going down to the dugout' : p.x === p.px && p.y === p.py ? 'fishing the deep water from the dugout' : p.task.h > 3 ? 'paddling out past the surf' : 'paddling home with the catch';
   if (p.task && p.task.k === 'dig') return 'burning and scraping out the dugout';
+  if (p.task && p.task.k === 'seal') return p.x === p.px && p.y === p.py ? 'creeping up on the seals with a club' : 'going down to the seals with a club';
   if (p.task && p.task.k === 'blaze') return p.x === p.px && p.y === p.py ? 'beating at the flames with a green branch' : 'running to the fire';
   if (p.task && p.task.k === 'honey') return p.x === p.px && p.y === p.py ? 'smoking the bees and cutting out the comb' : 'going to take the honey with a smoking brand';
   if (p.task && p.task.k === 'clay') return 'digging clay at the bank';
@@ -1135,6 +1136,7 @@ function frame() {
   }
   const flames = drawBlaze(now);
   const canoe = drawCanoe(now);
+  const seals = drawSeals(hf, now);
   // people
   const shown = [];
   let horner = null;
@@ -1167,7 +1169,8 @@ function frame() {
       if (Q && Q.w) sprite(sc, ['.bbbbbbb.', 'bbbbbbbbb'], BX + 4, BY + 2 + (1 - bob), OWN_DCOLS); // the upturned hull wallowing just off
       px(sc, BX - 2, BY + 1, 'rgba(235,242,250,0.7)', 5, 1); // the splash round the swimmer
       px(sc, BX - 1, BY - 1 + bob, '#f1c9a5', 2, 2);
-      px(sc, arm ? BX - 3 : BX + 2, BY - 1, '#f1c9a5'); // an arm comes over
+      if (floatIn()) { px(sc, BX + 1, BY - bob, FLOAT_COL, 3, 2); px(sc, BX + 1, BY - bob, FLOAT_HI); px(sc, BX + 1, BY + 1 - bob, '#f1c9a5'); } // both arms round the float
+      else px(sc, arm ? BX - 3 : BX + 2, BY - 1, '#f1c9a5'); // an arm comes over
       shown.push({ p, x, y });
       continue;
     }
@@ -1175,6 +1178,7 @@ function frame() {
       const BX = sub(x * TILE) - 4, BY = sub(y * TILE) - 1 + (w.squall && w.squall.cur && w.squall.cur.id === p.id ? Math.floor(now / 230) % 2 : 0); // pitching in a squall
       if (moving) px(sc, BX + (p.x < p.px ? 9 : -2), BY + 1, 'rgba(200,220,240,0.35)', 2, 1); // the wake
       sprite(sc, DUGOUT, BX, BY, OWN_DCOLS);
+      if (floatIn()) { px(sc, BX + 1, BY, FLOAT_COL, 2, 1); px(sc, BX + 1, BY, FLOAT_HI); }
       px(sc, BX + 4, BY - 2, '#f1c9a5'); px(sc, BX + 4, BY - 1, ROLE.fish);
       if (moving) { if (Math.floor(now / 300 + p.id) % 2) px(sc, BX + 5, BY + 1 + (Math.floor(now / 600 + p.id) % 2 ? -2 : 2), '#b49a6a', 1, 2); }
       else { // a hand line over the side, now and then a tug
@@ -1239,6 +1243,10 @@ function frame() {
         const jab = !moving && Math.floor(now / 260 + p.id) % 4 === 0 ? 1 : 0;
         px(sc, X + 3 + jab, Y - 2, '#b49a6a', 1, 5); px(sc, X + 3 + jab, Y - 3, '#e8e8e8', 1, 1);
       }
+      if (p.task && p.task.k === 'seal') { // a short blackthorn club, knob up; raised high once down among the seals
+        const up = !moving && Math.floor(now / 300 + p.id) % 3 !== 0;
+        px(sc, X + 3, Y - (up ? 2 : 0), '#4a3322', 1, 3); px(sc, X + 3, Y - (up ? 3 : 1), '#6e4a2a', 2, 1);
+      }
       if (p.task && p.task.k === 'cheese' && moving) { px(sc, X + 3, Y + 2, '#7a5232', 2, 2); px(sc, X + 3, Y + 2, '#efe9da', 2, 1); } // a pail of milk in the hand
       if (p.task && p.task.k === 'water') { // out with an empty skin over the shoulder; home with a full jar on the head, or a fat skin on the back
         const jar = w.techs.includes('pottery');
@@ -1248,8 +1256,8 @@ function frame() {
       }
       if (p.task && p.task.k === 'muck' && moving) { px(sc, X - 1, Y, WOOD, 2, 3); px(sc, X - 1, Y - 1, '#3d2a19', 2, 1); } // a basket of muck on the back
       if (p.task && p.task.k === 'haul') { // the kill slung over a shoulder
-        const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : '#4d3527';
-        px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, q === 'wolf' ? '#b4b7bc' : q === 'deer' ? '#efe6d2' : '#7a5444', 1, 1);
+        const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : q === 'seal' ? '#7d7f82' : '#4d3527';
+        px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, q === 'wolf' ? '#b4b7bc' : q === 'deer' ? '#efe6d2' : q === 'seal' ? '#55575b' : '#7a5444', 1, 1);
       }
     }
     if (w.heal && w.heal.id === p.id && age >= 14) { // the healer's basket on the hip, green leaves showing
@@ -1456,6 +1464,11 @@ function frame() {
       const s = S.summary(w), f = w.fields.find((o) => o.id === w.crow.cur.f), seed = f && f.stage === 'planted';
       tip.innerHTML = `<b>Rooks</b><br>${s.crowFlock} walking the rows · ${seed ? 'digging out the seed' : 'stripping the ripe ears'}${f && f.lost ? ` · ${Math.round(f.lost * 100)}% of this field gone` : ''}${s.scarers ? ` · ${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} coming with clappers` : ''}<br><span class="m">${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scared}x since ${esc(w.crow.nm || 'the eldest')} made the first clapper` : ' · nobody has an answer for them yet'}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = seals.find((o) => Math.hypot(o.x + 0.25 - mx, o.y + 0.15 - my) < 0.5))) {
+      const s = S.summary(w), W = w.seal;
+      tip.innerHTML = `<b>Grey seals</b><br>${s.seals} ${best.wet ? 'in the water off the beach' : 'hauled out on the sand'}${s.sealPups ? ` · ${s.sealPups} white ${s.sealPups === 1 ? 'pup' : 'pups'}` : ''}${s.sealer ? ` · <span class="bad">${esc(s.sealer)} coming with a club</span>` : ''}` +
+        `<br><span class="m">${s.sealFishYear.toLocaleString()} deep-water fish eaten this year · ${s.sealing ? `${s.sealsTaken} taken since ${esc(W.hn)} cut the first club` : 'nobody has gone after them yet'} · first seen by ${esc(W.nm || 'the paddler')} ${when(W.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = whaleAt(mx, my))) {
       const o = best.o, s = S.summary(w);
       tip.innerHTML = best.bone
@@ -1527,12 +1540,17 @@ const GUEST = '#6fa3c8';
 // being hollowed, with a wisp of smoke from the little fires along its back when someone is at work on it
 const OWN_DCOLS = { b: '#6e4a2c', B: '#a8784a' };
 const LOG = ['.ccccccc.', 'cCCCCCCCc', '.ccccccc.'], LOGCOL = { c: '#5e4026', C: '#7a5636' };
+const FLOAT_COL = '#9a948a', FLOAT_HI = '#c4beb2'; // a sealskin blown full
+const floatIn = () => !!(w.seal && w.seal.fl != null);
 function drawCanoe(now) {
   const K = w.canoe;
   if (!K || (K.at != null && K.ok)) return null;
   if (!K.ok && K.wk < 0) return null;
   const X = K.bx * TILE - 1, Y = K.by * TILE + 3;
-  if (K.ok) { sprite(sc, DUGOUT, X, Y, OWN_DCOLS); px(sc, X + 9, Y + 1, '#b49a6a', 2, 1); } // a paddle left lying beside it
+  if (K.ok) {
+    sprite(sc, DUGOUT, X, Y, OWN_DCOLS); px(sc, X + 9, Y + 1, '#b49a6a', 2, 1); // a paddle left lying beside it
+    if (floatIn()) { px(sc, X + 2, Y, FLOAT_COL, 3, 1); px(sc, X + 2, Y, FLOAT_HI); } // the sealskin float tied in the bottom
+  }
   else {
     sprite(sc, LOG, X, Y, LOGCOL);
     const done = Math.round((K.wk / 40) * 7); // the hollow creeps along the trunk
@@ -1545,6 +1563,65 @@ function drawCanoe(now) {
     }
   }
   return { x: K.bx + 0.5, y: K.by + 0.6 };
+}
+// ---------- seals ----------
+// grey seals hauled out on the sand of their quiet beach by day, heads lifting now and then; at night, in a storm
+// or with anyone close, they are only round heads bobbing in the swell off it. White pups stay on the sand.
+let sealSpots = null;
+function sealSand(W) {
+  const key = W.x + ',' + W.y;
+  if (sealSpots && sealSpots.key === key) return sealSpots.list;
+  const list = [];
+  for (let y = W.y - 2; y <= W.y + 2; y++) for (let x = W.x - 2; x <= W.x + 2; x++) {
+    if (x < 0 || y < 0 || x >= S.MAP || y >= S.MAP || w.tiles[y * S.MAP + x] !== S.T.SAND) continue;
+    const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const X = x + a, Y = y + b; return X < 0 || Y < 0 || X >= S.MAP || Y >= S.MAP || w.tiles[Y * S.MAP + X] === S.T.WATER; });
+    if (wet) list.push({ x, y, d: (x - W.x) * (x - W.x) + (y - W.y) * (y - W.y) });
+  }
+  list.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x);
+  if (!list.length) list.push({ x: W.x, y: W.y, d: 0 });
+  sealSpots = { key, list };
+  return list;
+}
+const SEAL_COLS = ['#7d7f82', '#6a6c70', '#8e8a80', '#5f6266'];
+function drawSeals(hf, now) {
+  const W = w.seal, out = [];
+  if (!W || !W.n) return out;
+  const spots = sealSand(W), cx = W.x + 0.5, cy = W.y + 0.5;
+  const near = w.people.some((p) => !p.asleep && (p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy) < 12);
+  const ashore = hf >= 7 && hf < 19 && wxNow() !== 'storm' && !near;
+  const pups = Math.min(4, W.p || 0), adults = W.n - (W.p || 0);
+  for (let k = 0; k < pups; k++) { // white pups on the sand, a little apart from the rest
+    const s = spots[(spots.length - 1 - k) % spots.length], h = S.hash(k, W.x, 71);
+    const X = s.x * TILE + 1 + Math.floor(h * 4), Y = s.y * TILE + 2 + Math.floor(S.hash(k, W.y, 73) * 4);
+    px(sc, X, Y, '#f2efe6', 3, 2); px(sc, X + (k & 1 ? 2 : 0), Y, '#2a2a2a');
+    out.push({ x: X / TILE, y: Y / TILE });
+  }
+  if (ashore) {
+    for (let k = 0; k < Math.min(adults, 10); k++) {
+      const s = spots[k % spots.length], h = S.hash(k, W.x * 7 + W.y, 79), face = h < 0.5 ? 1 : -1;
+      const X = s.x * TILE + Math.floor(S.hash(k, 3, 83) * 3) + (Math.floor(k / spots.length) % 2) * 3, Y = s.y * TILE + 1 + Math.floor(S.hash(k, 5, 89) * 4) - (Math.floor(k / spots.length) % 2) * 2;
+      const col = SEAL_COLS[k % SEAL_COLS.length], lift = Math.floor(now / 1300 + k * 1.7) % 5 === 0 ? 1 : 0;
+      const hx = face > 0 ? X : X + 5, tx = face > 0 ? X + 6 : X - 1;
+      px(sc, X + 1 - (face > 0 ? 0 : 1), Y + 1, col, 5, 2); // the body, lying like a sack
+      px(sc, X + 2 - (face > 0 ? 0 : 1), Y + 1, '#a3a29c', 3, 1); // light on the back
+      px(sc, hx, Y - lift, col, 1, 2); px(sc, hx, Y - lift, '#1c1c1c'); // the head, lifted now and then
+      px(sc, tx, Y + 2 - (Math.floor(now / 900 + k) % 4 === 0 ? 1 : 0), '#4a4c50'); // a tail flipper
+      out.push({ x: X / TILE + 0.3, y: Y / TILE + 0.1 });
+    }
+    return out;
+  }
+  for (let k = 0; k < Math.min(adults, 6); k++) { // heads in the swell off the beach, up for a breath and gone again
+    if (Math.floor(now / 1900 + k * 0.7) % 3 === 0) continue;
+    const r = 1.3 + S.hash(k, W.x, 97) * 2.2, side = S.hash(k, W.y, 101) * 3 - 1.5;
+    const x = cx + W.dx * r + W.dy * side, y = cy + W.dy * r + W.dx * side;
+    const tx = Math.floor(x), ty = Math.floor(y);
+    if (tx < 0 || ty < 0 || tx >= S.MAP || ty >= S.MAP || w.tiles[ty * S.MAP + tx] !== S.T.WATER) continue;
+    const X = Math.round(x * TILE), Y = Math.round(y * TILE) + (Math.floor(now / 500 + k) % 2);
+    px(sc, X - 1, Y + 2, 'rgba(220,235,250,0.4)', 4, 1); // the ring round it
+    px(sc, X, Y, '#4f5155', 2, 2); px(sc, X, Y, '#1c1c1c');
+    out.push({ x: x, y: y, wet: true });
+  }
+  return out;
 }
 function drawIsle(frac, now, fest) {
   const out = [], B = w.isle && w.isle.boat;
@@ -2024,7 +2101,7 @@ const RES_GROUPS = [
   ['Stores & crafts', ['gran', 'pot', 'cheese', 'bee', 'copse', 'path', 'herb']],
   ['Fields', ['muck', 'frost', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
   ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
-  ['Sea & sky', ['canoe', 'squall', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
+  ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
   ['Folk', ['by', 'tale', 'grave']],
 ];
 const RES_KEY = 'island.stats';
@@ -2089,6 +2166,7 @@ function updatePanels() {
     ...(s.dogsCame ? [['dog', 'Dogs', s.dogs ? `${s.dogs} <span class="m">· ${w.dogs.d.filter((d) => w.t - d.b >= S.TICKS_PER_YEAR).map((d) => { const o = w.people.find((q) => q.id === d.own); return esc(d.nm) + (o ? ' with ' + esc(o.name) : ''); }).join(' · ') || 'all pups'}${s.dogsTurned ? ` · ${s.dogsTurned} ${s.dogsTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}${s.dogsFound ? ` · ${s.dogsFound} lost found` : ''}${s.dogsRats ? ` · ${s.dogsRats} rats` : ''}</span>` : '<span class="m">none left</span>']] : []),
     ...(s.canoe ? [['canoe', 'Dugout', `${s.canoeOut ? `<span class="fest">${esc(s.canoeOut)} out on the deep water</span> · ` : s.canoeOk ? '<span class="m">on the beach</span> · ' : `<span class="bad">${s.canoeDug != null ? `being hollowed, ${s.canoeDug}%` : 'none, waiting for timber'}</span> · `}<span class="m">${s.canoeYear.toLocaleString()} fish this year · ${s.canoeTrips} ${s.canoeTrips === 1 ? 'trip' : 'trips'}${s.canoeLost ? ` · ${s.canoeLost} ${s.canoeLost === 1 ? 'boat' : 'boats'} lost` : ''}</span>`]] : []),
     ...(s.squalls ? [['squall', 'Squalls', `${s.squall ? `<span class="bad">${esc(s.squall)} ${s.squallSwim ? 'is in the water' : 'is caught out in a squall'} · ${s.squallWatch} on the beach</span> · ` : ''}<span class="m">${s.squalls} ${s.squalls === 1 ? 'squall' : 'squalls'} · ${s.squallIn} came in through it · ${s.squallSwam} swam ashore${s.squallDrowned ? ` · ${s.squallDrowned} drowned` : ''}${s.squallBoats ? ` · ${s.squallBoats} ${s.squallBoats === 1 ? 'boat' : 'boats'} lost` : ''}</span>`]] : []),
+    ...(s.sealsCame ? [['seal', 'Seals', `${s.sealer ? `<span class="fest">${esc(s.sealer)} creeping up on them with a club</span> · ` : ''}${s.seals}${s.sealPups ? ` <span class="m">(${s.sealPups} white ${s.sealPups === 1 ? 'pup' : 'pups'})</span>` : ''} <span class="m">· ${s.sealFishYear.toLocaleString()} deep-water fish eaten this year · ${s.sealing ? `${s.sealsTaken} taken${s.sealBites ? ` · ${s.sealBites} ${s.sealBites === 1 ? 'bite' : 'bites'}` : ''} · ${s.sealFloat ? `a sealskin float in the dugout${s.floatSaves ? ` (${s.floatSaves} kept afloat)` : ''}` : 'no float in the dugout'}` : 'nobody has gone after them yet'}</span>`]] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
     ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
