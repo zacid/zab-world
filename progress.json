@@ -318,5 +318,10 @@
   "at": "2026-11-24T21:49:45.002Z",
   "title": "Add a midsummer footrace with an oak wreath for the winner",
   "body": "- SIM_VERSION 57 (w.fest.race {d, sx/sy, ex/ey, lx/ly, rs, win, nm}, rn, rl; tech 'race'; task 'race'; deed 'r', byname \"the Swift\" at 3 wins)\n- At 17:00 on midsummer up to 8 islanders aged 9-30 line up by the bonfire, run out to a hazel stake 6-9 tiles away over open grass and back by 19:00; the winner is crowned at 20:00. The first race needs a runner under 16\n- Speed comes from age, a fixed \"quick legs\" per islander and luck, so some win again and again. A single winner of 17+ is pledged that night 70% of the time\n- Visible: the stake with a red rag, runners with pumping arms in a pale colour, a green oak wreath on the winner while the dance goes on, top-line note, a Race row under Folk\n- Watch: Hais runs its first race at the Y11 midsummer (summer day 46, 4 runners); on the probe Anfen became the Swift by Y14"
+ },
+ {
+  "at": "2026-11-24T23:11:52.740Z",
+  "title": "Add scarecrows that the rooks slowly see through",
+  "body": "- Fix the blank page: render.js declared `RCOL` twice (bear and rats), so the bundle did not parse; the bear palette is now `BEARCOL`, and build.mjs fails if the bundle does not parse\n- SIM_VERSION 58 (w.crow gains m, mk, mt, my, mv, mo, mnm, mat; scareTurn/scareSite/scareTask/scareDone in sim.js, SCARE_* constants; tech 'scarecrow'; task 'crowman', key zk; yearly `crowTurned`): learned once the children have driven the flock off 30 times\n- Idle adults stand 1 + fields/10 scarecrows (max 8, 1 timber each, a spare hide makes one last longer); a flock picking a field within ~3 tiles of one wheels away, but each turn wears it down and after 20-30 turns a rook sits on its hat and it must be moved to a new field\n- Visible: scarecrows in the fields (hide or straw coat, a rook on the hat when found out), carried over the shoulder and hammered in, hover text, scarecrow counts in the Rooks row\n- Watch: Hais learns it this spring (Y11); on the live world rook losses fall from ~200-400 to ~30-60 grain a year and found-out scarecrows get moved 2-3 times a year"
  }
 ]

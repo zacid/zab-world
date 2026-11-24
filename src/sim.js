@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 57;
+export const SIM_VERSION = 58;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -79,6 +79,7 @@ export const TECHS = {
   squall:   { name: 'Squalls', added: '2026-11-22T02:14Z', desc: 'Out past the surf the weather turns faster than anyone on the beach can see. On a hot afternoon, or in autumn, or the day before a storm, a black squall can come down on the deep water in minutes: wind, slanting rain and a short steep sea. The one in the dugout turns for home and fights the paddle; the village runs down to the landing to watch. Some come in through the surf with the catch thrown over the side, some are rolled over and swim for it, and the sea keeps a few. Nobody has an answer for it yet.', req: ['canoe'] },
   crows:    { name: 'Rooks', added: '2026-11-22T03:27Z', desc: 'A flock of rooks from the woods that comes down by day on new-sown fields to dig out the seed, and on the ripe grain to strip the ears. A field picked bare of its seed has to be sown again. The flock grows a little every year with the fields.', req: ['farming'] },
   scaring:  { name: 'Bird-scaring', added: '2026-11-22T03:27Z', desc: 'Two flat boards tied loosely with a thong, swung so they clap like a breaking branch. When the rooks come down on the grain the children run out with clappers and stones and shout until the flock lifts and goes back to the trees for a while. A flock driven off often enough in a year loses some of its birds to other woods.', req: ['crows'] },
+  scarecrow: { name: 'Scarecrows', added: '2026-11-24T22:42Z', desc: 'Two poles lashed in a cross and driven into the middle of a field, stuffed with straw, a turnip-pale head and an old hide hung on the arms to flap in the wind. A flock that wheels in over the rows sees a man standing there and goes on to a field nobody is guarding. Rooks are not fools: every time they are turned away they look a little longer, and in a few weeks one lands on its head and the rest come down around it. Then it has to be pulled up and stood somewhere new, where they have not seen it yet. One dressed in a hide frightens them longer than one in straw.', req: ['scaring'] },
   foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
   drought:  { name: 'Dry spring', added: '2026-11-22T04:45Z', desc: 'The spring by the village is fed by the rain. A hot, dry summer draws it down, and the more mouths there are the faster it goes, until one morning there is only cracked mud between the stones. Then the water comes from a deep pool in the woods, a long walk each way with a skin bag, or a jar once there is a potter. On a day with too few carries the small children and the old go thirsty and some sicken, and the goats give less milk. The autumn rains fill the spring again. Nobody has an answer for it yet.', req: ['fire'] },
   bear:     { name: 'The bear', added: '2026-11-24T20:06Z', desc: 'Some summers, when the bees are heavy with comb, a brown bear wades over the sand bar from the far isle at low tide and lies up in a thicket near the village until the first frosts. On quiet nights it comes out of the trees for the honey logs and the cheese rack: it tears the comb out with its claws, sometimes knocks a log over and splits it, and pulls the rounds off the rods. If a dog barks or someone sleeping nearby wakes, they run out with a burning brand and shout it back into the dark, and now and then it turns and swipes before it goes. A bear nobody kills comes back. Nobody has an answer for it yet.', req: ['bees'] },
@@ -807,7 +808,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -1404,7 +1405,8 @@ function crowYear(w) {
   else C.b = Math.max(C.b, Math.min(CROW_MAX, CROW_START + (w.fields.length >> 1), C.b + CROW_BREED));
   if (C.y >= 100) log(w, `Rooks ate ${Math.round(C.y).toLocaleString()} grain in the fields last year.`, 'bad');
   if (C.b < was) log(w, `So many times driven off the grain, some of the rooks have gone to build in other woods. The flock is down to ${C.b}.`, 'good');
-  C.y = 0; C.ys = 0;
+  if (C.m && C.my >= 20) log(w, `The scarecrows turned the rooks away ${C.my} times last year.`, 'good');
+  C.y = 0; C.ys = 0; if (C.m) C.my = 0;
 }
 function crowHour(w, c) {
   const C = w.crow, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
@@ -1426,11 +1428,13 @@ function crowHour(w, c) {
   const f = can[ri(w, can.length)];
   if (!C) crowCome(w, f);
   const K = w.crow;
-  K.cur = { f: f.id, x: f.x, y: f.y, t: w.t, h: 3 + ri(w, 4) };
+  if (K.m && scareTurn(w, K, f)) return;
+  if (K.sc && !K.m && K.s >= SCARE_LEARN) learnScarecrow(w, K);
+  K.cur ={ f: f.id, x: f.x, y: f.y, t: w.t, h: 3 + ri(w, 4) };
   K.n++;
 }
 function crowCome(w, f) {
-  w.crow = { b: CROW_START, n: 0, e: 0, g: 0, y: 0, st: 0, ys: 0, s: 0, wait: 0, cur: null, up: null, sc: null, nm: null, k: null };
+  w.crow = { b: CROW_START, n: 0, e: 0, g: 0, y: 0, st: 0, ys: 0, s: 0, wait: 0, cur: null, up: null, sc: null, nm: null, k: null, ...SCARE_FRESH() };
   if (!w.techs.includes('crows')) w.techs.push('crows');
   const who = elder(w);
   milestone(w, `A ragged black cloud comes up out of the woods at first light, wheels once over the houses, calling, and drops onto ${f.stage === 'ripe' ? 'the ripe grain' : 'a field sown only days ago'}. ` +
@@ -1501,6 +1505,113 @@ function crowScare(w, C, f, c) {
   }
 }
 export const crowsDown = (w) => !!(w.crow && w.crow.cur);
+
+// ---------- scarecrows ----------
+// Once the children have run out after the rooks SCARE_LEARN times, the eldest stands a cross of poles in a field
+// with straw and an old hide on it. When the flock picks a field to come down on and a scarecrow still frightens
+// them stands within SCARE_R2 of it, they wheel away and try again later; each time they are turned the
+// scarecrow loses a little of its fright (s.d). The turn it reaches nothing, one lands on its head and the flock
+// comes down around it: it is found out, guards nothing, and waits for an idle adult to pull it up and stand it
+// somewhere new (spring and summer only). The village keeps 1 + fields/SCARE_PER of them (up to SCARE_MAX);
+// each new one costs a pole of timber, and a hide when there are spare ones, which frightens them longer.
+// w.crow gains { m null | scarecrows [{x, y, f field id, d fright left, n flocks turned, by maker, hd hide, t made}],
+// mk made ever, mt flocks turned ever, my this year, mv moved ever, mo found out ever, mnm who made the first, mat }.
+const SCARE_LEARN = 30;       // times the children have driven the flock off before a scarecrow is thought of
+const SCARE_R2 = 10;          // squared tiles from a field to a scarecrow that guards it (about 3 tiles round)
+const SCARE_FEAR = 20;        // flocks a straw scarecrow turns before it is found out
+const SCARE_HIDE = 1.5;       // a hide-coated one lasts this much longer
+const SCARE_HIDES = 4;        // hides kept back before one goes on a scarecrow
+const SCARE_PER = 10, SCARE_MAX = 8; // fields per scarecrow, and the most kept
+const SCARE_WORK = 3;         // hours to drive the poles in and dress it
+const SCARE_FRESH = () => ({ m: null, mk: 0, mt: 0, my: 0, mv: 0, mo: 0, mnm: null, mat: null });
+const scareMax = (w) => Math.min(SCARE_MAX, 1 + Math.floor(w.fields.length / SCARE_PER));
+const scareFear = (s) => (s.hd ? Math.round(SCARE_FEAR * SCARE_HIDE) : SCARE_FEAR);
+function learnScarecrow(w, C) {
+  const who = elder(w);
+  if (!who) return;
+  C.m = []; C.mnm = who.name; C.mat = w.t;
+  if (!w.techs.includes('scarecrow')) w.techs.push('scarecrow');
+  milestone(w, `The children have run out after the rooks ${C.s} times, and still the flock comes back. ${who.name} watches it come in over the trees and turn away from a field where somebody stands hoeing, and laughs: they are afraid of a man, not of a clapper. ` +
+    `That evening two poles are lashed into a cross and stuffed with straw, ${w.hides >= SCARE_HIDES ? 'an old hide is hung over the arms' : 'a bundle of straw is tied on for a head'}, and the figure is carried out to the fields. ${w.name} learns to make scarecrows.`);
+}
+// the flock comes in over a field: is it still frightened of a scarecrow by it?
+function scareTurn(w, C, f) {
+  let s = null, bd = 1e9;
+  for (const o of C.m) {
+    if (o.x == null || o.d <= 0) continue;
+    const dd = d2(o.x, o.y, f.x, f.y);
+    if (dd <= SCARE_R2 && dd < bd) { bd = dd; s = o; }
+  }
+  if (!s) return false;
+  s.d--;
+  if (s.d <= 0) { // they have seen through it: one sits on its head, the rest come down
+    C.mo++;
+    const whose = s.by ? `${s.by}'s` : 'the';
+    log(w, [`A rook drops onto the hat of ${whose} scarecrow and sits there cawing, and the flock comes down round its feet. It frightens nobody now.`,
+      `The rooks walk the rows right up to ${whose} scarecrow now, and one is pulling straw out of its sleeve. It will have to be moved.`,
+      `The flock has seen through ${whose} scarecrow: they come down all round it and one perches on the crossbar.`][C.mo % 3], 'bad');
+    return false;
+  }
+  s.n++; C.mt++; C.my++;
+  if (C.mt === 1) log(w, `The rooks come in low over the trees, see the figure standing in the rows with its arms out, and wheel away cawing. Not one of them lands.`, 'good');
+  C.up = { x: f.x, y: f.y, t: w.t };
+  C.wait = w.t + 1 + ri(w, 2);
+  return true;
+}
+// where a new or moved scarecrow should stand: the field that brings the most unguarded fields inside its reach
+function scareSite(w, C, moving) {
+  const F = w.fields;
+  if (!F.length) return null;
+  const guarded = (f) => C.m.some((o) => o !== moving && o.x != null && o.d > 0 && d2(o.x, o.y, f.x, f.y) <= SCARE_R2);
+  const open = F.filter((f) => !guarded(f));
+  if (!open.length) return null;
+  const st = Math.max(1, Math.floor(open.length / 60)), fx = w.fire.x, fy = w.fire.y;
+  let best = null, bn = 0, bd = 1e9;
+  for (let k = 0; k < open.length; k += st) {
+    const f = open[k];
+    if (C.m.some((o) => o.x === f.x && o.y === f.y)) continue;
+    let n = 0;
+    for (const g of open) if (d2(g.x, g.y, f.x, f.y) <= SCARE_R2) n++;
+    const dd = d2(f.x, f.y, fx, fy);
+    if (n > bn || (n === bn && dd < bd)) { bn = n; bd = dd; best = f; }
+  }
+  return bn >= 2 ? best : null;
+}
+function scareTask(w, c) {
+  const C = w.crow;
+  if (!C || !C.m || c.season > 1 || w.res.zk != null) return null;
+  let o = -1;
+  for (let k = 0; k < C.m.length; k++) if (C.m[k].d <= 0) { o = k; break; }
+  if (o < 0 && (C.m.length >= scareMax(w) || w.timber < 1)) return null;
+  const f = scareSite(w, C, o >= 0 ? C.m[o] : null);
+  if (!f) return null;
+  return { k: 'crowman', key: 'zk', x: f.x, y: f.y, h: SCARE_WORK, o, f: f.id };
+}
+function scareDone(w, p, t, pop) {
+  const C = w.crow;
+  if (!C || !C.m) return;
+  const f = w.fields.find((o) => o.id === t.f);
+  if (!f || C.m.some((o) => o.x === f.x && o.y === f.y)) return;
+  if (t.o >= 0) { // a found-out one pulled up and stood where they have not seen it
+    const s = C.m[t.o];
+    if (!s || s.d > 0) return;
+    s.x = f.x; s.y = f.y; s.f = f.id; s.d = scareFear(s); s.n = 0;
+    C.mv++;
+    pop('moved', 'muted');
+    if (C.mv === 1) log(w, `${p.name} pulls the found-out scarecrow up by its poles, carries it across the fields over one shoulder and drives it in again where the rooks have not seen it. The next flock that comes in turns away.`, 'good');
+    return;
+  }
+  if (C.m.length >= scareMax(w) || w.timber < 1) return;
+  w.timber -= 1;
+  const hd = w.hides >= SCARE_HIDES ? 1 : 0;
+  if (hd) w.hides -= 1;
+  const s = { x: f.x, y: f.y, f: f.id, d: 0, n: 0, by: p.name, hd, t: w.t };
+  s.d = scareFear(s);
+  C.m.push(s); C.mk++;
+  pop('scarecrow', 'food');
+  if (C.mk === 1) milestone(w, `${p.name} drives the poles into the middle of a field and hangs ${hd ? 'an old hide' : 'straw'} on the arms. In the wind it flaps and turns, and from the trees it looks like someone standing there. The first scarecrow stands on ${w.name}.`);
+  else if (C.m.length > 1 && C.m.length === scareMax(w)) log(w, `${C.m.length} scarecrows stand in the fields now, each one keeping the rooks off the rows round it.`, 'good');
+}
 
 // ---------- smudge fires ----------
 // Twice blackened by a late frost, the village fights it. On the second evening of a spring cold snap (the night
@@ -5033,6 +5144,9 @@ function pickTask(w, p, c) {
   // the summer milk in the pails: curdled, pressed and set out on the rack
   const zk = cheeseTask(w);
   if (zk) return zk;
+  // a scarecrow for the fields, or a found-out one moved where the rooks have not seen it
+  const sck = scareTask(w, c);
+  if (sck) return sck;
   // muck from the heap by the pen, forked over the bare fields after the harvest
   const mk = muckTask(w, p);
   if (mk) return mk;
@@ -5842,6 +5956,8 @@ function finish(w, p, t, c, fx) {
     muckDone(w, p, t, pop);
   } else if (t.k === 'cheese') {
     cheeseDone(w, p, pop);
+  } else if (t.k === 'crowman') {
+    scareDone(w, p, t, pop);
   } else if (t.k === 'water') {
     waterDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
@@ -6700,6 +6816,10 @@ const MIGRATIONS = {
   56: (w) => {
     if (w.fest) { if (w.fest.race === undefined) w.fest.race = null; if (w.fest.rn === undefined) w.fest.rn = 0; if (w.fest.rl === undefined) w.fest.rl = null; }
   },
+  // v57 -> v58: scarecrows (w.crow.m and its counts). None stand yet; the eldest thinks of one once the children have driven the flock off often enough.
+  57: (w) => {
+    if (w.crow) for (const [k, v] of Object.entries(SCARE_FRESH())) if (w.crow[k] === undefined) w.crow[k] = v;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6814,6 +6934,9 @@ export function summary(w) {
     crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
     scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
     scarers: w.crow && w.crow.cur ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'scare').length : 0,
+    scarecrows: w.crow && w.crow.m ? w.crow.m.length : 0, scareFound: w.crow && w.crow.m ? w.crow.m.filter((o) => o.d <= 0).length : 0,
+    scareTurned: w.crow ? w.crow.mt || 0 : 0, scareYear: w.crow ? w.crow.my || 0 : 0, scareMoved: w.crow ? w.crow.mv || 0 : 0,
+    scareMaking: w.crow && w.crow.m ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'crowman').length : 0,
     spring: !!w.spring, springLevel: w.spring ? Math.round((w.spring.l / SPRING_FULL) * 100) : 0, springDry: springDry(w),
     springNeed: w.spring ? w.spring.nd : 0, springCarried: w.spring ? w.spring.c : 0, springThirst: thirst(w),
     springDays: w.spring ? w.spring.k : 0, springFailed: w.spring ? w.spring.f : 0, springDryYear: w.spring ? w.spring.yd : 0,

@@ -588,3 +588,17 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The Swift as a runner in the sim: sent to call the hunters or the dugout home when a storm is called, or to wake the village in a raid.
   - The course runs over open grass; late game, when fields fill the land near the hearth, raceCourse may find no clear run and the race lapses.
     A kept green (no fields within N tiles of the fire) would save it and the dancing ground.
+- The bear visit left render.js with two `const RCOL` declarations, so the bundled page threw a SyntaxError and showed nothing until this
+  visit renamed the bear one to BEARCOL. build.mjs now compiles the bundle (node:vm Script) and fails if it does not parse; `node --check
+  src/render.js` catches the same thing. Nothing yet runs render.js itself, so a runtime error in a draw function would still blank the page:
+  a smoke test that runs one frame against a stub canvas would close that gap.
+- Scarecrows are done (SIM_VERSION 58; w.crow.m [{x, y, f, d fright left, n turned, by, hd hide, t}], mk, mt, my, mv, mo, mnm, mat;
+  learnScarecrow/scareTurn/scareSite/scareTask/scareDone in sim.js, SCARE_* constants; task 'crowman' (key zk, t.o index of a found-out one
+  being moved or -1); drawScarecrows/scarecrowAt in render.js; yearly `crowTurned`). On the live world rook losses fall to ~30-60 grain a year.
+  Because the children scare far less now, the flock no longer thins (CROW_THIN) and climbs toward 40. Answers it invites:
+  - Late game 8 scarecrows cover only a part of 500+ fields; a second flock (or the gulls) would make them matter again.
+  - Snowmen and scarecrows: the children dress a scarecrow in the Wolf-slayer's old cloak, or name them like the snowmen.
+  - A storm could blow one down (it lies in the rows until someone stands it up again); the bear or boars could knock one over.
+  - Scarecrows in the History good-years strip (crowTurned is recorded but not shown).
+- Housekeeping: scripts/_scareprobe.mjs (runs the live world N years and prints rooks/scarecrow numbers) is a throwaway this visit could
+  not delete; it can go with .deerpeek.mjs, _bear.mjs, _sea.mjs, _seal.mjs, _seal2.mjs, _st.mjs and _race.mjs.

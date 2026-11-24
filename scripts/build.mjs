@@ -1,5 +1,6 @@
 // Bundles src/ into a single self-contained dist/index.html (plus a preview variant).
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { Script } from 'node:vm';
 
 const src = readFileSync('src/sim.js', 'utf8');
 // every name sim.js exports, so render.js sees the same S.* in the bundle as it does under Node
@@ -12,6 +13,8 @@ const used = new Set([...render.matchAll(/\bS\.([A-Za-z_]\w*)/g)].map((m) => m[1
 const missing = [...used].filter((n) => !names.has(n));
 if (missing.length) { console.error('render.js uses names sim.js does not export: ' + missing.join(', ')); process.exit(1); }
 const js = `(() => {\nconst S = (() => {\n${sim}\nreturn { ${[...names].join(', ')} };\n})();\n${render}\n})();`;
+// the page is one script: a syntax error anywhere (a name declared twice in render.js, say) leaves it blank
+try { new Script(js, { filename: 'bundle.js' }); } catch (e) { console.error('bundle does not parse: ' + e.message); process.exit(1); }
 const html = readFileSync('src/index.html', 'utf8');
 
 mkdirSync('dist', { recursive: true });

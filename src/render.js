@@ -125,6 +125,7 @@ function doing(p) {
     return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
   }
   if (p.task && p.task.k === 'wade') return p.x === p.px && p.y === p.py ? (p.id + Math.floor(w.t / 2)) % 3 ? 'paddling in the shallows' : 'feeling for cockles with their toes' : 'running down to the shallows';
+  if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
   if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
   if (p.task && p.task.k === 'horn') return 'blowing the fog horn at the hearth';
@@ -230,9 +231,10 @@ function work(k, id, X, Y, now) {
     const t = (now / 900 + id * 0.37) % 1;
     px(sc, X + 3, Y + 1, '#f1c9a5');
     if (t < 0.6) { const d = Math.floor(t * 6); px(sc, X + 4 + (d >> 1), Y + 1 + d, '#d9c27a'); px(sc, X + 3 + d, Y + 2 + (d >> 1), '#d9c27a'); }
-  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig') { // a mallet (spade, for digging) rising and falling
+  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig' || k === 'crowman') { // a mallet (spade, for digging) rising and falling
     const f = ph(200) % 3, spade = k === 'dig';
     if (k !== 'build') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
+    if (k === 'crowman') { px(sc, X + 2, Y + 1, '#7a5a36', 5, 1); px(sc, X + 4, Y - 1, '#d9c79a', 1, 1); } // the cross going up, its straw head on top
     if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
     else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
     if (f === 2) px(sc, X + 5 + (ph(200) % 2), Y + 2, spade ? '#6b4a2e' : 'rgba(230,230,230,0.7)'); // dust or a clod
@@ -424,6 +426,7 @@ function drawTerrain() {
     for (const [cx, cy] of [[0, 0], [7, 0], [0, 7], [7, 7]]) px(tc, X + cx, Y + cy, stake);
   }
   drawHedges(pal, c.season);
+  drawScarecrows(pal);
   // fire ring, stores
   const fx = w.fire.x * TILE, fy = w.fire.y * TILE;
   px(tc, fx - 8, fy, '#7d6a4e', 24, 8);
@@ -886,6 +889,29 @@ function whaleAt(mx, my) {
   const X = mx * TILE, Y = my * TILE;
   return whaleSpots().reverse().find((s) => X >= s.X && Y >= s.Y && X < s.X + (s.vert ? 5 : 15) && Y < s.Y + (s.vert ? 15 : 5)) || null;
 }
+// scarecrows in the fields: a pole with a crossbar, a straw head under a dark hat and an old hide (or a straw
+// coat) hung on the arms, tufts of straw at the ends. One the rooks have found out has a rook sitting on its head.
+function drawScarecrows(pal) {
+  const C = w.crow;
+  if (!C || !C.m) return;
+  for (const s of C.m) {
+    if (s.x == null) continue;
+    const X = s.x * TILE, Y = s.y * TILE, coat = s.hd ? '#8a6a44' : '#c9ad62';
+    px(tc, X + 4, Y + 2, '#6e4a2a', 1, 6); // the upright, driven into the earth
+    px(tc, X + 1, Y + 3, '#7a5a36', 7, 1); // the arms
+    px(tc, X + 1, Y + 4, '#e0c878'); px(tc, X + 7, Y + 4, '#e0c878'); // straw hands
+    px(tc, X + 3, Y + 4, coat, 3, 2); px(tc, X + 2, Y + 4, coat, 1, 1); px(tc, X + 6, Y + 4, coat, 1, 1);
+    px(tc, X + 3, Y + 6, coat); px(tc, X + 5, Y + 6, coat); // ragged hem
+    px(tc, X + 3, Y + 1, '#d9c79a', 3, 2); px(tc, X + 4, Y + 2, '#2a2a2a'); // the straw head
+    px(tc, X + 2, Y + 1, pal.snow ? '#e8eef2' : '#3a2c20', 5, 1); px(tc, X + 3, Y, pal.snow ? '#e8eef2' : '#3a2c20', 3, 1); // a hat (white with snow)
+    if (s.d <= 0) { px(tc, X + 3, Y - 2, ROOK, 3, 2); px(tc, X + 4, Y - 2, ROOK_HI); px(tc, X + 6, Y - 2, ROOK); px(tc, X + 7, Y - 1, ROOK_BILL); } // a rook on the hat
+  }
+}
+function scarecrowAt(mx, my) {
+  const C = w.crow;
+  if (!C || !C.m) return null;
+  return C.m.find((s) => s.x != null && mx >= s.x && mx < s.x + 1 && my >= s.y - 0.25 && my < s.y + 1) || null;
+}
 function snowmanAt(mx, my) {
   if (!w.snow) return null;
   return w.snow.men.find((m) => m.s >= 1 && mx >= m.x && mx < m.x + 1 && my >= m.y && my < m.y + 1) || null;
@@ -1254,6 +1280,7 @@ function frame() {
         const up = !moving && Math.floor(now / 300 + p.id) % 3 !== 0;
         px(sc, X + 3, Y - (up ? 2 : 0), '#4a3322', 1, 3); px(sc, X + 3, Y - (up ? 3 : 1), '#6e4a2a', 2, 1);
       }
+      if (p.task && p.task.k === 'crowman' && moving) { px(sc, X + 3, Y - 3, '#6e4a2a', 1, 6); px(sc, X + 2, Y - 2, '#7a5a36', 4, 1); px(sc, X + 3, Y - 4, '#d9c79a'); } // the scarecrow over the shoulder
       if (p.task && p.task.k === 'cheese' && moving) { px(sc, X + 3, Y + 2, '#7a5232', 2, 2); px(sc, X + 3, Y + 2, '#efe9da', 2, 1); } // a pail of milk in the hand
       if (p.task && p.task.k === 'water') { // out with an empty skin over the shoulder; home with a full jar on the head, or a fat skin on the back
         const jar = w.techs.includes('pottery');
@@ -1481,6 +1508,11 @@ function frame() {
       tip.innerHTML = best.bone
         ? `<b>Whale bones</b><br>ribs bleaching on the sand<br><span class="m">stranded ${when(o.t)} · ${o.g.toLocaleString()} meat cut by ${o.n} ${o.n === 1 ? 'islander' : 'islanders'}</span>`
         : `<b>Stranded whale</b><br>${o.rot ? 'starting to stink' : 'fresh from the storm'} · ${s.whaleCutting ? `${s.whaleCutting} cutting` : 'nobody at it'}<br><span class="m">${o.g.toLocaleString()} meat carried up · ${o.nm ? `found by ${esc(o.nm)}` : 'washed up'} ${when(o.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = scarecrowAt(mx, my))) {
+      const C = w.crow, full = best.hd ? 30 : 20;
+      tip.innerHTML = `<b>Scarecrow</b><br>${best.d <= 0 ? '<span class="bad">found out: a rook sits on its hat</span>' : best.d < full / 3 ? 'the rooks are getting used to it' : 'keeping the rooks off the rows round it'}` +
+        `<br><span class="m">${best.hd ? 'an old hide' : 'straw'} on a cross of poles · made by ${esc(best.by || 'the village')} ${when(best.t)} · turned ${best.n} ${best.n === 1 ? 'flock' : 'flocks'} here · ${C.mt} in all</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = snowmanAt(mx, my))) {
       const b = known.get(best.by) || w.people.find((q) => q.id === best.by);
@@ -1871,7 +1903,7 @@ const DCOL = { b: '#9a6a3c', h: '#8a5c32', e: '#6e4a2a', n: '#2a1d15', t: '#efe6
 const BEAR = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', '.dd..dd.'];
 const BEAR_RUN = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', 'dd....dd'];
 const BEAR_UP = ['..e.e.', '..bbb.', '.pbnbp', '..hbb.', '..bbb.', '..bbb.', '..d.d.'];
-const RCOL = { b: '#5e4129', h: '#46301d', e: '#3a2818', n: '#1a120c', d: '#2a1d13', p: '#3a2818' };
+const BEARCOL = { b: '#5e4129', h: '#46301d', e: '#3a2818', n: '#1a120c', d: '#2a1d13', p: '#3a2818' };
 const facing = new Map();
 function drawBeasts(frac, now) {
   const out = [];
@@ -1890,7 +1922,7 @@ function drawBeasts(frac, now) {
     else if (b.k === 'deer') rows = moving ? (stepF ? DEER_RUN : DEER) : Math.floor(now / 900 + b.id * 1.7) % 4 ? DEER_GRAZE : DEER;
     else if (b.k === 'bear') rows = !moving && b.raid && b.eat ? BEAR_UP : moving && stepF ? BEAR_RUN : BEAR;
     else rows = !moving && b.f != null ? (Math.floor(now / 380 + b.id) % 2 ? BOAR_ROOT : BOAR) : moving && stepF ? BOAR_RUN : BOAR;
-    const map = b.k === 'wolf' ? WCOL : b.k === 'lone' ? LCOL : b.k === 'deer' ? DCOL : b.k === 'bear' ? RCOL : BCOL;
+    const map = b.k === 'wolf' ? WCOL : b.k === 'lone' ? LCOL : b.k === 'deer' ? DCOL : b.k === 'bear' ? BEARCOL : BCOL;
     const Yr = b.k === 'lone' ? Y - 1 : b.k === 'bear' ? Y - rows.length + 4 : Y, wd = rows[0].length; // the lone wolf stands a pixel taller, the bear reared up three
     for (let r = 0; r < rows.length; r++) for (let k = 0; k < wd; k++) {
       const ch = rows[r][k];
@@ -2162,7 +2194,7 @@ function updatePanels() {
     ...(s.rusts ? [['rust', 'Rust', `${s.rusted ? `<span class="bad">${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted</span> · ` : ''}<span class="m">${s.rusts} ${s.rusts === 1 ? 'outbreak' : 'outbreaks'} · ${s.rustEver.toLocaleString()} fields spotted · ~${s.rustGrain.toLocaleString()} grain lost · last ${when(w.rust.last)}</span>`]] : []),
     ...(s.rogue ? [['rogue', 'Rogueing', `${s.rogueing ? `<span class="fest">${s.rogueing} pulling rusted grain</span> · ` : ''}<span class="m">${s.rogueEver.toLocaleString()} ${s.rogueEver === 1 ? 'field' : 'fields'} pulled clean · ${s.rogueStopped} ${s.rogueStopped === 1 ? 'outbreak' : 'outbreaks'} stopped before the harvest${w.rogue.nm ? ` · taught by ${esc(w.rogue.nm)}` : ''}</span>`]] : []),
     ...(s.smudge ? [['smudge', 'Smudge', `${s.smudgeFires ? `<span class="fest">${s.smudgeFires} ${s.smudgeFires === 1 ? 'fire' : 'fires'} smouldering in the fields</span> · ` : ''}<span class="m">${s.smudgeNights} ${s.smudgeNights === 1 ? 'night' : 'nights'} lit · ${s.smudgeSaved.toLocaleString()} ${s.smudgeSaved === 1 ? 'field' : 'fields'} saved${s.smudgeYear ? ` (${s.smudgeYear} this year)` : ''}</span>`]] : []),
-    ...(s.crows ? [['rook', 'Rooks', `${s.crowDown ? `<span class="bad">${s.crowFlock} down on the grain</span>${s.scarers ? ` · <span class="fest">${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} with clappers</span>` : ''} · ` : `${s.crowFlock} `}<span class="m">${s.crowDown ? '' : 'in the flock · '}${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scaredYear}x this year` : ''}</span>`]] : []),
+    ...(s.crows ? [['rook', 'Rooks', `${s.crowDown ? `<span class="bad">${s.crowFlock} down on the grain</span>${s.scarers ? ` · <span class="fest">${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} with clappers</span>` : ''} · ` : `${s.crowFlock} `}<span class="m">${s.crowDown ? '' : 'in the flock · '}${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scaredYear}x this year` : ''}${s.scarecrows ? ` · ${s.scarecrows} ${s.scarecrows === 1 ? 'scarecrow' : 'scarecrows'} turned them ${s.scareYear}x${s.scareFound ? ` · ${s.scareFound} found out` : ''}` : ''}</span>${s.scareMaking ? ` · <span class="fest">a scarecrow going up</span>` : ''}`]] : []),
     ['gran', 'Granaries',`${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
