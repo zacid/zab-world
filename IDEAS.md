@@ -614,3 +614,18 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The parents sitting up lose sleep too: tired workers the next day, slower harvests in a bad outbreak.
 - Housekeeping: scripts/_cough.mjs (live/seed cough probe), _bench.mjs and _oldsim.mjs (a copy of the old sim.js for a speed check) are
   throwaways this visit could not delete either; delete them with the older ones listed above.
+- Standing stones are done (SIM_VERSION 60; w.stones {cx, cy, sx, sy, s [{k, y, n, nm, g grave id, t}], cur {x, y, px, py, k, ids, w, h,
+  up, d, nm, g, ld}, n, y, hurt, at, nm, done}; STONE_RING slots exported with stoneOn/stoneSlot; the 37 tiles within d2 <= 10 of the
+  centre are T.BUILD so nothing is built or sown inside; task 'stone' with t.pull; deed 's' shows in tales and graves). The ring has no
+  effect beyond the haul and the feast. Answers it invites:
+  - Midwinter sunrise: once closed, the village walks out before dawn on the shortest day and watches the sun come up between two stones
+    (a yearly gathering like the tale night); the sky reader could count the year by it and time the sowing against late frost.
+  - The midsummer dance or weddings held in the ring; far-isle guests who see it and want one of their own (or envy it).
+  - A stone that topples in a storm or a wet winter, or a haul that breaks a rope on a slope and rolls back; a second outer ring or a
+    heel stone once the first is closed, for a bigger island with more hands.
+  - A byname for whoever hauls the most (the Stone-raiser), and stones in the History good-years strip.
+  - The haul takes up to 10 of the grown-ups for 3-5 days and picks the strongest; late game at 200+ people it barely shows. Several crews
+    at once, or bigger stones (more haulers, slower), would keep it a village event.
+- Housekeeping: this visit could not delete scripts/_stones.mjs (stone haul probe) or scripts/_bench2.mjs (speed check with the stones
+  switched off) either; delete them with the ones listed above. On this machine seed 777 runs ~1.6-1.8 s/yr at 150-270 people with or
+  without the stones, so the slowness comes from the machine, not this change.

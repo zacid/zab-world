@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', race: '#f0f0a0', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', race: '#f0f0a0', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c', stone: '#b9b4aa' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
 // the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
 const KILN = ['..kkkk..', '.kKKKKk.', 'kKKKKKKk', 'kKKKKKKk', 'kKKmmKKk', 'kKmmmmKk', 'kkmmmmkk', '........'];
@@ -127,6 +127,12 @@ function doing(p) {
     return m ? (m.s >= 2 ? "rolling a snowman's head" : 'rolling a snowman') : 'throwing snowballs';
   }
   if (p.task && p.task.k === 'wade') return p.x === p.px && p.y === p.py ? (p.id + Math.floor(w.t / 2)) % 3 ? 'paddling in the shallows' : 'feeling for cockles with their toes' : 'running down to the shallows';
+  if (p.task && p.task.k === 'stone') {
+    const C = w.stones && w.stones.cur, still = p.x === p.px && p.y === p.py;
+    if (!C) return 'hauling a stone';
+    if (!still) return `going to the ropes of the stone for ${C.nm}`;
+    return C.w < S.STONE_LEVER ? 'levering a boulder out of the sand onto the logs' : p.task.pull ? `leaning on the ropes, dragging the stone for ${C.nm} up to the ring` : 'digging the pit and hauling the stone upright';
+  }
   if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
   if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
@@ -430,6 +436,7 @@ function drawTerrain() {
   }
   drawHedges(pal, c.season);
   drawScarecrows(pal);
+  drawStones(pal);
   // fire ring, stores
   const fx = w.fire.x * TILE, fy = w.fire.y * TILE;
   px(tc, fx - 8, fy, '#7d6a4e', 24, 8);
@@ -910,6 +917,66 @@ function drawScarecrows(pal) {
     if (s.d <= 0) { px(tc, X + 3, Y - 2, ROOK, 3, 2); px(tc, X + 4, Y - 2, ROOK_HI); px(tc, X + 6, Y - 2, ROOK); px(tc, X + 7, Y - 1, ROOK_BILL); } // a rook on the hat
   }
 }
+// the standing stones: grey boulders heaped on the shore, a ring of stakes on the grass, and each raised stone
+// a tall grey slab with a lit edge, a shadowed edge and a spot of lichen (a cap of snow in winter). The stone on
+// the move is drawn over the terrain each frame (drawHaul) so it slides between the hours.
+const STONE_LT = '#c4bfb4', STONE_MID = '#97928a', STONE_DK = '#66625c';
+function drawStones(pal) {
+  const R = w.stones;
+  if (!R) return;
+  const BX = R.sx * TILE, BY = R.sy * TILE;
+  px(tc, BX + 1, BY + 4, STONE_DK, 3, 2); px(tc, BX + 1, BY + 4, STONE_MID, 2, 1);
+  px(tc, BX + 5, BY + 5, STONE_DK, 2, 2); px(tc, BX + 5, BY + 5, STONE_LT);
+  if (R.s.length + (R.cur ? 1 : 0) < S.STONE_RING.length - 1) { px(tc, BX + 3, BY + 1, STONE_MID, 3, 2); px(tc, BX + 3, BY + 1, STONE_LT); } // the heap goes down as the ring fills
+  const up = new Map(R.s.map((o) => [o.k, o]));
+  for (let k = 0; k < S.STONE_RING.length; k++) {
+    const [ox, oy] = S.STONE_RING[k], X = (R.cx + ox) * TILE, Y = (R.cy + oy) * TILE;
+    if (!up.has(k)) { // a stake where a stone will stand (the open pit, once this one is on its way)
+      if (R.cur && R.cur.k === k) { px(tc, X + 2, Y + 5, '#4a3a28', 4, 2); px(tc, X + 6, Y + 5, '#7a6448', 2, 2); }
+      else { px(tc, X + 4, Y + 4, '#7a5a36', 1, 3); px(tc, X + 4, Y + 4, '#a07c4e'); }
+      continue;
+    }
+    const tall = 5 + (k % 3), top = Y + 7 - tall;
+    px(tc, X + 2, Y + 7, 'rgba(0,0,0,0.28)', 6, 1); // its shadow on the grass
+    px(tc, X + 3, top, STONE_MID, 3, tall); px(tc, X + 3, top, STONE_LT, 1, tall); px(tc, X + 5, top + 1, STONE_DK, 1, tall - 1);
+    px(tc, X + 4, top - 1, STONE_MID); // a rounded crown
+    px(tc, X + 4, top + 2 + (k % 2), '#9aa36a'); // lichen
+    if (pal.snow) px(tc, X + 3, top - (k % 2 ? 0 : 1), '#eef3f7', 3, 1);
+  }
+}
+function drawHaul(frac) {
+  const C = w.stones && w.stones.cur;
+  if (!C) return null;
+  const x = C.px + (C.x - C.px) * frac, y = C.py + (C.y - C.py) * frac;
+  const X = sub(x * TILE), Y = sub(y * TILE);
+  const raising = C.x === S.stoneSlot(w.stones, C.k)[0] && C.y === S.stoneSlot(w.stones, C.k)[1] && C.up > 0;
+  if (raising) { // tipped into the pit and coming up on the ropes and props
+    const tall = 2 + Math.round((C.up / S.STONE_UP) * 4);
+    px(sc, X - 3, Y + 1, '#4a3a28', 3, 2); // the spoil from the pit
+    px(sc, X, Y + 2 - tall, STONE_MID, 3, tall); px(sc, X, Y + 2 - tall, STONE_LT, 1, tall);
+    px(sc, X + 3, Y + 1 - tall, '#7a5a36', 1, tall + 1); // a prop
+  } else { // lying on its side on two log rollers
+    px(sc, X - 3, Y + 1, '#6e4a2a', 1, 2); px(sc, X + 3, Y + 1, '#6e4a2a', 1, 2);
+    px(sc, X - 4, Y - 2, STONE_MID, 9, 3); px(sc, X - 4, Y - 2, STONE_LT, 8, 1); px(sc, X - 4, Y, STONE_DK, 9, 1);
+    if (C.w < S.STONE_LEVER) px(sc, X + 4, Y - 4, '#8a6a44', 1, 4); // a lever under it
+  }
+  // ropes out to everyone leaning on them
+  for (const p of w.people) {
+    if (!p.task || p.task.k !== 'stone' || !p.task.pull || p.asleep) continue;
+    const hx = p.px + (p.x - p.px) * fw(p, frac), hy = p.py + (p.y - p.py) * fw(p, frac);
+    const dx = hx - x, dy = hy - y, n = Math.min(12, Math.ceil(Math.sqrt(dx * dx + dy * dy) * 4));
+    for (let i = 1; i < n; i++) px(sc, sub((x + (dx * i) / n) * TILE), sub((y + (dy * i) / n) * TILE) - 1, 'rgba(214,196,150,0.75)');
+  }
+  return { x, y };
+}
+function stoneAt(mx, my) {
+  const R = w.stones;
+  if (!R) return null;
+  for (const o of R.s) { const [sx, sy] = S.stoneSlot(R, o.k); if (Math.abs(mx - sx) < 0.5 && my > sy - 1.2 && my < sy + 0.5) return { o }; }
+  if (Math.abs(mx - (R.sx + 0.5)) < 0.6 && Math.abs(my - (R.sy + 0.5)) < 0.6) return { shore: true };
+  if (Math.hypot(mx - R.cx - 0.5, my - R.cy - 0.5) < 2.6) return { ring: true };
+  return null;
+}
 function scarecrowAt(mx, my) {
   const C = w.crow;
   if (!C || !C.m) return null;
@@ -1170,6 +1237,7 @@ function frame() {
   const flames = drawBlaze(now);
   const canoe = drawCanoe(now);
   const seals = drawSeals(hf, now);
+  const haul = drawHaul(frac);
   // people
   const shown = [];
   let horner = null;
@@ -1521,6 +1589,22 @@ function frame() {
       tip.innerHTML = best.bone
         ? `<b>Whale bones</b><br>ribs bleaching on the sand<br><span class="m">stranded ${when(o.t)} · ${o.g.toLocaleString()} meat cut by ${o.n} ${o.n === 1 ? 'islander' : 'islanders'}</span>`
         : `<b>Stranded whale</b><br>${o.rot ? 'starting to stink' : 'fresh from the storm'} · ${s.whaleCutting ? `${s.whaleCutting} cutting` : 'nobody at it'}<br><span class="m">${o.g.toLocaleString()} meat carried up · ${o.nm ? `found by ${esc(o.nm)}` : 'washed up'} ${when(o.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((haul && Math.abs(haul.x - mx) < 0.7 && Math.abs(haul.y - 0.1 - my) < 0.45) || (best = stoneAt(mx, my))) {
+      const R = w.stones, C = R.cur, s = S.summary(w), left = S.STONE_RING.length - R.s.length;
+      const ring = `${R.s.length} of ${S.STONE_RING.length} stones up · ring marked by ${esc(R.nm)} ${when(R.at)}${R.hurt ? ` · ${R.hurt} ${R.hurt === 1 ? 'foot' : 'feet'} crushed` : ''}`;
+      if (!best || (!best.o && !best.shore && !best.ring)) { // the stone on the move
+        const [tx, ty] = S.stoneSlot(R, C.k), d = Math.hypot(tx - C.x, ty - C.y);
+        const what = C.w < S.STONE_LEVER ? (C.w ? 'being levered onto the rollers' : 'lying on the shore') : d > 0.01 ? `on the rollers, ${d < 1 ? 'nearly there' : `${Math.ceil(d)} tiles from the ring`}` : 'tipped into its pit, coming upright';
+        tip.innerHTML = `<b>Stone for ${esc(C.nm)}</b><br>${what}${s.stoneHauling ? ` · <span class="fest">${s.stoneHauling} on the ropes</span>` : ''}<br><span class="m">${C.ld ? `led by ${esc(C.ld)} · ` : ''}${ring}</span>`;
+      } else if (best.o) {
+        const o = best.o;
+        tip.innerHTML = `<b>Stone for ${esc(o.nm)}</b><br>raised Y${o.y} · ${o.n} on the ropes<br><span class="m">${ring}</span>`;
+      } else if (best.shore) {
+        tip.innerHTML = `<b>Grey boulders</b><br>${left ? `${left - (C ? 1 : 0)} more to drag up to the ring` : 'the ring took what it needed'}<br><span class="m">${ring}</span>`;
+      } else {
+        tip.innerHTML = `<b>Ring of standing stones</b><br>${left ? `${left} ${left === 1 ? 'stake' : 'stakes'} still waiting for a stone${C ? ` · <span class="fest">a stone is coming up from the shore</span>` : ' · one is hauled every summer after the harvest'}` : `closed ${when(R.done)}`}<br><span class="m">${ring}</span>`;
+      }
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = scarecrowAt(mx, my))) {
       const C = w.crow, full = best.hd ? 30 : 20;
@@ -2163,7 +2247,7 @@ const RES_GROUPS = [
   ['Fields', ['muck', 'frost', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
   ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
   ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
-  ['Folk', ['by', 'race', 'tale', 'grave']],
+  ['Folk', ['by', 'race', 'tale', 'stones', 'grave']],
 ];
 const RES_KEY = 'island.stats';
 let resOpen = (() => { try { return localStorage.getItem(RES_KEY) === 'open'; } catch { return false; } })();
@@ -2239,6 +2323,7 @@ function updatePanels() {
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.race || s.racing ? [['race', 'Race', `${s.racing ? `<span class="fest">${s.racing} out to the stake and back</span> · ` : s.raceWin ? `<span class="fest">${esc(s.raceWin)} in the oak wreath</span> · ` : ''}<span class="m">${s.races} run at midsummer${s.raceLast ? ` · last won by ${esc(s.raceLast.nm)}, ${s.raceLast.a}, in year ${s.raceLast.y}` : ''}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
+    ...(s.stones ? [['stones', 'Stones', `${s.stoneHauling ? `<span class="fest">${s.stoneHauling} on the ropes, the stone for ${esc(s.stoneHaul)}</span> · ` : ''}${s.stonesUp} <span class="m">of ${S.STONE_RING.length} standing${s.stoneHaul && !s.stoneHauling ? ` · the stone for ${esc(s.stoneHaul)} is on its way` : ''}${s.stoneFeet ? ` · ${s.stoneFeet} ${s.stoneFeet === 1 ? 'foot' : 'feet'} crushed` : ''}</span>`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ]);

@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 59;
+export const SIM_VERSION = 60;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -86,6 +86,7 @@ export const TECHS = {
   seals:    { name: 'Seals', added: '2026-11-24T20:41Z', desc: 'Grey seals that followed the dugout in from the deep water. They haul out on a quiet beach out of sight of the village, lie on the sand groaning to each other, and slide into the sea when anyone comes near. They eat from the same deep water as the dugout all year round, and every early winter they pup on the sand, so the herd grows and the catch out past the surf grows thin.', req: ['canoe'] },
   sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
+  stones:   { name: 'Standing stones', added: '2026-11-25T03:47Z', desc: 'A ring of eight stakes on open grass away from the houses, and grey boulders as long as a man lying on the shore. Every summer, once the grain is in and the stores are full, the strongest go down with ropes of plaited hide and an armful of logs, lever one boulder onto the rollers and drag it up to the ring, a few steps at a time, moving the back log to the front as they go. A pit is dug, the stone tipped in and hauled upright, and that night there is a feast in the ring. Each stone is raised for one of the dead. Now and then it slews off the logs onto a foot.', req: ['burial', 'midsummer'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -586,7 +587,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -759,6 +760,7 @@ export function step(w, fx) {
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
   if (w.blaze && w.blaze.cur) blazeHour(w, c);
+  if (w.stones && w.stones.cur) stoneHour(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
@@ -853,6 +855,7 @@ function daily(w, c, fx) {
   festDay(w, c);
   taleDay(w, c);
   snowDay(w, c);
+  if (w.stones !== undefined) stoneDay(w, c);
   if (w.wade !== undefined) wadeDay(w, c);
   const wx = w.wx.k;
   if (w.raid) raidNight(w, c, wx);
@@ -4909,6 +4912,7 @@ export function deedsText(d) {
   if (d.u) out.push('drove the bear off with a brand ' + n(d.u, 'time', 'times'));
   if (d.n) out.push('tended the sick ' + n(d.n, 'time', 'times'));
   if (d.r) out.push('won the midsummer race ' + n(d.r, 'time', 'times'));
+  if (d.s) out.push('hauled ' + n(d.s, 'stone', 'stones') + ' up to the ring');
   return out.join('; ');
 }
 function deed(w, p, k, v = 1) {
@@ -5935,7 +5939,8 @@ function act(w, p, c, fx) {
     }
   }
   if (w.squall && w.squall.cur && shoreWatch(w, p, a)) return; // the dugout is out in a squall: down to the landing to watch
-  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || p.task.k === 'stone' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (w.stones && w.stones.cur && stoneRope(w, p, c)) return; // on the ropes, dragging this summer's stone up to the ring
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
     const ht = herdTask(w, p);
@@ -6204,6 +6209,200 @@ function snowDay(w, c) {
   const had = S.men.length;
   S.men = S.men.filter((m) => m.s > 0 || (c.season === 3 && !m.m));
   if (had && !S.men.length && c.season !== 3) log(w, `The last snowman by the hearth slumps into the mud. Spring has come to ${w.name}.`, 'info');
+}
+
+// ---------- the standing stones ----------
+// Once the stores are full and there are hands to spare after the harvest, the eldest marks out a ring on open
+// grass away from the houses, and every summer after that a crew drags one boulder up from the shore on log
+// rollers and stands it in the ring: levered onto the logs, a few tiles an hour on the ropes, then a pit dug and
+// the stone hauled upright, and a feast. Each stone is raised for one of the dead. Eight close the ring.
+// w.stones { cx, cy centre tile, sx, sy the boulders on the shore, s [{ k slot, y year, n on the ropes, nm raised
+//   for, g their id, t tick }], cur null | { x, y, px, py the stone (tile coords), k slot, ids today's crew, w hours
+//   levering, h hours on the ropes, up hours raising, d day begun, nm raised for, g their id, ld who led it },
+//   n stones up, y year of the last, hurt feet crushed, at tick learned, nm who marked the ring, done tick closed }
+export const STONE_RING = [[0, -3], [2, -2], [3, 0], [2, 2], [0, 3], [-2, 2], [-3, 0], [-2, -2]]; // slots round the centre
+const STONE_ORDER = [0, 4, 2, 6, 1, 5, 3, 7]; // north and south first, then east and west, then between
+const STONE_R2 = 10;          // the ground kept clear round the centre (squared tiles)
+const STONE_POP = 20, STONE_ADULTS = 10; // islanders, and grown ones, before anyone thinks of it
+const STONE_RICH = 200;       // food per head in the stores before the ring is marked out
+const STONE_SPARE = 120;      // food per head before a summer's haul begins
+const STONE_FROM = 140, STONE_TO = 215; // days of the year a haul may begin: after midsummer, into early autumn
+const STONE_GO = 0.3;         // chance a fair morning in that window is the morning
+const STONE_H0 = 6, STONE_H1 = 18; // hours on the ropes
+const STONE_MIN = 6, STONE_MAX = 10; // a crew
+const STONE_PULL = 0.06;      // tiles an hour for each one on the ropes
+const STONE_TOP = 0.6;        // and never faster than this
+export const STONE_LEVER = 3; // hours to lever it out of the sand and onto the rollers
+export const STONE_UP = 4;    // hours to dig the pit and haul it upright
+const STONE_SLIP = 0.004;     // chance an hour on the ropes that it slews off the logs onto a foot
+const STONE_HURT = 8;         // days the foot keeps them in
+const STONE_FEAST = 3;        // extra food each islander eats the night a stone goes up
+export const stoneOn = (w, c) => !!(w.stones && w.stones.cur && w.stones.cur.ids.length && (c.season === 1 || c.season === 2) &&
+  c.hour >= STONE_H0 && c.hour < STONE_H1 && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'snow');
+export const stoneSlot = (S, k) => [S.cx + STONE_RING[k][0] + 0.5, S.cy + STONE_RING[k][1] + 0.5];
+function stoneHand(w, p) {
+  if (p.dead || p.sick || p.hurt || p.cg) return false;
+  const a = ageY(w, p);
+  if (a < 16 || a >= 50) return false;
+  if ((w.horn && w.horn.hid === p.id) || (w.watch && w.watch.hid === p.id) || (w.goats && w.goats.hid === p.id) ||
+    (w.heal && w.heal.id === p.id) || (w.pot && w.pot.id === p.id) || (w.canoe && w.canoe.at === p.id)) return false;
+  return !(w.cough && coughKept(w, p));
+}
+// open ground 8 to 18 tiles from the hearth, no water within 6, nothing built within 4, grass or woods (no stools) inside the ring
+function stoneSite(w) {
+  let best = null, bs = 1e9;
+  const { x: fx, y: fy } = w.fire;
+  for (let y = 6; y < MAP - 6; y++) for (let x = 6; x < MAP - 6; x++) {
+    const dd = d2(x, y, fx, fy);
+    if (dd < 64 || dd > 324) continue;
+    let sc = Math.abs(dd - 120) / 12 + hash(x, y, w.seed + 61) * 3;
+    if (sc >= bs) continue;
+    let ok = true, nf = 0;
+    for (let yy = y - 6; yy <= y + 6 && ok; yy++) for (let xx = x - 6; xx <= x + 6; xx++) {
+      const q = d2(xx, yy, x, y);
+      if (q > 36) continue;
+      const t = tile(w, xx, yy);
+      if (t === T.WATER || (q <= 16 && t === T.BUILD)) { ok = false; break; }
+      if (q > STONE_R2) continue;
+      if (t === T.FOREST && !isStool(w, idx(xx, yy))) nf++;
+      else if (t !== T.GRASS) { ok = false; break; }
+    }
+    sc += nf * 0.4;
+    if (!ok || sc >= bs || !lineOfLand(w, fx + 0.5, fy + 0.5, x + 0.5, y + 0.5)) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+// grey boulders on a beach 9 to 20 tiles off, in a straight run of land to the ring
+function stoneShore(w, cx, cy) {
+  let best = null, bs = 1e9;
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    if (w.tiles[idx(x, y)] !== T.SAND) continue;
+    const dd = d2(x, y, cx, cy);
+    if (dd < 81 || dd > 400) continue;
+    const sc = Math.abs(dd - 144) / 12 + hash(x, y, w.seed + 67) * 4;
+    if (sc >= bs) continue;
+    let ok = true;
+    for (const [ox, oy] of STONE_RING) if (!lineOfLand(w, x + 0.5, y + 0.5, cx + ox + 0.5, cy + oy + 0.5)) { ok = false; break; }
+    if (!ok) continue;
+    bs = sc; best = { x, y };
+  }
+  return best;
+}
+function learnStones(w, c) {
+  if (c.season !== 1 || c.doy < STONE_FROM || c.doy > STONE_TO || !w.yard || !w.techs.includes('midsummer')) return;
+  const n = w.people.length;
+  if (n < STONE_POP || w.food < n * STONE_RICH || !w.wx || (w.wx.k !== 'clear' && w.wx.k !== 'heat')) return;
+  if (w.people.filter((p) => ageY(w, p) >= 14).length < STONE_ADULTS || rnd(w) >= 0.2) return;
+  const who = elder(w), at = who && stoneSite(w), sh = at && stoneShore(w, at.x, at.y);
+  if (!sh) return;
+  for (let y = at.y - 3; y <= at.y + 3; y++) for (let x = at.x - 3; x <= at.x + 3; x++) {
+    if (d2(x, y, at.x, at.y) > STONE_R2) continue;
+    const i = idx(x, y);
+    w.timber += w.wood[i]; w.wood[i] = 0;
+    setTile(w, i, T.BUILD);
+  }
+  w.stones = { cx: at.x, cy: at.y, sx: sh.x, sy: sh.y, s: [], cur: null, n: 0, y: 0, hurt: 0, at: w.t, nm: who.name, done: null };
+  w.techs.push('stones');
+  const he = pron(who), He = Cap(he);
+  milestone(w, `${who.name} stands a long time by the burying ground, where the ring of small stones round the dead is half grown over with grass. ` +
+    `The stores are fuller than they have ever been, ${he} says, the grain is in and there are hands to spare: ${w.name} should raise something that will still be standing when everyone at the fire tonight is in the ground. ` +
+    `On the open grass ${sideOf(w, at.x, at.y)} of the village ${he} walks a circle round a peg on a cord and drives in eight stakes. Down on the ${sideOf(w, sh.x, sh.y)} shore lie grey boulders as long as a man. ` +
+    `${He} says one will be dragged up on rollers every summer after the harvest, and stood in the ring for one of the dead. ${w.name} begins a ring of standing stones.`);
+}
+// the one this summer's stone is raised for: the longest dead who has none yet, else the one who marked the ring
+function stoneFor(w) {
+  const S = w.stones, used = new Set(S.s.map((o) => o.g));
+  const g = (w.graves || []).find((o) => !used.has(o.id));
+  return g ? { nm: g.n, g: g.id } : { nm: S.nm, g: null };
+}
+function stoneDay(w, c) {
+  if (!w.stones) { learnStones(w, c); return; }
+  const S = w.stones;
+  if (S.cur || S.s.length >= STONE_RING.length || S.y >= c.year) return;
+  if ((c.season !== 1 && c.season !== 2) || c.doy < STONE_FROM || c.doy > STONE_TO) return;
+  if (!w.wx || (w.wx.k !== 'clear' && w.wx.k !== 'heat') || (w.fest && w.fest.on === c.day)) return;
+  if (w.food < w.people.length * STONE_SPARE || workLists(w).ripe.length) return;
+  if (w.people.filter((p) => stoneHand(w, p)).length < STONE_MIN || rnd(w) >= STONE_GO) return;
+  const f = stoneFor(w), x = S.sx + 0.5, y = S.sy + 0.5;
+  S.cur = { x, y, px: x, py: y, k: STONE_ORDER[S.s.length], ids: [], d: c.day, w: 0, h: 0, up: 0, nm: f.nm, g: f.g, ld: null };
+}
+// each morning of the haul: the strongest who are free, those who have hauled before first
+function stoneCrew(w, c) {
+  const S = w.stones, C = S.cur;
+  C.ids = [];
+  if ((c.season !== 1 && c.season !== 2) || !w.wx || w.wx.k === 'storm' || w.wx.k === 'snow' || workLists(w).ripe.length) return;
+  const hands = w.people.filter((p) => stoneHand(w, p));
+  if (hands.length < STONE_MIN) return;
+  hands.sort((a, b) => ((b.dd && b.dd.s) || 0) - ((a.dd && a.dd.s) || 0) || a.born - b.born || a.id - b.id);
+  C.ids = hands.slice(0, STONE_MAX).map((p) => p.id);
+  if (C.ld != null) return;
+  C.ld = hands[0].name;
+  log(w, `At first light ${hands[0].name} leads ${C.ids.length - 1} others down to the boulders on the ${sideOf(w, S.sx, S.sy)} shore with ropes of plaited hide and an armful of logs. This summer's stone is for ${C.nm}.`, 'good');
+}
+function stoneHour(w, c, fx) {
+  const S = w.stones, C = S.cur;
+  C.px = C.x; C.py = C.y;
+  if (c.hour === STONE_H0) stoneCrew(w, c);
+  if (!stoneOn(w, c)) return;
+  const on = [];
+  for (const id of C.ids) { const p = aliveId(w, id); if (p && !p.hurt && d2(p.x, p.y, C.x, C.y) <= 16) on.push(p); }
+  if (on.length * 2 < STONE_MIN) return; // still walking out to it
+  if (C.w < STONE_LEVER) { C.w++; return; } // levering it up out of the sand and onto the logs
+  const [tx, ty] = stoneSlot(S, C.k), dx = tx - C.x, dy = ty - C.y, dd = Math.sqrt(dx * dx + dy * dy);
+  if (dd > 0.001) {
+    const sp = Math.min(STONE_TOP, STONE_PULL * on.length) * (w.wx.k === 'rain' || w.wx.k === 'fog' ? 0.5 : 1); // mud and wet ropes
+    C.h++;
+    if (dd <= sp) { C.x = tx; C.y = ty; } else { C.x = Math.round((C.x + (dx / dd) * sp) * 1000) / 1000; C.y = Math.round((C.y + (dy / dd) * sp) * 1000) / 1000; }
+    if (rnd(w) < STONE_SLIP) {
+      const p = on[ri(w, on.length)];
+      p.hurt = Math.max(p.hurt || 0, w.t + STONE_HURT * TICKS_PER_DAY);
+      release(w, p);
+      C.ids = C.ids.filter((id) => id !== p.id);
+      S.hurt++;
+      log(w, `The stone slews off the rollers on a slope and comes down on ${p.name}'s foot. ${Cap(pron(p))} is carried home white in the face, and the others lever it back onto the logs.`, 'bad');
+      if (fx) fx.push({ x: p.x, y: p.y - 0.5, text: 'crushed foot', color: 'sick' });
+    }
+    return;
+  }
+  if (++C.up < STONE_UP) return; // the pit dug, the stone tipped in and hauled upright with ropes and props
+  stoneUp(w, c, fx, on.length);
+}
+function stoneUp(w, c, fx, n) {
+  const S = w.stones, C = S.cur, [tx, ty] = stoneSlot(S, C.k);
+  S.s.push({ k: C.k, y: c.year, n, nm: C.nm, g: C.g, t: w.t });
+  S.n++; S.y = c.year; S.cur = null;
+  for (const id of C.ids) { const p = aliveId(w, id); if (p) { deed(w, p, 's'); if (p.task && p.task.k === 'stone') p.task = null; } }
+  const eat = Math.min(Math.floor(w.food * 0.05), w.people.length * STONE_FEAST);
+  w.food = Math.round((w.food - eat) * 100) / 100;
+  if (fx) fx.push({ x: tx, y: ty - 1, text: 'a stone stands', color: 'food' });
+  const left = STONE_RING.length - S.s.length;
+  if (S.n === 1) milestone(w, `${n} islanders lean back on the ropes, the stone tips over the lip of the pit and drops in with a thud the children feel through their feet. ` +
+    `Packed round with rubble and stamped down, it stands taller than any of them: the first standing stone on ${w.name}, raised for ${C.nm}. That night the stores are opened and there is a feast in the ring.`);
+  else if (!left) {
+    S.done = w.t;
+    const yrs = c.year - clock(S.at).year + 1;
+    milestone(w, `The eighth stone drops into its pit and the ring is closed, ${yrs} summers after ${S.nm} drove in the stakes. ` +
+      `That evening everyone on ${w.name} walks out and stands inside it, among stones raised for ${S.s.slice(0, 3).map((o) => o.nm).join(', ')} and the rest, and for once nobody has much to say.`);
+  } else log(w, `Another stone goes up in the ring, raised for ${C.nm}: ${S.s.length} of ${STONE_RING.length} stand now. ${n} hands were on the ropes, and there is a feast in the ring tonight.`, 'good');
+}
+// on the ropes: strung out ahead of the stone while it is hauled, round it while it is levered or raised
+function stoneRope(w, p, c) {
+  const S = w.stones, C = S.cur, i = C.ids.indexOf(p.id);
+  if (i < 0 || p.hurt || !stoneOn(w, c)) return false;
+  if (p.task && p.task.k !== 'stone') release(w, p);
+  const [tx, ty] = stoneSlot(S, C.k), dx = tx - C.x, dy = ty - C.y, dd = Math.sqrt(dx * dx + dy * dy);
+  const pull = C.w >= STONE_LEVER && dd > 0.001;
+  let sx, sy;
+  if (pull) {
+    const ux = dx / dd, uy = dy / dd, along = 1.2 + (i >> 1) * 0.55, side = i & 1 ? 0.4 : -0.4;
+    sx = C.x + ux * along - uy * side; sy = C.y + uy * along + ux * side;
+  } else { const [rx, ry] = RING[(i * 5) % 24]; sx = C.x + rx * 1.1; sy = C.y + ry * 1.1; }
+  if (tile(w, Math.floor(sx), Math.floor(sy)) === T.WATER) { sx = C.x; sy = C.y; }
+  sx = Math.round(sx * 1000) / 1000; sy = Math.round(sy * 1000) / 1000;
+  p.task = { k: 'stone', x: Math.floor(sx), y: Math.floor(sy), h: 99, pull: pull ? 1 : 0 };
+  walk(w, p, sx, sy);
+  return true;
 }
 
 // ---------- the shallows ----------
@@ -6912,6 +7111,10 @@ const MIGRATIONS = {
   58: (w) => {
     if (w.cough === undefined) w.cough = null;
   },
+  // v59 -> v60: the standing stones (w.stones). Not begun; a rich late summer with hands to spare sets the eldest marking out a ring.
+  59: (w) => {
+    if (w.stones === undefined) w.stones = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7039,6 +7242,8 @@ export function summary(w) {
     sealing: !!(w.seal && w.seal.h != null), sealsTaken: w.seal ? w.seal.k : 0, sealsYear: w.seal ? w.seal.yk : 0, sealSkins: w.seal ? w.seal.s : 0,
     sealBites: w.seal ? w.seal.b : 0, sealFloat: !!(w.seal && w.seal.fl != null), floatSaves: w.seal ? w.seal.fs : 0,
     sealer: (w.seal && (w.people.find((p) => !p.dead && p.task && p.task.k === 'seal') || {}).name) || null,
+    stones: !!w.stones, stonesUp: w.stones ? w.stones.s.length : 0, stoneHaul: w.stones && w.stones.cur ? w.stones.cur.nm : null,
+    stoneHauling: stoneOn(w, c) ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'stone').length : 0, stoneFeet: w.stones ? w.stones.hurt : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
