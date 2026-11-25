@@ -93,6 +93,8 @@ function doing(p) {
   const a = Math.floor(S.ageY(w, p));
   if (p.sick) return p.asleep ? 'tossing with fever' : 'laid up with fever';
   if (p.cg && a < 14) return p.asleep ? 'whooping in the night' : a < 1 ? 'a baby with the whooping cough' : 'kept by the door with the whooping cough';
+  const T = p.asleep && trystNow();
+  if (T && (T.L.f === p.id || T.L.m === p.id)) return `out after dark ${T.L.at === 'stones' ? 'among the standing stones' : 'on the beach'} with ${p.id === T.L.f ? T.L.mn : T.L.fn}, of the other house`;
   if (p.asleep) return 'asleep at home';
   if (!p.task && w.cough && w.cough.nu.includes(p.id)) return 'sitting up with a coughing child';
   if (p.task && p.task.k === 'mourn') {
@@ -1044,6 +1046,26 @@ function drawHaul(frac) {
   }
   return { x, y };
 }
+// lovers across the thorn branch: out after dark (21:00 to midnight) while both houses sleep, sat close under one
+// cloak among the standing stones or on the beach; now and then one head comes down on the other's shoulder
+function trystNow() {
+  const L = S.loveNight(w);
+  if (!L) return null;
+  const c = S.clock(Math.max(0, w.t - 1));
+  if (c.day !== L.on || c.hour < 21) return null;
+  const f = w.people.find((p) => p.id === L.f), m = w.people.find((p) => p.id === L.m);
+  return f && m && f.asleep && m.asleep ? { L, f, m } : null;
+}
+function drawTryst(shown, now) {
+  const T = trystNow();
+  if (!T) return;
+  const { L, f, m } = T, X = sub(L.x * TILE), Y = sub(L.y * TILE);
+  const lean = Math.floor(now / 3200 + L.f) % 3 === 0 ? 1 : 0;
+  px(sc, X - 2, Y, '#f1c9a5'); px(sc, X + 1 - lean, Y + lean, '#f1c9a5'); // two heads, close
+  px(sc, X - 3, Y + 1, '#5e4e40', 6, 1); px(sc, X - 3, Y + 2, '#4e4034', 6, 1); // one cloak round both
+  px(sc, X - 3, Y + 3, '#3a3026', 6, 1);
+  shown.push({ p: f, x: L.x - 0.2, y: L.y }); shown.push({ p: m, x: L.x + 0.2, y: L.y });
+}
 function stoneAt(mx, my) {
   const R = w.stones;
   if (!R) return null;
@@ -1494,6 +1516,7 @@ function frame() {
     if (p.task && p.task.k === 'lost' && !moving && Math.floor(now / 900 + p.id) % 2) px(sc, X - 1, Y + 3, '#f4f4f4', 5, 1); // sat down, arms round the knees
     shown.push({ p, x, y });
   }
+  drawTryst(shown, now);
   lastShown = shown;
   // keep the followed islander in the middle of the screen (at home while they sleep)
   let fpos = null;
@@ -2408,7 +2431,7 @@ function updatePanels() {
   const lc = S.clock(Math.max(0, w.t - 1)); // the hour now under way (the island is worked out one hour ahead)
   $('when').innerHTML = `Year ${lc.year} · ${S.SEASONS[lc.season]}, day ${lc.dos} · ${String(lc.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.stormCalled ? ` · <span class="bad">${esc(s.skyReader)} reads the sky: a storm by morning</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.racing ? ` · <span class="fest">${s.racing} running the race</span>` : s.raceWin ? ` · <span class="fest">${esc(s.raceWin)} wears the oak wreath</span>` : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = resPanel([
-    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young${s.incomers ? `, ${s.incomers} came over` : ''})</span>` + (s.incBoat === 'in' ? ' <span class="fest">a household from the far isle coming over</span>' : '') + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.coughing ? ` <span class="bad">${s.coughing} whooping${s.nursing ? `, ${s.nursing} sitting up with them` : ''}</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '') + (s.quarrel ? ` <span class="bad">feud: ${esc(s.quarrel)}${s.bruised ? `, ${s.bruised} laid up after a fight` : ''}</span>` : '')],
+    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young${s.incomers ? `, ${s.incomers} came over` : ''})</span>` + (s.incBoat === 'in' ? ' <span class="fest">a household from the far isle coming over</span>' : '') + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.coughing ? ` <span class="bad">${s.coughing} whooping${s.nursing ? `, ${s.nursing} sitting up with them` : ''}</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '') + (s.quarrel ? ` <span class="bad">feud: ${esc(s.quarrel)}${s.bruised ? `, ${s.bruised} laid up after a fight` : ''}${s.lovers ? `; ${esc(s.lovers)} caught meeting across it` : ''}</span>` : '') + (s.loversOut ? ' <span class="fest">two out after dark</span>' : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
@@ -2443,7 +2466,7 @@ function updatePanels() {
     ...(s.squalls ? [['squall', 'Squalls', `${s.squall ? `<span class="bad">${esc(s.squall)} ${s.squallSwim ? 'is in the water' : 'is caught out in a squall'} · ${s.squallWatch} on the beach</span> · ` : ''}<span class="m">${s.squalls} ${s.squalls === 1 ? 'squall' : 'squalls'} · ${s.squallIn} came in through it · ${s.squallSwam} swam ashore${s.squallDrowned ? ` · ${s.squallDrowned} drowned` : ''}${s.squallBoats ? ` · ${s.squallBoats} ${s.squallBoats === 1 ? 'boat' : 'boats'} lost` : ''}</span>`]] : []),
     ...(s.sealsCame ? [['seal', 'Seals', `${s.sealer ? `<span class="fest">${esc(s.sealer)} creeping up on them with a club</span> · ` : ''}${s.seals}${s.sealPups ? ` <span class="m">(${s.sealPups} white ${s.sealPups === 1 ? 'pup' : 'pups'})</span>` : ''} <span class="m">· ${s.sealFishYear.toLocaleString()} deep-water fish eaten this year · ${s.sealing ? `${s.sealsTaken} taken${s.sealBites ? ` · ${s.sealBites} ${s.sealBites === 1 ? 'bite' : 'bites'}` : ''} · ${s.sealFloat ? `a sealskin float in the dugout${s.floatSaves ? ` (${s.floatSaves} kept afloat)` : ''}` : 'no float in the dugout'}` : 'nobody has gone after them yet'}</span>`]] : []),
     ...(s.horn ? [['horn', 'Horn', `<span class="m">${esc(s.horn)} blows it at the hearth${s.hornFound ? ` · ${s.hornFound} lost ${s.hornFound === 1 ? 'one' : 'ones'} walked home to it` : ''}</span>`]] : []),
-    ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
+    ...(s.isleVisits ? [['isle', 'Far isle', `${s.guests ? `<span class="fest">${s.guests} guests here</span> · ` : ''}<span class="m">${s.isleVisits} ${s.isleVisits === 1 ? 'visit' : 'visits'} · ${s.isleWed} stayed to marry${s.isleGone ? ` · ${s.isleGone} sailed away` : ''}${s.ranAway ? `, ${s.ranAway === 1 ? 'a pair' : `${s.ranAway} pairs`} ran off together${s.cameBack ? ` (${s.cameBack} came home)` : ''}` : ''}${s.awayNow ? `, ${esc(s.awayNow)} over there` : ''}</span>${s.feud ? ' · <span class="bad">no boat welcome this summer</span>' : ''}`]] : []),
     ...(s.raids ? [['raid', 'Raiders', `${s.raids} <span class="m">${s.raids === 1 ? 'night' : 'nights'} · ${s.raidGrain.toLocaleString()} grain carried off · ${s.raidsDriven} driven off${s.gifts ? ` · ${s.gifts} ${s.gifts === 1 ? 'gift' : 'gifts'} of grain sent home (${s.giftGrain.toLocaleString()})` : ''}</span>${s.gifted ? ' · <span class="herb">at peace this year</span>' : ''}`]] : []),
     ...(s.watch ? [['watch', 'Watch', `${s.watcher ? `<span class="fest">${esc(s.watcher)} by the beach fire</span> · ` : ''}<span class="m">${s.watchNights} ${s.watchNights === 1 ? 'night' : 'nights'} kept · ${s.watchTurned} ${s.watchTurned === 1 ? 'boat' : 'boats'} turned back${s.moonLore ? ` · ${s.moonRested} bright ${s.moonRested === 1 ? 'night' : 'nights'} slept` : ''}</span>`]] : []),
     ...(s.moonLore ? [['moon', 'Moon', `<span class="m">${S.moonName(c.day)} · ${S.moonDark(c.day) ? 'dark enough for a boat to creep in' : 'too bright to row in unseen'} · counted since ${esc(w.moon.nm)} saw it ${when(w.moon.at)}</span>`]] : []),

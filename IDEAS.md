@@ -669,5 +669,13 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Cloth as a gift or trade with the far isle; a blanket sent home with hungry guests; a shroud for the dead in the burying ground.
   - A second loom once the village passes ~20 houses, or girls apprenticed to the weaver (a byname, "the Weaver").
   - Moths in the blankets in a damp year, or a winter fire in the weaver's house that takes the loom and the web.
-- Housekeeping: deleting files is still blocked on this machine; scripts/_loom.mjs (loom probe) joins the scripts/_*.mjs and
+- Lovers across the thorn branch are done (SIM_VERSION 65; quarrel cur.lv {f, m, fn, mn, fh, mh, d, n, on, x, y, at, s, k, go}, w.quarrel.el
+  {f, m: {nm, sex, b, mo, fa, cg}, y, an, bn, w}, pr [f, m] promised, ran, back; drawTryst/trystNow in render.js). Young islanders pair
+  off at 17 within months, so single teens are rare; that is why the love feud is chosen at quarrelBegin rather than waited for. Answers it invites:
+  - A child of the secret match born before the bowl is shared (talk at the spring, the grandmothers come round).
+  - The runaways' child, raised on the far isle, could carry far-isle ways home (shell beads, a song, a better net).
+  - A pair caught at the stones could be blamed for a stone that falls or a bad harvest ("they have angered the dead").
+  - The tale on the longest night: the eldest tells of the pair who ran off and came home.
+  - Lovers could use the island's own dugout if no guests come, and the island goes without it until they bring it back.
+- Housekeeping: scripts/_love.mjs and scripts/_love2.mjs (lovers probes) also could not be deleted. Earlier: deleting files is still blocked on this machine; scripts/_loom.mjs (loom probe) joins the scripts/_*.mjs and
   scripts/.deerpeek.mjs that should all be deleted. check.mjs ran 1.5-2.5 s/yr here on all three seeds; verify on the live world 866 ms/yr.

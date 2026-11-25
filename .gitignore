@@ -3,6 +3,7 @@ dist/
 world/
 scripts/.prof*/
 *.cpuprofile
+scripts/_*.mjs
 
 
 LAST_RUN.md

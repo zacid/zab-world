@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 64;
+export const SIM_VERSION = 65;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -2743,6 +2743,7 @@ function midsummer(w, c, fx) {
       F.pairs.push(`${f.name} and ${m.name}`);
     }
     if (w.isle && w.isle.boat) isleWed(w);
+    if (w.isle && w.isle.boat && w.quarrel && w.quarrel.cur) loveBoat(w);
   } else if (h === 22) {
     F.n = (F.n || 0) + 1;
     const feast = F.feast >= pop ? ' and feast on the best of the stores' : F.feast > 0 ? ' and share what the stores can spare' : ' on empty stomachs';
@@ -2921,7 +2922,7 @@ function isleWed(w) {
   for (const g of B.gs) {
     if (g.k !== 'fest') continue;
     const p = w.people.find((o) => !o.dead && o.sex !== g.sex && o.partner == null && ageY(w, o) >= 17 && ageY(w, o) <= 45 &&
-      Math.abs(ageY(w, o) - g.a) < 14 && alone(w, o));
+      Math.abs(ageY(w, o) - g.a) < 14 && alone(w, o) && !inLove(w, o));
     if (!p || rnd(w) >= ISLE_WED) continue;
     const q = addPerson(w, g.sex, g.a, null, null, null);
     q.name = g.nm; q.x = q.px = g.x; q.y = q.py = g.y;
@@ -2973,6 +2974,7 @@ function isleGift(w, B, R, y) {
 function boatLands(w, B) {
   const I = w.isle;
   I.n++;
+  if (w.quarrel && w.quarrel.el) loveBack(w, B);
   B.gs.forEach((g, k) => { // up the beach to wait by the hearth until the fire is lit
     g.x = B.bx + 0.5; g.y = B.by + 0.5;
     g.tx = w.fire.x + 0.5 + (k % 3) - 1; g.ty = w.fire.y + 2.5 + (k >> 1) * 0.5;
@@ -2989,8 +2991,9 @@ function boatLeaves(w, B) {
   B.st = 'out';
   for (const g of B.gs) { g.x = B.x; g.y = B.y; g.k = 'boat'; }
   const I = w.isle, pop = w.people.length;
+  if (B.el) loveGone(w, B);
   if (pop >= ISLE_CROWD) {
-    const p = w.people.find((o) => !o.dead && o.partner == null && !o.sick && !o.hurt && ageY(w, o) >= 17 && ageY(w, o) <= 30 && alone(w, o) &&
+    const p = w.people.find((o) => !o.dead && o.partner == null && !o.sick && !o.hurt && ageY(w, o) >= 17 && ageY(w, o) <= 30 && alone(w, o) && !inLove(w, o) &&
       !(w.heal && w.heal.id === o.id) && !(w.horn && w.horn.hid === o.id) && !(w.goats && w.goats.hid === o.id) && !(w.lost && w.lost.cur && w.lost.cur.id === o.id) &&
       !w.people.some((k) => !k.dead && (k.mother === o.id || k.father === o.id) && ageY(w, k) < 14));
     if (p && rnd(w) < ISLE_LEAVE) {
@@ -3771,12 +3774,14 @@ function houseHead(w, id) {
 function quarrelDay(w, c, fx) {
   const Q = w.quarrel;
   if (Q && Q.br.length) Q.br = Q.br.filter((id) => { const p = aliveId(w, id); return p && p.hurt; });
+  if (Q && Q.pr) lovePromise(w);
   const C = Q && Q.cur;
   if (C) {
     const a = aliveId(w, C.ai), b = aliveId(w, C.bi);
     if (!a || !b) return quarrelGrave(w, a || b, C);
     if (a.home !== C.a || b.home !== C.b) { quarrelOver(w); return log(w, `${C.an} and ${C.bn} no longer live next door to each other, and the quarrel between their houses goes cold.`, 'info'); }
     if (rnd(w) < QUARREL_SPAT) quarrelSpat(w, c, C, a, b, fx);
+    loveDay(w, c, C, fx);
     return;
   }
   if (c.year < QUARREL_FROM || w.people.length < QUARREL_POP || (Q && Q.end != null && w.t - Q.end < QUARREL_GAP * TICKS_PER_YEAR)) return;
@@ -3785,9 +3790,9 @@ function quarrelDay(w, c, fx) {
   quarrelBegin(w, c, homes, fx);
 }
 function quarrelBegin(w, c, homes, fx) {
-  const A = homes[ri(w, homes.length)];
-  let B = null, bd = Infinity; // they fall out with the people next door
-  for (const o of homes) if (o !== A) { const d = d2(A.x, A.y, o.x, o.y); if (d < bd) { bd = d; B = o; } }
+  const lov = rnd(w) < LOVE_CAUSE ? loveCause(w, homes) : null; // a girl caught with a lad her father will not have
+  let A = lov ? lov.A : homes[ri(w, homes.length)], B = lov ? lov.B : null, bd = Infinity; // or they fall out with the people next door
+  if (!B) for (const o of homes) if (o !== A) { const d = d2(A.x, A.y, o.x, o.y); if (d < bd) { bd = d; B = o; } }
   const a = houseHead(w, A.id), b = houseHead(w, B.id);
   const young = (id, not) => { let best = null; for (const p of w.people) if (!p.dead && p.home === id && p !== not && ageY(w, p) >= 6 && ageY(w, p) < 25 && (!best || p.id < best.id)) best = p; return best; };
   const ay = young(A.id, a), by = young(B.id, b);
@@ -3798,12 +3803,14 @@ function quarrelBegin(w, c, homes, fx) {
   if (w.bees && ay) why.push(['honey', `Comb has gone from the bee log, and ${b.name} says ${ay.name} of ${a.name}'s house was seen with sticky hands. ${a.name} calls ${b.name} a liar in front of the whole hearth.`]);
   if (w.dogs && w.dogs.d.length && by) why.push(['dog', `A dog from ${a.name}'s doorway snaps at ${by.name}, and ${b.name} throws a stone at it and lames it. ${a.name} sees it done.`]);
   if (w.techs.includes('hunting') && ageY(w, a) < 55 && ageY(w, b) < 55) why.push(['spear', `${a.name} and ${b.name} both swear it was their spear that brought down the last boar, and neither will give up the hide.`]);
-  const [k, text] = why.length > 1 && rnd(w) < 0.85 ? why[1 + ri(w, why.length - 1)] : why[0];
+  const [k, text] = lov ? ['love', `${a.name} finds ${lov.f.name} after dark at the edge of the woods with ${lov.m.name} of ${b.name}'s house, and drags ${lov.f.sex === 'f' ? 'her' : 'him'} home by the arm. ${a.name} says before the whole hearth that no child of ${a.sex === 'f' ? 'hers' : 'his'} will go to ${b.name}'s house, and ${b.name} takes it as the insult it is.`]
+    : why.length > 1 && rnd(w) < 0.85 ? why[1 + ri(w, why.length - 1)] : why[0];
   let Q = w.quarrel;
   const first = !Q;
   if (first) Q = w.quarrel = { k: 0, cur: null, end: null, y: 0, yf: 0, f: 0, m: 0, br: [], cup: null };
   Q.k++;
   Q.cur = { a: A.id, b: B.id, ai: a.id, bi: b.id, an: a.name, bn: b.name, d: c.day, why: k, n: 0, f: 0 };
+  if (lov) Q.cur.lv = { f: lov.f.id, m: lov.m.id, fn: lov.f.name, mn: lov.m.name, fh: a.name, mh: b.name, d: c.day, n: 0, on: null, x: 0, y: 0, at: 'beach', s: 1, k: c.day + LOVE_KEPT, go: 0 };
   if (first && !w.techs.includes('feud')) w.techs.push('feud');
   if (fx) fx.push({ x: A.x + 0.5, y: A.y - 0.5, text: 'a quarrel', color: 'sick' });
   const after = `From that day ${a.name}'s house and ${b.name}'s house do not speak. A thorn branch is laid across each doorstep, nobody from one will sit by anyone from the other at the fire, and no child of one will be married to a child of the other.`;
@@ -3828,8 +3835,9 @@ function quarrelSpat(w, c, C, a, b, fx) {
 function quarrelGrave(w, alive, C) {
   const dead = alive && alive.id === C.ai ? C.bn : C.an;
   quarrelOver(w);
-  if (!alive) return log(w, `${C.an} and ${C.bn} are both in the burying ground now, and their houses have forgotten what the quarrel was about.`, 'info');
-  log(w, `${dead} is laid in the earth, and ${alive.name} comes to the graveside and stands with ${dead}'s house. Whatever the quarrel was, it goes into the ground too. The thorn branches are taken off the doorsteps.`, 'good');
+  const wed = loveWed(w, C, (f, m) => ` Before the month is out ${f} and ${m}, who have been slipping out to meet all along, are joined at the fire, and nobody says a word against it.`);
+  if (!alive) return log(w, `${C.an} and ${C.bn} are both in the burying ground now, and their houses have forgotten what the quarrel was about.${wed}`, 'info');
+  log(w, `${dead} is laid in the earth, and ${alive.name} comes to the graveside and stands with ${dead}'s house. Whatever the quarrel was, it goes into the ground too. The thorn branches are taken off the doorsteps.${wed}`, 'good');
 }
 function quarrelOver(w) {
   const Q = w.quarrel;
@@ -3842,18 +3850,27 @@ function quarrelMend(w, c, at, mead) {
   const a = aliveId(w, C.ai), b = aliveId(w, C.bi);
   if (!a || !b || a.sick || b.sick) return;
   const days = c.day - C.d, long = days >= QUARREL_LONG * DAYS_PER_YEAR;
-  const odds = Q.cup != null ? QUARREL_CUP : QUARREL_MEND + (mead ? QUARREL_MEAD : 0);
+  const L = loveOf(w, C), known = !!(L && L.s);
+  const odds = (Q.cup != null ? QUARREL_CUP : QUARREL_MEND + (mead ? QUARREL_MEAD : 0)) * (known ? LOVE_STUBBORN : 1);
   const night = at === 'fest' ? 'midsummer night' : 'the longest night';
-  if (!long && rnd(w) >= odds) return log(w, `On ${night} ${C.an} and ${C.bn} sit on opposite sides of the fire and do not look at each other.`, 'info');
+  if (!long && rnd(w) >= odds) {
+    if (known && !L.go) { // the bowl was not shared, and the two of them give up waiting for it
+      L.go = 1;
+      return log(w, `On ${night} ${C.an} and ${C.bn} sit on opposite sides of the fire and do not look at each other. ${L.fn} and ${L.mn} do not look at anyone else. Somebody hears ${L.fn} say that the far isle is not so far.`, 'bad');
+    }
+    return log(w, `On ${night} ${C.an} and ${C.bn} sit on opposite sides of the fire and do not look at each other.`, 'info');
+  }
   let who = null;
   for (const p of w.people) if (!p.dead && !p.sick && p.home !== C.a && p.home !== C.b && ageY(w, p) >= 30 && (!who || p.born < who.born || (p.born === who.born && p.id < who.id))) who = p;
   const by = who ? who.name : 'the eldest', bowl = mead ? 'with mead' : 'from the spring';
   const first = Q.cup == null;
   quarrelOver(w);
   Q.m++;
-  // and to seal it, a match across the two doorsteps if there is one to be had
-  let seal = '';
-  for (const f of w.people) {
+  // and to seal it, a match across the two doorsteps if there is one to be had: the secret lovers first
+  let seal = loveWed(w, C, (f, m) => known
+    ? ` Then ${by} calls ${f} and ${m} into the light too, and everyone knows why. They are pledged before the bowl is cold, and that settles it.`
+    : ` Before the night is out ${f} of one house is pledged to ${m} of the other, and only then does it come out that they have been meeting in secret for months.`);
+  if (!seal) for (const f of w.people) {
     if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || (f.home !== C.a && f.home !== C.b)) continue;
     const m = w.people.find((o) => o.home === (f.home === C.a ? C.b : C.a) && matches(w, f, o));
     if (!m) continue;
@@ -3867,6 +3884,179 @@ function quarrelMend(w, c, at, mead) {
     if (!w.techs.includes('peacecup')) w.techs.push('peacecup');
     milestone(w, `On ${night} ${by} stands up by the fire and will not sit down again until ${C.an} and ${C.bn} come into the light. ${Cap(by)} fills one bowl ${bowl}, puts it in ${C.an}'s hands and then in ${C.bn}'s, and they drink from it in front of everyone. ${len} of not speaking are over, and the thorn branches come off the doorsteps.${seal} From now on any quarrel on ${w.name} is brought to the fire and ended over one shared bowl. ${w.name} keeps the peace cup.`);
   } else log(w, `On ${night} ${by} brings ${C.an} and ${C.bn} to the fire, and they drink from the peace cup in front of everyone. ${len} of not speaking are over.${seal}`, 'good');
+}
+
+// ---------- lovers across the thorn branch ----------
+// Half the feuds start over a girl still at home who is found after dark with a lad of another house her father will
+// not have (loveCause); in any feud a pair from the two houses may also fall for each other later (loveDay). They
+// meet in secret after dark, among the standing stones or down on the beach. Each night out they may be seen; then
+// the lad may take a beating, and both are kept in for a while. Once it is known, the girl's father is slower to drink
+// from the bowl; when the bowl ends it, or a head dies, the two are pledged (or promised, if under 17). If the bowl
+// is refused once, they mean to leave: at the next midsummer with far-isle guests they go with the boat, the shame of
+// it ends the feud, and from the second summer after, they may come home in the guests' boat with a child.
+// cur.lv { f, m ids, fn, mn, fh, mh their heads' names, d day it began, n nights out, on day of the last night out,
+//   x, y where they meet, at 'stones'|'beach', s times seen, k kept in until this day, go 1 once they mean to leave }
+// w.quarrel.el { f, m: {nm, sex, b born, mo, fa, cg}, y, an, bn, w word sent } once a pair has run off; ran pairs ever
+const LOVE_AFTER = 20;       // days into a feud before anyone notices anyone across the thorn branch
+const LOVE_SEED = 0.02;      // daily chance, once there is a pair to fall for each other
+const LOVE_AGE = 15;         // youngest to slip out at night
+const LOVE_CAUSE = 0.5;     // chance a new feud is over a girl and a lad, if there is a pair in two houses to start it
+const LOVE_NIGHT = 0.1;    // chance of a night out (none in a storm, snow or a hard cold)
+const LOVE_FROM = 21;        // hours they are out: 21:00 to midnight
+const LOVE_SEEN = 0.05;     // chance a night out is seen (x2 under a bright moon, half in fog)
+const LOVE_KEPT = 20;        // days both are kept in after being seen
+const LOVE_STUBBORN = 0.6;   // x the odds of the bowl at a gathering once everyone knows: the girl's father will not drink
+const LOVE_BACK = 0.5;       // chance they are in the boat, each far-isle visit from the second summer after they left
+const loveOf = (w, C) => {
+  const L = C && C.lv;
+  if (!L) return null;
+  const f = aliveId(w, L.f), m = aliveId(w, L.m);
+  return f && m && f.partner == null && m.partner == null ? L : null;
+};
+const inLove = (w, p) => {
+  const Q = w.quarrel;
+  if (!Q) return false;
+  const L = Q.cur && Q.cur.lv;
+  return (!!L && (p.id === L.f || p.id === L.m)) || (!!Q.pr && (p.id === Q.pr[0] || p.id === Q.pr[1]));
+};
+// for the map: the pair out tonight, and where
+export const loveNight = (w) => { const C = quarrelOf(w); return C && C.lv && C.lv.on != null ? C.lv : null; };
+export const loveKnown = (w) => { const C = quarrelOf(w); return C && C.lv && C.lv.s ? `${C.lv.fn} and ${C.lv.mn}` : null; };
+// a feud about to start: is there a girl still at home (16-24) and an unpledged lad (16-30) under another roof?
+function loveCause(w, homes) {
+  const H = new Map(homes.map((b) => [b.id, b]));
+  for (const f of w.people) {
+    if (f.dead || f.sex !== 'f' || f.partner != null || f.sick || !H.has(f.home) || ageY(w, f) < LOVE_AGE || ageY(w, f) > 24) continue;
+    const a = houseHead(w, f.home);
+    if (!a || a === f) continue;
+    for (const m of w.people) {
+      if (m.dead || m.sex !== 'm' || m.partner != null || m.sick || m.home === f.home || !H.has(m.home) || ageY(w, m) < LOVE_AGE || ageY(w, m) > 30 ||
+        Math.abs(ageY(w, m) - ageY(w, f)) >= 10 || sibling(f, m)) continue;
+      const b = houseHead(w, m.home);
+      if (!b || b === m || b.partner === a.id) continue;
+      return { A: H.get(f.home), B: H.get(m.home), f, m };
+    }
+  }
+  return null;
+}
+function loveDay(w, c, C, fx) {
+  const L = C.lv;
+  if (!L) {
+    if (c.day - C.d < LOVE_AFTER || rnd(w) >= LOVE_SEED) return;
+    // of the house: living under its roof, or a son or daughter of it who has moved out
+    const kin = (p, h) => { if (p.home === h) return true; const mo = p.mother != null && aliveId(w, p.mother), fa = p.father != null && aliveId(w, p.father); return !!((mo && mo.home === h) || (fa && fa.home === h)); };
+    const ok = (p, sex, h) => !p.dead && p.sex === sex && p.partner == null && !p.sick && ageY(w, p) >= LOVE_AGE && ageY(w, p) <= 35 && kin(p, h);
+    for (const [ha, hb] of [[C.a, C.b], [C.b, C.a]]) for (const f of w.people) {
+      if (!ok(f, 'f', ha) || kin(f, hb)) continue;
+      const m = w.people.find((o) => ok(o, 'm', hb) && !kin(o, ha) && Math.abs(ageY(w, o) - ageY(w, f)) < 10 && !sibling(f, o));
+      if (!m) continue;
+      const fh = ha === C.a ? C.an : C.bn, mh = ha === C.a ? C.bn : C.an;
+      C.lv = { f: f.id, m: m.id, fn: f.name, mn: m.name, fh, mh, d: c.day, n: 0, on: null, x: 0, y: 0, at: 'beach', s: 0, k: 0, go: 0 };
+      return log(w, `At the spring ${f.name} of ${fh}'s house and ${m.name} of ${mh}'s house are the only two who do not look away from each other.`, 'love');
+    }
+    return;
+  }
+  const f = aliveId(w, L.f), m = aliveId(w, L.m);
+  if (!f || !m || f.partner != null || m.partner != null) { C.lv = null; return; }
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (L.on === c.day - 1) { // last night they were out: was anyone else?
+    const lit = (wx === 'clear' || wx === 'heat' || wx === 'cold') && moonLight(c.day - 1) >= 10;
+    if (rnd(w) < LOVE_SEEN * (lit ? 2 : wx === 'fog' ? 0.5 : 1)) loveSeen(w, c, C, L, f, m, lit, fx);
+  }
+  L.on = null;
+  if (c.day < L.k || f.sick || m.sick || f.hurt || m.hurt || wx === 'storm' || wx === 'snow' || wx === 'cold' || rnd(w) >= LOVE_NIGHT) return;
+  const R = w.stones && w.stones.s.length ? w.stones : null, B = !R && landing(w);
+  if (!R && !B) return;
+  L.on = c.day; L.n++;
+  L.at = R ? 'stones' : 'beach';
+  L.x = R ? R.cx + 0.5 : B.bx + 0.5; L.y = R ? R.cy + 0.9 : B.by + 0.5;
+  if (L.n === 1) log(w, `After dark ${f.name} slips out of ${L.fh}'s house, and ${m.name} out of ${L.mh}'s. They meet ${R ? 'among the standing stones, where nobody goes at night' : 'down on the beach, where the waves cover their voices'}.`, 'love');
+}
+function loveSeen(w, c, C, L, f, m, lit, fx) {
+  const Q = w.quarrel;
+  L.s++; L.k = c.day + LOVE_KEPT;
+  C.n++; Q.y++;
+  const out = w.people.filter((p) => !p.dead && p !== f && p !== m && ageY(w, p) >= 12);
+  const by = out.length ? out[ri(w, out.length)] : null;
+  const where = L.at === 'stones' ? 'among the standing stones' : 'down on the beach';
+  const fit = (h) => { let best = null; for (const p of w.people) { const ag = ageY(w, p); if (!p.dead && p.home === h && p !== f && ag >= 16 && ag <= 50 && !p.sick && !p.hurt && (!best || p.born < best.born)) best = p; } return best; };
+  const hit = fit(f.home), days = QUARREL_HURT + ri(w, 3);
+  let text = L.s === 1
+    ? `${by ? by.name : 'Somebody'} comes home late${lit ? ' under a bright moon' : ''} and sees two people sitting close ${where} under one cloak: ${f.name} of ${L.fh}'s house and ${m.name} of ${L.mh}'s. By morning both houses know. ${f.name} and ${m.name} are kept in, and the thorn branches seem to grow longer.`
+    : `${f.name} and ${m.name} are caught ${where} again. Both houses are kept in for weeks, and everyone else on ${w.name} takes a side.`;
+  if (hit && rnd(w) < QUARREL_BLOWS * 1.5) {
+    m.hurt = Math.max(m.hurt || 0, w.t + days * TICKS_PER_DAY);
+    if (!Q.br.includes(m.id)) Q.br.push(m.id);
+    C.f++; Q.f++; Q.yf++;
+    text += ` ${hit.name} goes to ${L.mh}'s door and knocks ${m.name} down in the doorway; ${pron(m)} is no use for ${days} days.`;
+    if (fx) fx.push({ x: m.x, y: m.y - 0.5, text: 'blows', color: 'sick' });
+  }
+  if (fx) fx.push({ x: f.x, y: f.y - 0.5, text: 'seen!', color: 'sick' });
+  log(w, text, 'bad');
+}
+// a gathering ends the feud, or a head dies: the two of them are free, and pledged at once
+function loveWed(w, C, say) {
+  const L = loveOf(w, C);
+  if (!L) return '';
+  const f = aliveId(w, L.f), m = aliveId(w, L.m);
+  C.lv = null;
+  if (ageY(w, f) < 17 || ageY(w, m) < 17) { // too young yet: promised, and joined when both are grown
+    w.quarrel.pr = [f.id, m.id];
+    return ` ${f.name} and ${m.name} are promised to each other, to be joined when they are both grown.`;
+  }
+  f.partner = m.id; m.partner = f.id; f.wants = true;
+  return say(f.name, m.name);
+}
+// a promise made over the bowl, kept once both are 17
+function lovePromise(w) {
+  const Q = w.quarrel, f = aliveId(w, Q.pr[0]), m = aliveId(w, Q.pr[1]);
+  if (!f || !m || f.partner != null || m.partner != null) { Q.pr = null; return; }
+  if (ageY(w, f) < 17 || ageY(w, m) < 17) return;
+  Q.pr = null;
+  f.partner = m.id; m.partner = f.id; f.wants = true;
+  log(w, `${f.name} and ${m.name}, promised over the peace bowl, are joined at the fire. Both their houses are there.`, 'love');
+}
+// midsummer, late in the dance: two who mean to leave slip down to the guests' boat
+function loveBoat(w) {
+  const C = quarrelOf(w), L = loveOf(w, C), B = w.isle && w.isle.boat;
+  if (!L || !L.go || !B || B.st !== 'ashore' || B.el) return;
+  const f = aliveId(w, L.f), m = aliveId(w, L.m);
+  if (f.sick || m.sick || ageY(w, f) < 17 || ageY(w, m) < 17) return;
+  B.el = [f.id, m.id];
+}
+// first light: they are in the boat, and the feud that drove them out is over
+function loveGone(w, B) {
+  const Q = w.quarrel, C = quarrelOf(w), ids = B.el;
+  delete B.el;
+  const f = aliveId(w, ids[0]), m = aliveId(w, ids[1]);
+  if (!f || !m || !C) return;
+  const y = clock(w.t).year, keep = (p) => ({ nm: p.name, sex: p.sex, b: p.born, mo: p.mother, fa: p.father, cg: p.cgi ? 1 : 0 });
+  Q.el = { f: keep(f), m: keep(m), y, an: C.lv.fh, bn: C.lv.mh, w: 0 };
+  Q.ran = (Q.ran || 0) + 1;
+  for (const [p, o] of [[f, m], [m, f]]) {
+    rollCall(w, { id: p.id, n: p.name, x: p.sex, b: p.born, d: w.t, why: `ran away to the far isle with ${o.name}`, m: p.mother, f: p.father, pt: null, by: byname(p) });
+    B.gs.push({ nm: p.name, sex: p.sex, a: Math.floor(ageY(w, p)), x: B.x, y: B.y, px: p.x, py: p.y, k: 'boat', isl: 1 });
+    release(w, p); p.dead = true; unname(w, p);
+  }
+  quarrelOver(w);
+  log(w, `At first light the guests push off for the far isle, and ${f.name} and ${m.name} are in the boat with them. Nobody stopped them; nobody saw them go down to the beach. ${Q.el.an} and ${Q.el.bn} stand at the water's edge side by side and watch the boat until it is gone into the haze. That evening the thorn branches are taken off both doorsteps, and nobody puts them back.`, 'bad');
+}
+// a later midsummer: word of them from the guests, or the two of them in the boat with a child
+function loveBack(w, B) {
+  const Q = w.quarrel, E = Q && Q.el;
+  if (!E) return;
+  const y = clock(w.t).year;
+  if (y - E.y < 2 || rnd(w) >= LOVE_BACK) {
+    if (!E.w && y > E.y) { E.w = 1; log(w, `The guests from the far isle bring word of ${E.f.nm} and ${E.m.nm}: they have a house of their own over there now, against the wind.`, 'info'); }
+    return;
+  }
+  const f = addPerson(w, 'f', 0, E.f.mo, E.f.fa, null), m = addPerson(w, 'm', 0, E.m.mo, E.m.fa, null);
+  for (const [p, e] of [[f, E.f], [m, E.m]]) { p.name = e.nm; p.born = e.b; p.x = p.px = B.bx + 0.5; p.y = p.py = B.by + 0.5; if (e.cg) p.cgi = 1; }
+  f.partner = m.id; m.partner = f.id; f.wants = true;
+  const k = addPerson(w, rnd(w) < 0.5 ? 'f' : 'm', Math.min(y - E.y - 1, 3), f.id, m.id, null);
+  k.x = k.px = B.bx + 0.5; k.y = k.py = B.by + 0.5;
+  Q.el = null; Q.back = (Q.back || 0) + 1;
+  log(w, `There are two more in the dugout from the far isle than anyone expected: ${f.name} and ${m.name} have come home, and ${f.name} carries a child, ${k.name}, on ${poss(f)} hip. ${E.an} and ${E.bn} both walk down to the beach to meet them. The child is passed from one to the other, and nobody speaks of thorn branches.`, 'love');
 }
 
 // ---------- rats ----------
@@ -5538,7 +5728,7 @@ function lifeAndDeath(w, c) {
 
 const sibling = (a, b) => (a.mother != null && a.mother === b.mother) || (a.father != null && a.father === b.father);
 const matches = (w, f, o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
-  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id && !apart(w, f, o);
+  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id && !apart(w, f, o) && !inLove(w, f) && !inLove(w, o);
 function mate(w, f) {
   return w.people.find((o) => matches(w, f, o));
 }
@@ -7673,6 +7863,10 @@ const MIGRATIONS = {
   63: (w) => {
     if (w.loom === undefined) w.loom = null;
   },
+  // v64 -> v65: lovers across the thorn branch (w.quarrel.cur.lv, w.quarrel.el/ran/back). No feud is running yet.
+  64: (w) => {
+    if (w.quarrel && w.quarrel.cur && w.quarrel.cur.lv === undefined) w.quarrel.cur.lv = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7714,6 +7908,8 @@ export function summary(w) {
     quarrel: quarrelOf(w) ? `${w.quarrel.cur.an}'s and ${w.quarrel.cur.bn}'s houses` : null, quarrels: (w.quarrel && w.quarrel.k) || 0,
     quarrelFights: (w.quarrel && w.quarrel.f) || 0, quarrelsMended: (w.quarrel && w.quarrel.m) || 0, peaceCup: !!(w.quarrel && w.quarrel.cup != null),
     bruised: w.quarrel ? w.people.filter((p) => quarrelBruised(w, p)).length : 0,
+    lovers: loveKnown(w), loversOut: !!(loveNight(w) && loveNight(w).on === c.day && c.hour >= LOVE_FROM),
+    ranAway: (w.quarrel && w.quarrel.ran) || 0, cameBack: (w.quarrel && w.quarrel.back) || 0, awayNow: (w.quarrel && w.quarrel.el) ? `${w.quarrel.el.f.nm} and ${w.quarrel.el.m.nm}` : null,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,
