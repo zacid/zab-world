@@ -659,3 +659,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - A fence of thorn round the pit after a child falls in, or the children taught a rhyme about it in the winter tale.
   - A wary bear that keeps dodging could earn a legend ("the bear that cannot be taken") told on the longest night.
   - Boars or a lone wolf could also go into a covered pit; the far isle could ask for a bearskin as a peace gift.
+- Spinning and the loom are done (SIM_VERSION 64; w.loom {id, nm, k, at, by, h, y, wv, b, n, yb, wo, cv}; learnLoom/loomDay/loomTask/
+  loomDone, loomAt/loomCover/spinning exported; drawLoom/loomRect in render.js). Hair comes only from goats, and the herd is capped near 14,
+  so a big late-game village cannot cover every bed. Answers it invites:
+  - Sheep (a ram and ewes off a far-isle boat, or traded for a bearskin): wool, many times the hair a goat gives.
+  - Flax in a wet field by the spring: linen for shirts and sails, retted in the stream (a smell, a new field kind).
+  - Dyes: woad blue, onion-skin yellow, madder red; dyed cloaks for the midsummer dancers, a coloured shirt per household on the sprites.
+  - A sail for the dugout (faster trips to the far isle, or a second, bigger boat); fishing nets instead of lines.
+  - Cloth as a gift or trade with the far isle; a blanket sent home with hungry guests; a shroud for the dead in the burying ground.
+  - A second loom once the village passes ~20 houses, or girls apprenticed to the weaver (a byname, "the Weaver").
+  - Moths in the blankets in a damp year, or a winter fire in the weaver's house that takes the loom and the web.
+- Housekeeping: deleting files is still blocked on this machine; scripts/_loom.mjs (loom probe) joins the scripts/_*.mjs and
+  scripts/.deerpeek.mjs that should all be deleted. check.mjs ran 1.5-2.5 s/yr here on all three seeds; verify on the live world 866 ms/yr.

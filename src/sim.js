@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 63;
+export const SIM_VERSION = 64;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -91,6 +91,7 @@ export const TECHS = {
   feud:     { name: 'Feuds', added: '2026-11-25T20:06Z', desc: 'Two households next door to each other fall out over something small: goats in the young grain, a trip at the race, comb gone from the bee log, a stone thrown at a dog. Then they stop speaking. A thorn branch lies across each doorstep, they sit apart at the fire, and no child of one is married to a child of the other. Now and then it comes to blows and somebody is laid up for a few days. It can last for years, and it ends at a graveside if nothing ends it sooner.', req: ['fire'] },
   peacecup: { name: 'The peace cup', added: '2026-11-25T20:06Z', desc: 'At midsummer or on the longest night the eldest who is not of either house brings the two heads of a feud into the firelight and makes them drink from one bowl, mead if there is any, in front of everyone. Once it has worked, it is the custom: a quarrel is brought to the next gathering and nearly always ended there, and fewer of them come to blows while they last. Often a match between the two houses seals it.', req: ['feud', 'midsummer'] },
   incomers: { name: 'Incomers', added: '2026-11-25T20:38Z', desc: 'The far isle is small and stony, and some springs a household there has nothing left to stay for: a thin year that ate the seed grain, a house burnt in the winter, a husband lost at sea, a match a father will not allow. They load their dugout with bundles and a pot of embers and come over by day. While the granaries are full and the island has room, the eldest takes them in. They sleep where there is space until a house is raised for them, their dugout is broken up for its roof-beams, and their children grow up to marry island children.', req: ['farisle'] },
+  loom:     { name: 'Spinning and weaving', added: '2026-11-25T21:44Z', desc: 'Each spring, when the goats moult, the herder combs the loose winter coats out of them with a bone comb. The children and the old spin the hair into yarn on drop spindles, a stone whorl twirling on a thread, in every idle moment. One weaver keeps an upright loom against the wall of their house, the warp threads pulled straight by hanging weights, and on winter days and wet days the cloth grows on it a finger at a time. A blanket on every bed means a house keeps warm on less firewood, and the cold reaches the small and the old less hard. Blankets wear through in a few years and have to be woven again.', req: ['goats'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -601,7 +602,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -826,7 +827,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -913,7 +914,7 @@ function daily(w, c, fx) {
   const burn = c.season === 3 ? (wx === 'cold' ? 2 : wx === 'snow' ? 1.3 : 1) : wx === 'cold' ? 0.5 : 0;
   if (burn > 0) {
     const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && w.people.some((p) => p.home === b.id)).length;
-    const warm = homes ? Math.min(HIDE_WARM, ((w.hides || 0) / homes) * HIDE_WARM) : 0;
+    const warm = (homes ? Math.min(HIDE_WARM, ((w.hides || 0) / homes) * HIDE_WARM) : 0) + loomCover(w) * BLANKET_WARM;
     const need = Math.round(homes * FUEL_PER_HOUSE * burn * (1 - warm) * 100) / 100;
     if (w.timber >= need) { w.timber = Math.round((w.timber - need) * 100) / 100; if (w.stats.cold) { w.stats.cold = false; log(w, 'Every hearth is lit again.', 'good'); } }
     else { w.timber = 0; if (!w.stats.cold) { w.stats.cold = true; log(w, 'The woodpile is bare. Homes go cold.', 'bad'); } }
@@ -933,6 +934,7 @@ function daily(w, c, fx) {
   if (w.heal !== undefined) herbs(w, c);
   if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
+  if (w.loom !== undefined) loomDay(w, c, wx);
   if (w.muck) muckDay(w);
   if (w.dogs !== undefined) dogDay(w, c);
   lifeAndDeath(w, c);
@@ -4575,6 +4577,133 @@ function cheeseDone(w, p, pop) {
   else if (C.c === CHEESE_RACK) log(w, `The cheese rack by the goat pen is full: ${CHEESE_RACK} rounds drying on the rods. The rest of the milk is drunk.`, 'good');
   else if (C.n === 100 || C.n === 500 || C.n === 2000) log(w, `${C.n} rounds of cheese have been pressed by the goat pen.`, 'good');
 }
+// ---------- the loom ----------
+// One bitter winter, with the goats long settled, the eldest pulls tufts of moulted hair off the pen wattle and
+// twists them into a thread between finger and thumb. From then on: each spring, once the kids are born, the
+// herder combs out the winter coats (hair); through the year the children and the old spin it on drop spindles
+// in idle moments (yarn); and one weaver sets up an upright loom against the wall of their house, its warp held
+// taut by hanging weights, and weaves on winter days and wet days. A blanket on every bed keeps a house warm on
+// less wood, and keeps the cold off the small and the old. Blankets wear through over the years.
+// w.loom { id weaver, nm, k weavers so far, at tick, by who found it, h hair, y yarn, wv sittings on the web now,
+//   b blankets in use, n woven ever, yb this year, wo worn out ever, cv cover (0..1, blankets per bed, set daily) }
+const LOOM_YEARS = 3;        // years after the goats came before anyone thinks of the hair on the wattle
+const LOOM_HERD = 8;         // goats in the pen before there is enough hair to bother with
+const LOOM_FIND = 0.06;      // daily chance on a bitter winter day
+const COMB_DAY = 50;         // the spring moult: combed out a few days after the kidding
+const HAIR_GOAT = 1.5;       // hair combed from each grown goat
+const HAIR_MAX = 80;
+const SPIN_HAND = 0.04;      // yarn spun a day by each child (7-13) and each of the old (55+)
+const YARN_MAX = 24;         // balls of yarn put by before the spindles are set aside
+const BLANKET_YARN = 3;      // yarn in one blanket
+const BLANKET_WORK = 3;      // four-hour sittings at the loom for one blanket
+const BLANKET_HOUSE = 2;     // blankets a lived-in house needs before every bed has one
+const BLANKET_WEAR = 0.15;   // chance each year that a blanket is worn through
+const BLANKET_WARM = 0.15;   // winter firewood saved at full cover, on top of the hides
+const BLANKET_GUARD = 0.35;  // at full cover the cold reaches the frail this much less
+const LOOM_OLD = 70;
+export const spinning = (w) => !!(w.loom && w.loom.h > 0 && w.loom.y < YARN_MAX);
+export const loomCover = (w) => (w.loom ? w.loom.cv || 0 : 0);
+const livedIn = (w) => { let n = 0; for (const b of w.buildings) if (isHouse(b) && b.progress >= 1 && w.people.some((p) => p.home === b.id)) n++; return n; };
+// where the loom leans: against the weaver's house, on whichever side is open (right, left, then in front)
+export function loomAt(w) {
+  const L = w.loom, p = L && aliveId(w, L.id);
+  const b = p && p.home != null && w.buildings.find((o) => o.id === p.home);
+  if (!b || b.progress < 1) return null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1]]) {
+    const x = b.x + dx, y = b.y + dy, t = inMap(x, y) ? tile(w, x, y) : T.WATER;
+    if (t !== T.BUILD && t !== T.WATER) return { x, y, b: b.id, s: dx };
+  }
+  return { x: b.x, y: b.y + 1, b: b.id, s: 0 };
+}
+// the weaver: a grown child or housemate of the last one first, then whoever with a roof of their own is nearest 40;
+// never the healer, the goatherd, the potter or the keeper of the horn
+function pickWeaver(w, old) {
+  let best = null, bs = 1e9;
+  const busy = [w.heal && w.heal.id, w.goats && w.goats.hid, w.horn && w.horn.hid, w.pot && w.pot.id];
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || p === old || a < 16 || a >= LOOM_OLD - 5 || p.sick || p.home == null || busy.includes(p.id)) continue;
+    const tier = old && (p.mother === old.id || p.father === old.id) ? 0 : old && old.home != null && p.home === old.home ? 1 : 2;
+    const sc = tier * 100 + Math.abs(a - 40);
+    if (sc < bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+function learnLoom(w, c, wx) {
+  const G = w.goats;
+  if (c.season !== 3 || (wx !== 'cold' && wx !== 'snow') || !G || G.herd.length < LOOM_HERD || !w.learned || w.learned.goats == null ||
+    w.t - w.learned.goats < LOOM_YEARS * TICKS_PER_YEAR || rnd(w) >= LOOM_FIND) return;
+  const old = elder(w), wv = pickWeaver(w, null);
+  if (!old || !wv) return;
+  const hair = Math.min(HAIR_MAX, Math.round(G.herd.length * HAIR_GOAT));
+  w.loom = { id: wv.id, nm: wv.name, k: 1, at: w.t, by: old.name, h: hair, y: 0, wv: 0, b: 0, n: 0, yb: 0, wo: 0, cv: 0 };
+  w.techs.push('loom');
+  const O = Cap(pron(old)), W = wv === old ? Cap(pron(wv)) : wv.name;
+  milestone(w, `The frost has the island by the throat and the children cry with the cold at night. ${old.name} walks round the goat pen and pulls the tufts of moulted hair off the wattle, a whole fistful of it, and sits by the fire twisting it between finger and thumb into a thread. ${O} hangs a stone off the end and sets it spinning, and the thread draws itself out long and even. ` +
+    `${W} lashes two poles against the wall of ${poss(wv)} house with a beam across the top, hangs the threads from it in a row and ties ${w.pot ? 'clay weights from the kiln' : 'pebbles with holes worn through them'} on the ends to pull them straight. Thread goes over and under, and a hand's breadth of rough grey cloth grows on the frame. ${w.name} learns to spin and weave.`);
+}
+function loomDay(w, c, wx) {
+  if (w.loom === null) { learnLoom(w, c, wx); return; }
+  const L = w.loom, G = w.goats;
+  if (c.doy === 0) {
+    L.yb = 0;
+    let worn = 0;
+    for (let k = 0; k < L.b; k++) if (rnd(w) < BLANKET_WEAR) worn++;
+    L.b -= worn; L.wo += worn;
+    if (worn && L.b < livedIn(w) * BLANKET_HOUSE) log(w,`${plural(worn, 'blanket has', 'blankets have')} worn through over the year and gone for rags. ${L.b} still lie on the beds.`, 'info');
+  }
+  // the spring moult: the herder combs the loose winter coats out of the goats
+  if (c.doy === COMB_DAY && G && G.herd.length) {
+    let grown = 0;
+    for (const g of G.herd) if (w.t - g.b >= TICKS_PER_YEAR) grown++;
+    const got = Math.min(HAIR_MAX - L.h, Math.round(grown * HAIR_GOAT));
+    if (got > 0) {
+      L.h += got;
+      const hd = aliveId(w, G.hid);
+      log(w, `The goats are moulting. ${hd ? hd.name : 'Someone'} combs the loose winter coats out of the herd with a bone comb: ${got} ${got === 1 ? 'handful' : 'handfuls'} of hair for the spindles.`, 'good');
+    }
+  }
+  // spinning, in odd moments: children and the old with a spindle on a thread
+  if (L.h > 0 && L.y < YARN_MAX) {
+    let n = 0;
+    for (const p of w.people) { if (p.dead || p.sick || p.cg) continue; const a = ageY(w, p); if ((a >= 7 && a < 14) || a >= 55) n++; }
+    const s = Math.min(L.h, Math.round(n * SPIN_HAND * 100) / 100);
+    L.h = Math.round((L.h - s) * 100) / 100; L.y = Math.round((L.y + s) * 100) / 100;
+  }
+  L.cv = Math.round(Math.min(1, L.b / Math.max(1, livedIn(w) * BLANKET_HOUSE)) * 100) / 100;
+  // a new weaver when the old one dies, grows too stiff, or takes on other work
+  const cur = aliveId(w, L.id);
+  const busy = cur && ((w.heal && w.heal.id === cur.id) || (w.goats && w.goats.hid === cur.id) || (w.horn && w.horn.hid === cur.id) || (w.pot && w.pot.id === cur.id));
+  if (cur && !busy && ageY(w, cur) < LOOM_OLD && cur.home != null) return;
+  const next = pickWeaver(w, cur || (L.id != null ? { id: L.id, home: null } : null));
+  if (!next) { if (!cur) L.id = null; return; }
+  const before = L.nm;
+  L.id = next.id; L.nm = next.name; L.k++; L.wv = 0;
+  if (cur && busy) log(w, `${cur.name} has no time for the loom now. ${next.name} carries the poles and the weights over to ${next.sex === 'f' ? 'her' : 'his'} own wall.`, 'info');
+  else if (cur) log(w, `${cur.name}'s eyes are too dim for the threads. ${next.name} takes the loom.`, 'info');
+  else log(w, `With ${before} gone, the half-woven web is cut down and ${next.name} sets the loom up again against ${next.sex === 'f' ? 'her' : 'his'} own wall.`, 'info');
+}
+// the weaver at the loom: on winter days and wet days, in daylight, while there is yarn and beds without a blanket
+function loomTask(w, p, c) {
+  const L = w.loom;
+  if (!L || L.id !== p.id || c.hour < 8 || c.hour > 14 || w.res.lw != null) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (c.season !== 3 && wx !== 'rain' && wx !== 'fog' && wx !== 'storm' && wx !== 'cold') return null;
+  if (!L.wv && (L.y < BLANKET_YARN || L.b >= livedIn(w) * BLANKET_HOUSE + 2)) return null;
+  const at = loomAt(w);
+  return at ? { k: 'weave', key: 'lw', x: at.x, y: at.y, h: 4 } : null;
+}
+function loomDone(w, p, pop) {
+  const L = w.loom;
+  if (!L || L.id !== p.id) return;
+  if (!L.wv) { if (L.y < BLANKET_YARN) return; L.y = Math.round((L.y - BLANKET_YARN) * 100) / 100; }
+  L.wv++;
+  if (L.wv < BLANKET_WORK) { pop('weaving', 'muted'); return; }
+  L.wv = 0; L.b++; L.n++; L.yb++;
+  pop('a blanket', 'muted');
+  if (L.n === 1) milestone(w, `${p.name} cuts the first blanket down off the loom: goat hair, grey and brown, rough as a dog's back and as warm. It goes on the bed where the youngest sleep. Nobody on ${w.name} has slept under cloth before.`);
+  else if (L.n === 50 || L.n === 200 || L.n === 1000) log(w, `${L.n} blankets have come off the loom.`, 'good');
+}
 // ---------- foot rot ----------
 // A long wet spell turns a full pen into a wallow of mud and dung, and the hooves go soft in it. One goat
 // starts to limp; others follow, fastest while the wet holds. Lame goats bed down in the straw: no grazing,
@@ -5365,7 +5494,7 @@ function lifeAndDeath(w, c) {
   const pop = w.people.length;
   const wx = w.wx ? w.wx.k : 'clear';
   const bitter = wx === 'cold' && c.season === 3; // a deep frost reaches the frail even by the fire
-  const fed = cheeseFed(w) ? CHEESE_GUARD : 1; // a wedge of cheese by the fire on the bitter days
+  const fed = (cheeseFed(w) ? CHEESE_GUARD : 1) * (1 - loomCover(w) * BLANKET_GUARD); // a wedge of cheese by the fire on the bitter days, a blanket on the bed
   const dry = thirst(w) * SPRING_THIRST * (wx === 'heat' ? 2 : 1); // too little water carried up from the pool yesterday
   for (const p of w.people) {
     if (p.dead) continue;
@@ -5587,6 +5716,11 @@ function pickTask(w, p, c) {
   if (w.pot && w.pot.id === p.id) {
     const pk = potTask(w, p, c);
     if (pk) return pk;
+  }
+  // the weaver at the loom against the house wall
+  if (w.loom && w.loom.id === p.id) {
+    const lk = loomTask(w, p, c);
+    if (lk) return lk;
   }
   // the honey, from the logs that hold more than the bees need for the winter
   const ek = beeTask(w, p, c);
@@ -6450,6 +6584,8 @@ function finish(w, p, t, c, fx) {
     muckDone(w, p, t, pop);
   } else if (t.k === 'cheese') {
     cheeseDone(w, p, pop);
+  } else if (t.k === 'weave') {
+    loomDone(w, p, pop);
   } else if (t.k === 'crowman') {
     scareDone(w, p, t, pop);
   } else if (t.k === 'pit') {
@@ -7533,6 +7669,10 @@ const MIGRATIONS = {
     if (B.pit === undefined) B.pit = null;
     if (!B.pit && !B.cur && w.techs.includes('hunting') && (B.r >= PIT_NIGHTS || B.k)) B.pd = 1;
   },
+  // v63 -> v64: spinning and the loom (w.loom). Not found yet; a bitter winter day once the goat herd is big enough.
+  63: (w) => {
+    if (w.loom === undefined) w.loom = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7653,6 +7793,9 @@ export function summary(w) {
     cheese: !!w.cheese, cheeseRack: w.cheese ? w.cheese.c : 0, cheesePail: w.cheese ? Math.floor(w.cheese.p) : 0, cheeseMade: w.cheese ? w.cheese.n : 0,
     cheeseYear: w.cheese ? w.cheese.y : 0, cheeseEaten: w.cheese ? w.cheese.e : 0, cheeseDays: w.cheese ? w.cheese.d : 0, cheeseFed: cheeseFed(w),
     cheeseMaking: w.cheese ? w.people.filter((p) => p.task && p.task.k === 'cheese').length : 0,
+    loom: !!w.loom, weaver: w.loom ? w.loom.nm : null, weaverAlive: !!(w.loom && aliveId(w, w.loom.id)), blankets: w.loom ? w.loom.b : 0, blanketCover: loomCover(w),
+    hair: w.loom ? Math.round(w.loom.h) : 0, yarn: w.loom ? Math.floor(w.loom.y) : 0, onLoom: w.loom ? w.loom.wv : 0, woven: w.loom ? w.loom.n : 0, wovenYear: w.loom ? w.loom.yb : 0,
+    weaving: w.loom ? w.people.filter((p) => p.task && p.task.k === 'weave').length : 0,
     crows: !!w.crow, crowFlock: w.crow ? w.crow.b : 0, crowDown: crowsDown(w), crowLandings: w.crow ? w.crow.n : 0,
     crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
     scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
