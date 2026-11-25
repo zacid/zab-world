@@ -640,3 +640,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Far-isle guests taking sides at midsummer; or the far isle as the other party, with a feud between whole islands.
   - Tales: the eldest tells the story of the first feud and the first peace cup on the longest night.
 - Housekeeping: deleting files is still blocked on this machine, so scripts/_*.mjs and scripts/.deerpeek.mjs are all still there.
+- Incomers are done (SIM_VERSION 62; w.inc {n households, p people, y, on day due, lean, cur boat {.., st 'in'|'beached', gs [{nm, sex, a,
+  r 'f'|'m'|'c'}], k 'house'|'pair'|'widow', why, d, nm, ids}, last}; p.fi year came over; incBoat exported; drawInc and the shell bead in
+  render.js; yearly `came`). Once ashore they are ordinary islanders; nothing else treats them differently yet. Ideas it opens up:
+  - Strangers' ways: the newcomers keep a far-isle custom (a different midsummer song, shell beads, a way of smoking fish) that the island
+    slowly takes up, or a skill Hais lacks (weaving, a better net) arriving with them as a new tech.
+  - Distrust: in the first years their house is the first one blamed when comb or grain goes missing (a feud seed tied to p.fi), until a
+    marriage or a shared hardship settles it.
+  - Kin on both shores: a household with family left behind makes the far isle less likely to raid (like isleWed), and the guests at
+    midsummer ask after them by name.
+  - A crowded Hais (70+) turns them away with a sack of grain; the far isle remembers who was refused.
+  - The runaway pair: the girl's father paddles over at midsummer to fetch her back.

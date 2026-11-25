@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 61;
+export const SIM_VERSION = 62;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -89,6 +89,7 @@ export const TECHS = {
   stones:   { name: 'Standing stones', added: '2026-11-25T03:47Z', desc: 'A ring of eight stakes on open grass away from the houses, and grey boulders as long as a man lying on the shore. Every summer, once the grain is in and the stores are full, the strongest go down with ropes of plaited hide and an armful of logs, lever one boulder onto the rollers and drag it up to the ring, a few steps at a time, moving the back log to the front as they go. A pit is dug, the stone tipped in and hauled upright, and that night there is a feast in the ring. Each stone is raised for one of the dead. Now and then it slews off the logs onto a foot.', req: ['burial', 'midsummer'] },
   feud:     { name: 'Feuds', added: '2026-11-25T20:06Z', desc: 'Two households next door to each other fall out over something small: goats in the young grain, a trip at the race, comb gone from the bee log, a stone thrown at a dog. Then they stop speaking. A thorn branch lies across each doorstep, they sit apart at the fire, and no child of one is married to a child of the other. Now and then it comes to blows and somebody is laid up for a few days. It can last for years, and it ends at a graveside if nothing ends it sooner.', req: ['fire'] },
   peacecup: { name: 'The peace cup', added: '2026-11-25T20:06Z', desc: 'At midsummer or on the longest night the eldest who is not of either house brings the two heads of a feud into the firelight and makes them drink from one bowl, mead if there is any, in front of everyone. Once it has worked, it is the custom: a quarrel is brought to the next gathering and nearly always ended there, and fewer of them come to blows while they last. Often a match between the two houses seals it.', req: ['feud', 'midsummer'] },
+  incomers: { name: 'Incomers', added: '2026-11-25T20:38Z', desc: 'The far isle is small and stony, and some springs a household there has nothing left to stay for: a thin year that ate the seed grain, a house burnt in the winter, a husband lost at sea, a match a father will not allow. They load their dugout with bundles and a pot of embers and come over by day. While the granaries are full and the island has room, the eldest takes them in. They sleep where there is space until a house is raised for them, their dugout is broken up for its roof-beams, and their children grow up to marry island children.', req: ['farisle'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -589,7 +590,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -665,7 +666,7 @@ function findShore(w) {
 const personShape = (o) => ({
   id: o.id, name: o.name, sex: o.sex, born: o.born, mother: o.mother, father: o.father, partner: o.partner, home: o.home,
   wants: o.wants, lastBirth: o.lastBirth, hunger: o.hunger, x: o.x, y: o.y, px: o.px, py: o.py, task: o.task, asleep: o.asleep,
-  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi,
+  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi, fi: o.fi,
 });
 const fieldShape = (o) => ({
   id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
@@ -771,6 +772,7 @@ export function step(w, fx) {
   if (w.lost) lostHour(w, c);
   if (w.isle && w.isle.boat) isleHour(w, c);
   if (w.raid && (w.raid.cur || w.raid.on === c.day)) raidHour(w, c);
+  if (w.inc && (w.inc.cur ? w.inc.cur.st === 'in' : w.inc.on === c.day)) incHour(w, c);
   if (w.people.some((p) => p.dead)) w.people = w.people.filter((p) => !p.dead);
   if (w.techs.length !== w.nLearned) noteLearned(w);
   w.t++;
@@ -813,7 +815,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -916,6 +918,7 @@ function daily(w, c, fx) {
   if (w.fever) fever(w, c, fx);
   if (w.cough !== undefined) coughDay(w, c, fx);
   if (w.quarrel !== undefined) quarrelDay(w, c, fx);
+  if (w.inc !== undefined) incDay(w, c);
   if (w.heal !== undefined) herbs(w, c);
   if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
@@ -2890,6 +2893,115 @@ function isleHour(w, c) {
     }
   } else if (moveToward(B, B.sx + 0.5, B.sy + 0.5, BOAT_SPEED)) w.isle.boat = null;
   else for (const g of B.gs) { g.x = B.x; g.y = B.y; }
+}
+
+// ---------- incomers ----------
+// The far isle is small and stony. Some springs a household there has nothing left to stay for: a thin year, a house
+// burnt in the winter, a man lost at sea, a match the girl's father will not allow. Once the far isle knows Hais well,
+// such a household may load its dugout and come over by day, in the hungry gap between the snow and the sowing.
+// A rich, half-empty island takes them in; they sleep where there is room until a house is raised for them, and
+// the dugout they came in is broken up for its roof-beams.
+// w.inc: n households taken in, p people ever, y year the last came, on day one is due, cur the boat
+// {bx, by, lx, ly, sx, sy, x, y, px, py, st 'in'|'beached', gs [{nm, sex, a, r role 'm'|'f'|'c'}], k kind, why, d, ids},
+// last {nm, n, y}. p.fi is the year an islander came over.
+const INC_FROM = 6;          // not before this year
+const INC_VISITS = 2;        // and not before the far isle has been to midsummer this often
+const INC_ODDS = 0.3;        // chance each spring that a household makes up its mind (x INC_LEAN in a thin year there)
+const INC_LEAN = 2;
+const INC_GAP = 3;           // years between households
+const INC_FOOD = 160;       // grain in store per head before the eldest says there is room
+const INC_POP = 70;          // a crowded island has no room, and its own young are leaving
+const INC_DAY = 12;          // the first day of spring they might set out, and the window after it
+const INC_WIN = 45;
+const INC_SAIL = 9;          // hour the boat comes into sight
+const INC_WOOD = 10;         // timber the broken-up dugout gives
+const INC_BEACHED = 3;       // days it lies on the sand first
+export const incBoat = (w) => (w.inc && w.inc.cur) || null;
+function incDay(w, c) {
+  const I = w.inc;
+  if (I && I.cur && I.cur.st === 'beached' && c.day >= I.cur.d + INC_BEACHED) { // the dugout is broken up for roof-beams
+    w.timber = Math.round((w.timber + INC_WOOD) * 100) / 100;
+    log(w, `The dugout ${I.cur.nm} came over in is dragged up the beach and broken up. Its sides will be roof-beams.`, 'info');
+    I.cur = null;
+  }
+  if (c.doy !== INC_DAY || !w.isle || w.isle.n < INC_VISITS || c.year < INC_FROM) return;
+  if (I && (I.cur || c.year - I.y < INC_GAP)) return;
+  if (w.isle.feud >= c.year || w.people.length >= INC_POP || w.food < w.people.length * INC_FOOD) return;
+  const lean = !!(w.raid && w.raid.lean === c.year - 1); // the thin year was last year; this is the hungry spring after it
+  if (rnd(w) >= INC_ODDS * (lean ? INC_LEAN : 1)) return;
+  w.inc ||= { n: 0, p: 0, y: 0, on: null, cur: null, last: null };
+  w.inc.on = c.day + 1 + ri(w, INC_WIN);
+  w.inc.lean = lean ? 1 : 0;
+}
+// hour by hour on the day: the boat comes in, and the household walks up the beach
+function incHour(w, c) {
+  const I = w.inc, h = c.hour;
+  if (!I.cur) {
+    if (h !== INC_SAIL) return;
+    const wx = w.wx ? w.wx.k : 'clear';
+    if (wx === 'storm' || wx === 'fog' || wx === 'snow') { I.on = c.day + 1; return; } // nobody crosses in that; they wait for a better day
+    I.on = null;
+    if (w.food < w.people.length * INC_FOOD * 0.6 || w.people.length >= INC_POP) return; // a bad spring here after all: they turn back unseen
+    const L = landing(w);
+    if (!L) return;
+    incSail(w, c, L);
+    return;
+  }
+  const B = I.cur;
+  if (B.st !== 'in') return;
+  B.px = B.x; B.py = B.y;
+  if (moveToward(B, B.lx + 0.5, B.ly + 0.5, BOAT_SPEED)) incLand(w, c, B);
+}
+function incSail(w, c, L) {
+  const kinds = [['house', 50], ['pair', 25], ['widow', 25]];
+  let r = rnd(w) * 100, k = 'house';
+  for (const [kk, n] of kinds) { if (r < n) { k = kk; break; } r -= n; }
+  const gs = [];
+  const fa = 20 + ri(w, 14);
+  gs.push({ nm: makeName(w), sex: 'f', a: k === 'pair' ? 17 + ri(w, 5) : fa, r: 'f' });
+  if (k !== 'widow') gs.push({ nm: makeName(w), sex: 'm', a: Math.max(18, gs[0].a - 2 + ri(w, 7)), r: 'm' });
+  if (k !== 'pair') {
+    const n = k === 'widow' ? 2 + ri(w, 2) : 1 + ri(w, 3);
+    let age = ri(w, 3);
+    for (let i = 0; i < n && age < gs[0].a - 16; i++) { gs.push({ nm: makeName(w), sex: rnd(w) < 0.5 ? 'f' : 'm', a: age, r: 'c' }); age += 2 + ri(w, 3); }
+  }
+  const mum = gs[0].nm, dad = gs[1] && gs[1].r === 'm' ? gs[1].nm : null;
+  const why = k === 'pair' ? `${mum}'s father on the far isle would not have ${dad} for her, and the two of them took the old man's boat in the night`
+    : k === 'widow' ? `${mum}'s man was lost at sea in the autumn, and the house she was left in is not hers`
+      : I_WHY[w.inc.lean ? 0 : 1 + ri(w, I_WHY.length - 1)](mum, dad);
+  w.inc.cur = { ...L, x: L.sx + 0.5, y: L.sy + 0.5, px: L.sx + 0.5, py: L.sy + 0.5, st: 'in', gs, k, why, d: c.day, nm: mum, ids: [] };
+}
+const I_WHY = [
+  (m, d) => `the far isle had a thin year, and by the end of winter ${d}'s house had eaten its seed grain`,
+  (m, d) => `${m} and ${d}'s house burnt down in the winter with everything in it`,
+  (m, d) => `there is no more ground to clear on the far isle, and ${d} is a fourth son`,
+  (m, d) => `${d} fell out with his brothers over their father's fields, and will not live beside them`,
+];
+function incLand(w, c, B) {
+  const I = w.inc;
+  B.st = 'beached'; B.d = c.day; B.px = B.x; B.py = B.y;
+  let mum = null, dad = null;
+  for (const g of B.gs) {
+    const q = addPerson(w, g.sex, g.a, g.r === 'c' && mum ? mum.id : null, g.r === 'c' && dad ? dad.id : null, null);
+    q.name = g.nm; q.x = q.px = B.bx + 0.5; q.y = q.py = B.by + 0.5; q.fi = c.year;
+    if (g.r === 'f') mum = q;
+    else if (g.r === 'm') dad = q;
+    if (g.r !== 'c') q.cgi = 1; // they had the cough as children over there
+    B.ids.push(q.id);
+  }
+  if (mum && dad) { mum.partner = dad.id; dad.partner = mum.id; mum.wants = true; }
+  else if (mum) mum.wants = true;
+  I.n++; I.p += B.gs.length; I.y = c.year;
+  I.last = { nm: B.nm, n: B.gs.length, y: c.year };
+  const kids = B.gs.filter((g) => g.r === 'c'), N = B.gs.length;
+  const who = kids.length ? `${B.gs.filter((g) => g.r !== 'c').map((g) => g.nm).join(' and ')} with ${kids.length === 1 ? (kids[0].a < 2 ? 'a baby' : 'a child') : `${kids.length} children`}` : `${B.gs[0].nm} and ${B.gs[1].nm}, hardly grown`;
+  B.gs = [];
+  const el = elder(w), en = el ? el.name : 'The eldest';
+  if (!w.techs.includes('incomers')) {
+    w.techs.push('incomers');
+    milestone(w, `In broad day a dugout comes in over the sea from the far isle, low in the water with bundles and a pot of embers, and ${N} people climb out onto the sand: ${who}. They have not come for a dance. ${Cap(B.why)}. ` +
+      `${en} walks down to meet them, looks back at the full granaries and the empty ground beyond the fields, and says there is room on ${w.name}. They sleep where there is space until a house is raised for them. For the first time since the landing, ${w.name} has taken in new people.`);
+  } else log(w, `A dugout from the far isle runs up on the beach by day: ${who}. ${Cap(B.why)}. ${en} says there is room, and they stay.`, 'good');
 }
 
 // ---------- raiders ----------
@@ -7266,6 +7378,10 @@ const MIGRATIONS = {
   60: (w) => {
     if (w.quarrel === undefined) w.quarrel = null;
   },
+  // v61 -> v62: incomers from the far isle (w.inc, p.fi). None yet; a household may cross over some spring once the far isle knows the island.
+  61: (w) => {
+    if (w.inc === undefined) w.inc = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7323,6 +7439,7 @@ export function summary(w) {
     watch: !!w.watch, watcher: (watchOn(w) && (aliveId(w, w.watch.hid) || {}).name) || null, watchNights: w.watch ? w.watch.n : 0, watchTurned: w.watch ? w.watch.s : 0,
     moon: moonName(c.day), moonLight: moonLight(c.day), moonLore: !!w.moon, moonRested: w.moon ? w.moon.s : 0,
     gifts: (w.raid && w.raid.peace) || 0, giftGrain: (w.raid && w.raid.pg) || 0, gifted: !!(w.raid && w.raid.gift === c.year),
+    incomers: w.inc ? w.inc.p : 0, incHouses: w.inc ? w.inc.n : 0, incBoat: w.inc && w.inc.cur ? w.inc.cur.st : null, incDue: !!(w.inc && w.inc.on != null),
     raiders: w.raid && w.raid.cur ? w.raid.cur.st : null, feud: !!(w.isle && w.isle.feud >= c.year),
     jars: w.pot ? w.pot.j : 0, jarsWet: w.pot ? w.pot.wet : 0, jarsSealed: Math.round(sealed(w)), potter: (w.pot && w.pot.id != null && w.pot.nm) || null, firings: w.pot ? w.pot.f : 0,
     snowmen: w.snow ? w.snow.men.filter((m) => m.s >= 3).length : 0, snowmenEver: w.snow ? w.snow.n : 0,
