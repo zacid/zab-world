@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 60;
+export const SIM_VERSION = 61;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -87,6 +87,8 @@ export const TECHS = {
   sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
   stones:   { name: 'Standing stones', added: '2026-11-25T03:47Z', desc: 'A ring of eight stakes on open grass away from the houses, and grey boulders as long as a man lying on the shore. Every summer, once the grain is in and the stores are full, the strongest go down with ropes of plaited hide and an armful of logs, lever one boulder onto the rollers and drag it up to the ring, a few steps at a time, moving the back log to the front as they go. A pit is dug, the stone tipped in and hauled upright, and that night there is a feast in the ring. Each stone is raised for one of the dead. Now and then it slews off the logs onto a foot.', req: ['burial', 'midsummer'] },
+  feud:     { name: 'Feuds', added: '2026-11-25T20:06Z', desc: 'Two households next door to each other fall out over something small: goats in the young grain, a trip at the race, comb gone from the bee log, a stone thrown at a dog. Then they stop speaking. A thorn branch lies across each doorstep, they sit apart at the fire, and no child of one is married to a child of the other. Now and then it comes to blows and somebody is laid up for a few days. It can last for years, and it ends at a graveside if nothing ends it sooner.', req: ['fire'] },
+  peacecup: { name: 'The peace cup', added: '2026-11-25T20:06Z', desc: 'At midsummer or on the longest night the eldest who is not of either house brings the two heads of a feud into the firelight and makes them drink from one bowl, mead if there is any, in front of everyone. Once it has worked, it is the custom: a quarrel is brought to the next gathering and nearly always ended there, and fewer of them come to blows while they last. Often a match between the two houses seals it.', req: ['feud', 'midsummer'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -587,7 +589,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -811,7 +813,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -826,6 +828,7 @@ function daily(w, c, fx) {
     }
     if (w.lost) w.lost.y = 0;
     if (w.cough) w.cough.y = w.cough.yd = 0;
+    if (w.quarrel) w.quarrel.y = w.quarrel.yf = 0;
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
     if (w.bear) w.bear.yr = 0;
@@ -912,6 +915,7 @@ function daily(w, c, fx) {
   if (w.whale) whaleDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.cough !== undefined) coughDay(w, c, fx);
+  if (w.quarrel !== undefined) quarrelDay(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
@@ -2585,6 +2589,7 @@ function midsummer(w, c, fx) {
     w.food = Math.round((w.food - F.feast) * 100) / 100;
     if (F.feast >= pop) for (const p of w.people) p.hunger = 0;
   } else if (h === 21) { // late in the dance, the unpaired find each other
+    if (w.quarrel && w.quarrel.cur) quarrelMend(w, c, 'fest', !!F.mead); // a feud ended first, so its houses can dance together
     if (F.race && F.race.d === c.day) raceWed(w, F); // the wreath first
     for (const f of w.people) {
       if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= (F.mead ? MEAD_PAIR : FEST_PAIR)) continue;
@@ -2670,6 +2675,7 @@ function longNight(w, c, fx) {
   } else if (h === TALE_TELL) {
     const t = aliveId(w, F.id);
     if (t && !t.sick) tellTale(w, t);
+    if (w.quarrel && w.quarrel.cur) quarrelMend(w, c, 'tale', false);
   } else if (h === TALE_TO) {
     F.id = null; F.k = 0; F.j = 0;
     delete F.kids;
@@ -3467,6 +3473,147 @@ function coughDay(w, c, fx) {
   const he = pron(p), his = poss(p);
   if (first) milestone(w, `In the dark before dawn ${p.name} wakes coughing: a hard dry cough that comes in long fits until ${he} cannot get a breath, and then a great whooping gasp as the air goes back in. The grown-ups look at each other over ${his} head. Every one of the settlers had this as a child, far away over the sea, and remembers it; none of the ${open.length} children born on ${w.name} ever has. Nobody knows anything to do for it but keep the little ones warm and sit up with them through the night.`);
   else log(w, `The whooping cough is back on ${w.name}. ${p.name} wakes in the night whooping, and ${open.length} children here have never had it.`, 'bad');
+}
+
+// ---------- quarrels ----------
+// Once the village is big enough, two neighbouring households fall out over something small (goats in the grain,
+// the race, missing comb, a dog, a woodpile) and stop speaking. While it lasts nobody from one house is married to
+// anyone from the other, there are spats now and then, and sometimes blows: the one who comes off worse is laid up
+// for a few days. It ends at a gathering (midsummer or the longest night) when the eldest makes the two heads drink
+// from one bowl, or at a graveside when one of them dies. The first time the bowl works, the island keeps the custom
+// (the peace cup), and later quarrels end sooner and come to blows less.
+// w.quarrel { k quarrels, cur, end tick the last ended, y spats this year, yf fights this year, f fights ever,
+//   m mended over the bowl, br [ids laid up after a fight], cup tick the peace cup was first shared or null }
+// cur { a, b house ids, ai, bi, an, bn the two heads, d day it began, why, n spats, f fights }
+const QUARREL_FROM = 6;      // not before this year
+const QUARREL_POP = 18;      // people on the island before households have neighbours enough to fall out with
+const QUARREL_GAP = 3;       // years at least between one quarrel ending and the next
+const QUARREL_SEED = 0.003;  // daily chance, x houses / 8 (at most x3)
+const QUARREL_SPAT = 0.04;   // daily chance of a spat while it lasts
+const QUARREL_BLOWS = 0.3;   // chance a spat comes to blows (half that once the peace cup is kept)
+const QUARREL_HURT = 3;      // days laid up after coming off worse (3-5)
+const QUARREL_MIN = 45;      // days before anyone will try to end it
+const QUARREL_MEND = 0.35;   // chance the eldest ends it at a gathering
+const QUARREL_MEAD = 0.25;   // more with mead in the bowl
+const QUARREL_CUP = 0.85;    // once the peace cup is the custom
+const QUARREL_LONG = 2;      // years before both sides are sick of it and it ends at the next gathering
+const SPATS = [
+  (a, b) => `${a} and ${b} meet on the path to the fields and neither will step aside. They stand there glaring until the people behind them have to go round through the grain.`,
+  (a, b) => `Somebody has kicked over ${b}'s woodpile in the night. Nobody asks ${a}'s house about it, but everybody thinks it.`,
+  (a, b) => `At the hearth ${a} gets up and moves to the far side as soon as ${b} sits down.`,
+  (a, b) => `The children of ${a}'s house throw clods at the children of ${b}'s, and nobody stops them.`,
+  (a, b) => `${b} says something about ${a} at the spring, loud enough to be heard.`,
+  (a, b) => `${a} will not lend ${b} an axe, though ${b}'s has a cracked haft.`,
+];
+const quarrelOf = (w) => (w.quarrel && w.quarrel.cur) || null;
+export const quarrelHouses = (w) => { const C = quarrelOf(w); return C ? [C.a, C.b] : null; };
+export const quarrelBruised = (w, p) => !!(p.hurt && w.quarrel && w.quarrel.br.includes(p.id));
+// is this pair kept apart by the quarrel?
+const apart = (w, f, o) => { const C = quarrelOf(w); return !!C && f.home != null && o.home != null && ((f.home === C.a && o.home === C.b) || (f.home === C.b && o.home === C.a)); };
+function houseHead(w, id) {
+  let best = null;
+  for (const p of w.people) if (!p.dead && p.home === id && ageY(w, p) >= 18 && (!best || p.born < best.born || (p.born === best.born && p.id < best.id))) best = p;
+  return best;
+}
+function quarrelDay(w, c, fx) {
+  const Q = w.quarrel;
+  if (Q && Q.br.length) Q.br = Q.br.filter((id) => { const p = aliveId(w, id); return p && p.hurt; });
+  const C = Q && Q.cur;
+  if (C) {
+    const a = aliveId(w, C.ai), b = aliveId(w, C.bi);
+    if (!a || !b) return quarrelGrave(w, a || b, C);
+    if (a.home !== C.a || b.home !== C.b) { quarrelOver(w); return log(w, `${C.an} and ${C.bn} no longer live next door to each other, and the quarrel between their houses goes cold.`, 'info'); }
+    if (rnd(w) < QUARREL_SPAT) quarrelSpat(w, c, C, a, b, fx);
+    return;
+  }
+  if (c.year < QUARREL_FROM || w.people.length < QUARREL_POP || (Q && Q.end != null && w.t - Q.end < QUARREL_GAP * TICKS_PER_YEAR)) return;
+  const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && occupants(w, b.id) >= 2 && houseHead(w, b.id));
+  if (homes.length < 3 || rnd(w) >= QUARREL_SEED * Math.min(3, homes.length / 8)) return;
+  quarrelBegin(w, c, homes, fx);
+}
+function quarrelBegin(w, c, homes, fx) {
+  const A = homes[ri(w, homes.length)];
+  let B = null, bd = Infinity; // they fall out with the people next door
+  for (const o of homes) if (o !== A) { const d = d2(A.x, A.y, o.x, o.y); if (d < bd) { bd = d; B = o; } }
+  const a = houseHead(w, A.id), b = houseHead(w, B.id);
+  const young = (id, not) => { let best = null; for (const p of w.people) if (!p.dead && p.home === id && p !== not && ageY(w, p) >= 6 && ageY(w, p) < 25 && (!best || p.id < best.id)) best = p; return best; };
+  const ay = young(A.id, a), by = young(B.id, b);
+  const RL = w.fest && w.fest.rl, racer = RL && RL.y >= c.year - 1 && w.people.find((p) => !p.dead && p.name === RL.nm && p.home === A.id);
+  const why = [['word', `${a.name} and ${b.name} fall out over where one woodpile ends and the other begins, and then over everything else.`]];
+  if (w.goats && w.goats.herd.length) why.push(['goats', `${ay ? ay.name : 'Somebody'} of ${a.name}'s house leaves a gap in the pen wattle, and by the time anyone sees, the goats have eaten a strip of young grain to the ground beside ${b.name}'s door. ${b.name} says it was done on purpose. ${a.name} says a goat is a goat.`]);
+  if (racer && by && racer !== by) why.push(['race', `${by.name} of ${b.name}'s house still swears that ${racer.name} tripped ${by.sex === 'f' ? 'her' : 'him'} at the hazel stake. Words at the spring turn into shouting, and ${a.name} and ${b.name} each take their own child's side.`]);
+  if (w.bees && ay) why.push(['honey', `Comb has gone from the bee log, and ${b.name} says ${ay.name} of ${a.name}'s house was seen with sticky hands. ${a.name} calls ${b.name} a liar in front of the whole hearth.`]);
+  if (w.dogs && w.dogs.d.length && by) why.push(['dog', `A dog from ${a.name}'s doorway snaps at ${by.name}, and ${b.name} throws a stone at it and lames it. ${a.name} sees it done.`]);
+  if (w.techs.includes('hunting') && ageY(w, a) < 55 && ageY(w, b) < 55) why.push(['spear', `${a.name} and ${b.name} both swear it was their spear that brought down the last boar, and neither will give up the hide.`]);
+  const [k, text] = why.length > 1 && rnd(w) < 0.85 ? why[1 + ri(w, why.length - 1)] : why[0];
+  let Q = w.quarrel;
+  const first = !Q;
+  if (first) Q = w.quarrel = { k: 0, cur: null, end: null, y: 0, yf: 0, f: 0, m: 0, br: [], cup: null };
+  Q.k++;
+  Q.cur = { a: A.id, b: B.id, ai: a.id, bi: b.id, an: a.name, bn: b.name, d: c.day, why: k, n: 0, f: 0 };
+  if (first && !w.techs.includes('feud')) w.techs.push('feud');
+  if (fx) fx.push({ x: A.x + 0.5, y: A.y - 0.5, text: 'a quarrel', color: 'sick' });
+  const after = `From that day ${a.name}'s house and ${b.name}'s house do not speak. A thorn branch is laid across each doorstep, nobody from one will sit by anyone from the other at the fire, and no child of one will be married to a child of the other.`;
+  if (first) milestone(w, `${text} ${after} It is the first feud on ${w.name}, and nobody knows how to end it.`);
+  else log(w, `${text} ${after}${Q.cup != null ? ' Everyone waits for the next gathering and the bowl.' : ''}`, 'bad');
+}
+function quarrelSpat(w, c, C, a, b, fx) {
+  const Q = w.quarrel, flip = rnd(w) < 0.5, x = flip ? b : a, y = flip ? a : b;
+  C.n++; Q.y++;
+  const fit = (id) => { let best = null; for (const p of w.people) { const ag = ageY(w, p); if (!p.dead && p.home === id && ag >= 16 && ag <= 45 && !p.sick && !p.hurt && (!best || Math.abs(ag - 24) < Math.abs(ageY(w, best) - 24))) best = p; } return best; };
+  const p = fit(C.a), q = fit(C.b);
+  if (!p || !q || rnd(w) >= QUARREL_BLOWS * (Q.cup != null ? 0.5 : 1)) return log(w, SPATS[ri(w, SPATS.length)](x.name, y.name), 'bad');
+  const lose = rnd(w) < 0.5 ? p : q, win = lose === p ? q : p, days = QUARREL_HURT + ri(w, 3);
+  lose.hurt = Math.max(lose.hurt || 0, w.t + days * TICKS_PER_DAY);
+  if (!Q.br.includes(lose.id)) Q.br.push(lose.id);
+  C.f++; Q.f++; Q.yf++;
+  if (fx) fx.push({ x: lose.x, y: lose.y - 0.5, text: 'blows', color: 'sick' });
+  const where = ['behind the granary', 'down at the landing', 'at the edge of the fields', 'by the spring', 'in the middle of the path'][ri(w, 5)];
+  log(w, `Words turn to blows between ${win.name} and ${lose.name} ${where}. ${lose.name} comes home with a split lip and an eye swelling shut, and is no use for ${days} days.${C.f === 1 && Q.f === 1 ? ` Nobody on ${w.name} has struck anyone before.` : ''}`, 'bad');
+}
+// one head is dead: the other comes to the graveside, and the quarrel is buried with them
+function quarrelGrave(w, alive, C) {
+  const dead = alive && alive.id === C.ai ? C.bn : C.an;
+  quarrelOver(w);
+  if (!alive) return log(w, `${C.an} and ${C.bn} are both in the burying ground now, and their houses have forgotten what the quarrel was about.`, 'info');
+  log(w, `${dead} is laid in the earth, and ${alive.name} comes to the graveside and stands with ${dead}'s house. Whatever the quarrel was, it goes into the ground too. The thorn branches are taken off the doorsteps.`, 'good');
+}
+function quarrelOver(w) {
+  const Q = w.quarrel;
+  Q.cur = null; Q.end = w.t;
+}
+// at a gathering: will the eldest bring the two heads to the fire and make them drink from one bowl?
+function quarrelMend(w, c, at, mead) {
+  const Q = w.quarrel, C = Q && Q.cur;
+  if (!C || c.day - C.d < QUARREL_MIN) return;
+  const a = aliveId(w, C.ai), b = aliveId(w, C.bi);
+  if (!a || !b || a.sick || b.sick) return;
+  const days = c.day - C.d, long = days >= QUARREL_LONG * DAYS_PER_YEAR;
+  const odds = Q.cup != null ? QUARREL_CUP : QUARREL_MEND + (mead ? QUARREL_MEAD : 0);
+  const night = at === 'fest' ? 'midsummer night' : 'the longest night';
+  if (!long && rnd(w) >= odds) return log(w, `On ${night} ${C.an} and ${C.bn} sit on opposite sides of the fire and do not look at each other.`, 'info');
+  let who = null;
+  for (const p of w.people) if (!p.dead && !p.sick && p.home !== C.a && p.home !== C.b && ageY(w, p) >= 30 && (!who || p.born < who.born || (p.born === who.born && p.id < who.id))) who = p;
+  const by = who ? who.name : 'the eldest', bowl = mead ? 'with mead' : 'from the spring';
+  const first = Q.cup == null;
+  quarrelOver(w);
+  Q.m++;
+  // and to seal it, a match across the two doorsteps if there is one to be had
+  let seal = '';
+  for (const f of w.people) {
+    if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || (f.home !== C.a && f.home !== C.b)) continue;
+    const m = w.people.find((o) => o.home === (f.home === C.a ? C.b : C.a) && matches(w, f, o));
+    if (!m) continue;
+    f.partner = m.id; m.partner = f.id; f.wants = true;
+    seal = ` Before the night is out ${f.name} of one house is pledged to ${m.name} of the other, and that settles it.`;
+    break;
+  }
+  const len = days >= DAYS_PER_YEAR ? 'More than a year' : `${Math.round(days / 30)} months`;
+  if (first) {
+    Q.cup = w.t;
+    if (!w.techs.includes('peacecup')) w.techs.push('peacecup');
+    milestone(w, `On ${night} ${by} stands up by the fire and will not sit down again until ${C.an} and ${C.bn} come into the light. ${Cap(by)} fills one bowl ${bowl}, puts it in ${C.an}'s hands and then in ${C.bn}'s, and they drink from it in front of everyone. ${len} of not speaking are over, and the thorn branches come off the doorsteps.${seal} From now on any quarrel on ${w.name} is brought to the fire and ended over one shared bowl. ${w.name} keeps the peace cup.`);
+  } else log(w, `On ${night} ${by} brings ${C.an} and ${C.bn} to the fire, and they drink from the peace cup in front of everyone. ${len} of not speaking are over.${seal}`, 'good');
 }
 
 // ---------- rats ----------
@@ -5011,7 +5158,7 @@ function lifeAndDeath(w, c) {
 
 const sibling = (a, b) => (a.mother != null && a.mother === b.mother) || (a.father != null && a.father === b.father);
 const matches = (w, f, o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
-  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id;
+  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id && !apart(w, f, o);
 function mate(w, f) {
   return w.people.find((o) => matches(w, f, o));
 }
@@ -7115,6 +7262,10 @@ const MIGRATIONS = {
   59: (w) => {
     if (w.stones === undefined) w.stones = null;
   },
+  // v60 -> v61: quarrels between households (w.quarrel). None yet; two neighbouring houses fall out once the village is big enough.
+  60: (w) => {
+    if (w.quarrel === undefined) w.quarrel = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7153,6 +7304,9 @@ export function summary(w) {
     race: !!(w.fest && w.fest.rn), racing: raceNow(w, c) ? w.fest.race.rs.length : 0, raceWin: (raceOn(w, c) && w.fest.race.nm) || null,
     races: (w.fest && w.fest.rn) || 0, raceLast: (w.fest && w.fest.rl) || null,
     coughing: w.people.filter((p) => p.cg).length, nursing: w.cough ? w.cough.nu.length : 0, coughs: (w.cough && w.cough.k) || 0, coughLost: (w.cough && w.cough.lost) || 0, coughHad: w.people.filter((p) => p.cgi).length,
+    quarrel: quarrelOf(w) ? `${w.quarrel.cur.an}'s and ${w.quarrel.cur.bn}'s houses` : null, quarrels: (w.quarrel && w.quarrel.k) || 0,
+    quarrelFights: (w.quarrel && w.quarrel.f) || 0, quarrelsMended: (w.quarrel && w.quarrel.m) || 0, peaceCup: !!(w.quarrel && w.quarrel.cup != null),
+    bruised: w.quarrel ? w.people.filter((p) => quarrelBruised(w, p)).length : 0,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,

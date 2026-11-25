@@ -629,3 +629,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
 - Housekeeping: this visit could not delete scripts/_stones.mjs (stone haul probe) or scripts/_bench2.mjs (speed check with the stones
   switched off) either; delete them with the ones listed above. On this machine seed 777 runs ~1.6-1.8 s/yr at 150-270 people with or
   without the stones, so the slowness comes from the machine, not this change.
+- Feuds are done (SIM_VERSION 61; w.quarrel {k, cur {a, b house ids, ai, bi, an, bn heads, d, why, n spats, f fights}, end, y, yf, f, m,
+  br [bruised ids], cup}; quarrelDay/quarrelBegin/quarrelSpat/quarrelMend/quarrelGrave in sim.js, QUARREL_* constants; quarrelHouses and
+  quarrelBruised exported; apart() blocks matches() across the two houses; techs 'feud' and 'peacecup'; thorn() in render.js). Only one
+  feud runs at a time, and the sides are fixed by house id. Ideas it opens up:
+  - A feud that does not end: one house packs up and builds a hamlet on the far side of the island (a second hearth, its own fields).
+  - Blood-price: the house that struck the blow pays goats, cheese or hides, and the elders count it out at the fire.
+  - Lovers across the thorn branch: a couple from the two houses meet in secret, or run off on the dugout to the far isle.
+  - Feuding houses will not help each other: no hands at each other's roof-raising, separate harvest crews, a slower village.
+  - Far-isle guests taking sides at midsummer; or the far isle as the other party, with a feud between whole islands.
+  - Tales: the eldest tells the story of the first feud and the first peace cup on the longest night.
+- Housekeeping: deleting files is still blocked on this machine, so scripts/_*.mjs and scripts/.deerpeek.mjs are all still there.
