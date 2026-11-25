@@ -92,7 +92,9 @@ function moveCam(target) {
 function doing(p) {
   const a = Math.floor(S.ageY(w, p));
   if (p.sick) return p.asleep ? 'tossing with fever' : 'laid up with fever';
+  if (p.cg && a < 14) return p.asleep ? 'whooping in the night' : a < 1 ? 'a baby with the whooping cough' : 'kept by the door with the whooping cough';
   if (p.asleep) return 'asleep at home';
+  if (!p.task && w.cough && w.cough.nu.includes(p.id)) return 'sitting up with a coughing child';
   if (p.task && p.task.k === 'mourn') {
     const g = w.yard && p.mourn && w.graves.find((o) => o.s === p.mourn[1]);
     return g ? `mourning at ${g.n}'s grave` : 'mourning at a graveside';
@@ -213,6 +215,7 @@ function fw(o, frac, ref = 3) {
 // Work at the spot (render-only): tools swing in a steady rhythm, each islander a little out of step with the next,
 // and chips, seed, clods or dust fly on the beat. X, Y = top-left of an adult standing sprite; tools on the right.
 const WOOD = '#8a5a32', IRON = '#c8c8c8';
+const COUGH_COL = '#c3d0d8'; // a whooping child's shirt: washed-out, bluish
 function work(k, id, X, Y, now) {
   const ph = (n) => Math.floor(now / n + id * 0.37);
   if (k === 'chop' || k === 'clear') { // an axe (or a mattock for stumps) over the shoulder and down, chips on the blow
@@ -1191,6 +1194,16 @@ function frame() {
       const sh = Math.floor(now / 700 + p.id) % 5 === 0 ? 1 : 0;
       px(sc, X - 1 + sh, Y + 2, '#c9d4a8'); px(sc, X + sh, Y + 2, '#7d6a52', 4, 2); px(sc, X + 1 + sh, Y + 2, '#a08868', 2, 1);
       if (Math.floor(now / 2600 + p.id * 0.7) % 3 === 0) px(sc, X - 1, Y, 'rgba(183,201,138,0.7)'); // breath in the cold
+      shown.push({ p, x, y });
+      continue;
+    }
+    if (!moving && !p.task && w.cough && S.coughKept(w, p)) { // on the doorstep: a whooping child doubled over in a fit, or a parent sat beside one
+      const y0 = Y + (age < 14 ? 2 : 1), fit = p.cg ? Math.floor(now / 420 + p.id * 1.7) % 11 : -1;
+      const bend = fit >= 0 && fit < 5 ? fit % 2 : 0; // a run of hacking coughs, then the whoop
+      px(sc, X + 1, y0 + bend, '#f1c9a5'); px(sc, X, y0 + 1, p.cg ? COUGH_COL : '#d9d9d9', 3, 1); px(sc, X, y0 + 2, '#5a4a3a', 3, 1);
+      if (fit >= 0 && fit < 5) px(sc, X + 3 + (fit >> 1), y0 - 1 + bend, 'rgba(230,236,240,0.7)'); // breath forced out
+      else if (fit === 5) { px(sc, X + 1, y0 - 1, '#f1c9a5'); px(sc, X + 3, y0 - 2, 'rgba(230,236,240,0.45)', 2, 1); } // head thrown back for the whooping gasp
+      else if (!p.cg && Math.floor(now / 900 + p.id) % 4 === 0) px(sc, X + 3, y0, '#f1c9a5'); // a hand on the child's back
       shown.push({ p, x, y });
       continue;
     }
@@ -2184,7 +2197,7 @@ function updatePanels() {
   const lc = S.clock(Math.max(0, w.t - 1)); // the hour now under way (the island is worked out one hour ahead)
   $('when').innerHTML = `Year ${lc.year} · ${S.SEASONS[lc.season]}, day ${lc.dos} · ${String(lc.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.stormCalled ? ` · <span class="bad">${esc(s.skyReader)} reads the sky: a storm by morning</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.racing ? ` · <span class="fest">${s.racing} running the race</span>` : s.raceWin ? ` · <span class="fest">${esc(s.raceWin)} wears the oak wreath</span>` : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = resPanel([
-    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
+    ['pop', 'People', `${s.pop} <span class="m">(${s.children} young)</span>` + (s.sick ? ` <span class="bad">${s.sick} sick</span>` : '') + (s.coughing ? ` <span class="bad">${s.coughing} whooping${s.nursing ? `, ${s.nursing} sitting up with them` : ''}</span>` : '') + (s.lost ? ` <span class="bad">${esc(s.lost)} lost in the fog</span>` : '')],
     ['food', 'Grain', s.food > s.safe ? `${s.food.toLocaleString()} <span class="m">(${(s.food - s.safe).toLocaleString()} rotting)</span>` : s.food.toLocaleString()],
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
@@ -2343,7 +2356,7 @@ const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
 const HARD = [
   ['storms', (h) => (h.storms || 0) + (h.squalls || 0), (h) => [h.storms && pl(h.storms, 'storm day', 'storm days'), h.flattened && pl(h.flattened, 'field flattened', 'fields flattened'), h.squalls && pl(h.squalls, 'squall at sea', 'squalls at sea')]],
   ['fog', (h) => h.fog || 0, (h) => [h.fog && pl(h.fog, 'fog day', 'fog days'), h.lost && pl(h.lost, 'search in the fog', 'searches in the fog')]],
-  ['fever', (h) => h.sick || 0, (h) => [h.sick && `${h.sick} fell sick`]],
+  ['sickness', (h) => (h.sick || 0) + (h.coughs || 0), (h) => [h.sick && `${h.sick} fell sick with fever`, h.coughs && pl(h.coughs, 'child whooping', 'children whooping'), h.coughDied && pl(h.coughDied, 'baby lost to the cough', 'babies lost to the cough')]],
   ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0) + (h.bear || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.bear && pl(h.bear, 'night the bear came in', 'nights the bear came in'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
   ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
   ['grain', (h) => (h.rats || 0) + (h.stolen || 0) + (h.rooks || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`, h.rooks && `${h.rooks} grain to rooks`]],

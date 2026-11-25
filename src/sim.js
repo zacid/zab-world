@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 58;
+export const SIM_VERSION = 59;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -86,6 +86,7 @@ export const TECHS = {
   seals:    { name: 'Seals', added: '2026-11-24T20:41Z', desc: 'Grey seals that followed the dugout in from the deep water. They haul out on a quiet beach out of sight of the village, lie on the sand groaning to each other, and slide into the sea when anyone comes near. They eat from the same deep water as the dugout all year round, and every early winter they pup on the sand, so the herd grows and the catch out past the surf grows thin.', req: ['canoe'] },
   sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
+  cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
 // ---------- weather ----------
@@ -585,7 +586,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -661,7 +662,7 @@ function findShore(w) {
 const personShape = (o) => ({
   id: o.id, name: o.name, sex: o.sex, born: o.born, mother: o.mother, father: o.father, partner: o.partner, home: o.home,
   wants: o.wants, lastBirth: o.lastBirth, hunger: o.hunger, x: o.x, y: o.y, px: o.px, py: o.py, task: o.task, asleep: o.asleep,
-  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl,
+  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi,
 });
 const fieldShape = (o) => ({
   id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
@@ -808,7 +809,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -822,6 +823,7 @@ function daily(w, c, fx) {
       w.rats.y = 0;
     }
     if (w.lost) w.lost.y = 0;
+    if (w.cough) w.cough.y = w.cough.yd = 0;
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
     if (w.bear) w.bear.yr = 0;
@@ -906,6 +908,7 @@ function daily(w, c, fx) {
   if (w.copse !== undefined) copseDay(w, c);
   if (w.whale) whaleDay(w, c);
   if (w.fever) fever(w, c, fx);
+  if (w.cough !== undefined) coughDay(w, c, fx);
   if (w.heal !== undefined) herbs(w, c);
   if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
@@ -1467,7 +1470,7 @@ function crowUp(w, C, shy) {
   C.cur = null;
   C.wait = w.t + shy;
 }
-const crowKid = (w, p) => { const a = ageY(w, p); return a >= CROW_KID_AGE && a < 14; };
+const crowKid = (w, p) => { const a = ageY(w, p); return a >= CROW_KID_AGE && a < 14 && !p.cg; };
 function learnScare(w, C, f) {
   const kids = w.people.filter((p) => !p.dead && !p.sick && crowKid(w, p));
   if (!kids.length) return; // nobody to send yet
@@ -2484,7 +2487,7 @@ function festSpot(w) {
 // w.fest.rn races run, w.fest.rl last winner {nm, y, a}). The positions are set by the hour, not walked.
 const raceOn = (w, c) => !!(w.fest && w.fest.race && w.fest.race.d === c.day && c.hour >= RACE_FROM && c.hour < FEST_TO);
 export const raceNow = (w, c) => !!(raceOn(w, c) && c.hour < RACE_FROM + 3);
-const racer = (w, p, a) => !p.dead && !p.sick && !p.hurt && a >= RACE_MIN && a <= RACE_MAX && !(w.horn && w.horn.hid === p.id);
+const racer = (w, p, a) => !p.dead && !p.sick && !p.hurt && !p.cg && a >= RACE_MIN && a <= RACE_MAX && !(w.horn && w.horn.hid === p.id);
 // the longest clear run of grass from the fire, in one of eight directions (no water, no buildings, no woods)
 function raceCourse(w) {
   let best = null, bs = -1;
@@ -3377,6 +3380,90 @@ function fever(w, c, fx) {
   feverBegins(w, p, a < 14
     ? `${p.name} will not eat, burns hot to the touch and cries through the night.`
     : `${p.name} wakes burning hot, shivering, and cannot stand.`);
+}
+
+// ---------- whooping cough ----------
+// A children's cough. Every settler and newcomer had it as a child somewhere else, and nobody takes it twice
+// (p.cgi), so it can only take hold once enough children have been born on the island who never had it. Then a
+// child wakes coughing in the cold half of the year and within weeks nearly every one of them is whooping: it
+// passes in the house and wherever the children play together. A coughing child is kept by the door (p.cg is the
+// tick it ends); a parent stays home with a coughing child under COUGH_NURSE (w.cough.nu, set each morning).
+// It is the babies it kills. Nobody on the island has an answer to it yet.
+// w.cough { k outbreaks, n cases this one, d dead this one, all, lost, y/yd this year, end tick the last ended, who, nu }
+const COUGH_DAYS = 20;      // coughing for 20-34 days
+const COUGH_OPEN = 7;       // children who never had it before it can take hold
+const COUGH_SEED = 0.012;   // daily chance it takes hold then, autumn to spring
+const COUGH_GAP = 4;        // years at least between outbreaks
+const COUGH_FROM = 3;       // not before this year
+const COUGH_HOUSE = 0.1;    // daily chance per coughing housemate
+const COUGH_PLAY = 0.3;     // daily chance x share of the children coughing
+const COUGH_GROWN = 0.3;    // an island-born grown-up who never had it catches it this much less often (and it never kills them)
+const COUGH_RISK = [0.007, 0.003, 0.0014, 0.0007, 0.0003, 0.0002]; // daily risk of dying by age in years; 6-13: COUGH_RISK_BIG
+const COUGH_RISK_BIG = 0.0001;
+const COUGH_NURSE = 4;
+export const coughOpen = (w, p, a) => !p.dead && !p.cg && !p.cgi && (a < 14 || p.mother != null);
+export const coughKept = (w, p) => !!(p.cg && ageY(w, p) < 14) || !!(w.cough && w.cough.nu.length && w.cough.nu.includes(p.id));
+function coughs(w, p, fx) {
+  const C = w.cough;
+  p.cg = w.t + (COUGH_DAYS + ri(w, 15)) * TICKS_PER_DAY;
+  C.n++; C.all++; C.y++;
+  if (fx) fx.push({ x: p.x, y: p.y - 0.5, text: 'cough', color: 'sick' });
+}
+function coughDay(w, c, fx) {
+  let C = w.cough, sick = 0, small = 0, kids = 0;
+  if (C) C.nu = [];
+  for (const p of w.people) {
+    if (p.dead) continue;
+    const a = ageY(w, p);
+    if (a < 14) kids++;
+    if (!p.cg) continue;
+    if (p.cg <= w.t) { p.cg = undefined; p.cgi = 1; continue; }
+    let risk = a < COUGH_RISK.length ? COUGH_RISK[Math.floor(a)] : a < 14 ? COUGH_RISK_BIG : 0;
+    if (p.hunger > 4) risk *= 2;
+    if (w.stats.cold) risk *= 1.5;
+    if (risk && rnd(w) < risk) { C.d++; C.lost++; C.yd++; die(w, p, 'died of the whooping cough'); continue; }
+    sick++;
+    if (a < 14) small++;
+    if (a < COUGH_NURSE) { // the mother sits at home with it, or the father if she is gone
+      const m = aliveId(w, p.mother), f = aliveId(w, p.father);
+      const q = m && !m.sick && ageY(w, m) >= 14 ? m : f && !f.sick && ageY(w, f) >= 14 ? f : null;
+      if (q && !C.nu.includes(q.id)) C.nu.push(q.id);
+    }
+  }
+  if (C && !sick && C.n) { // the last child is breathing easy again
+    const text = C.d
+      ? `The whooping cough leaves ${w.name}. ${plural(C.n, 'islander', 'islanders')} coughed through it, and ${C.d === 1 ? 'one of the smallest' : `${C.d} of the smallest`} did not live.`
+      : `The whooping cough leaves ${w.name}. ${plural(C.n, 'islander', 'islanders')} coughed through it, and every one of them is still here.`;
+    if (C.k === 1 || C.d >= 2) milestone(w, text); else log(w, text, C.d ? 'bad' : 'good');
+    C.n = C.d = 0; C.end = w.t; C.who = null;
+  }
+  if (sick) { // it passes in the house, and wherever the children play together
+    const at = new Map();
+    for (const p of w.people) if (p.cg && !p.dead && p.home != null) at.set(p.home, (at.get(p.home) || 0) + 1);
+    const k = c.season === 3 ? 1.3 : c.season === 1 ? 0.7 : 1;
+    const play = (COUGH_PLAY * small) / Math.max(6, kids);
+    const caught = [];
+    for (const p of w.people) {
+      const a = ageY(w, p);
+      if (!coughOpen(w, p, a)) continue;
+      const h = p.home != null ? at.get(p.home) || 0 : 0;
+      if (rnd(w) < Math.min(0.5, (h * COUGH_HOUSE + play) * k * (a < 14 ? 1 : COUGH_GROWN))) caught.push(p);
+    }
+    for (const p of caught) coughs(w, p, fx);
+    return;
+  }
+  // it takes hold in the cold months, once enough children have never had it
+  if (c.year < COUGH_FROM || c.season === 1 || (C && C.end != null && w.t - C.end < COUGH_GAP * TICKS_PER_YEAR)) return;
+  const open = w.people.filter((p) => ageY(w, p) < 14 && coughOpen(w, p, ageY(w, p)));
+  if (open.length < COUGH_OPEN || rnd(w) >= COUGH_SEED) return;
+  const p = open[ri(w, open.length)];
+  const first = !C;
+  if (first) { C = w.cough = { k: 0, n: 0, d: 0, all: 0, lost: 0, y: 0, yd: 0, end: null, who: null, nu: [] }; if (!w.techs.includes('cough')) w.techs.push('cough'); }
+  C.k++; C.who = p.name;
+  coughs(w, p, fx);
+  const he = pron(p), his = poss(p);
+  if (first) milestone(w, `In the dark before dawn ${p.name} wakes coughing: a hard dry cough that comes in long fits until ${he} cannot get a breath, and then a great whooping gasp as the air goes back in. The grown-ups look at each other over ${his} head. Every one of the settlers had this as a child, far away over the sea, and remembers it; none of the ${open.length} children born on ${w.name} ever has. Nobody knows anything to do for it but keep the little ones warm and sit up with them through the night.`);
+  else log(w, `The whooping cough is back on ${w.name}. ${p.name} wakes in the night whooping, and ${open.length} children here have never had it.`, 'bad');
 }
 
 // ---------- rats ----------
@@ -5798,11 +5885,12 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
-  if (night || storm || p.sick) { // in a storm nobody works outdoors: they wait it out at home. The sick keep to their beds
+  const kept = w.cough != null && coughKept(w, p); // a whooping child, or the parent sitting with a small one
+  if (night || storm || p.sick || kept) { // in a storm nobody works outdoors: they wait it out at home. The sick keep to their beds
     if (p.task && p.task.k !== 'home') release(w, p);
     const home = homeOf(w, p);
     const off = (p.id % 3) * 0.25 - 0.25;
-    if (!night && !storm) { // by day the sick lie wrapped up in the doorway, out of the smoke
+    if (!night && !storm) { // by day the sick lie wrapped up in the doorway, out of the smoke (and the coughers sit there)
       p.asleep = false;
       moveToward(p, home.x + 0.5 + off, home.y + 1.25);
       return;
@@ -6820,6 +6908,10 @@ const MIGRATIONS = {
   57: (w) => {
     if (w.crow) for (const [k, v] of Object.entries(SCARE_FRESH())) if (w.crow[k] === undefined) w.crow[k] = v;
   },
+  // v58 -> v59: the whooping cough (w.cough, p.cg, p.cgi). Not come yet; it waits for enough island-born children who never had it.
+  58: (w) => {
+    if (w.cough === undefined) w.cough = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -6857,6 +6949,7 @@ export function summary(w) {
     festival: !!(w.fest && w.fest.on === c.day && c.hour >= FEST_FROM && c.hour < FEST_TO), midsummers: (w.fest && w.fest.n) || 0,
     race: !!(w.fest && w.fest.rn), racing: raceNow(w, c) ? w.fest.race.rs.length : 0, raceWin: (raceOn(w, c) && w.fest.race.nm) || null,
     races: (w.fest && w.fest.rn) || 0, raceLast: (w.fest && w.fest.rl) || null,
+    coughing: w.people.filter((p) => p.cg).length, nursing: w.cough ? w.cough.nu.length : 0, coughs: (w.cough && w.cough.k) || 0, coughLost: (w.cough && w.cough.lost) || 0, coughHad: w.people.filter((p) => p.cgi).length,
     sick: w.people.filter((p) => p.sick).length, fevers: (w.fever && w.fever.k) || 0, feverLost: (w.fever && w.fever.lost) || 0,
     paths: w.paths || 0,
     graves: (w.yard && w.yard.n) || 0, lying: (w.graves || []).length,

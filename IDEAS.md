@@ -602,3 +602,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Scarecrows in the History good-years strip (crowTurned is recorded but not shown).
 - Housekeeping: scripts/_scareprobe.mjs (runs the live world N years and prints rooks/scarecrow numbers) is a throwaway this visit could
   not delete; it can go with .deerpeek.mjs, _bear.mjs, _sea.mjs, _seal.mjs, _seal2.mjs, _st.mjs and _race.mjs.
+- Whooping cough is done, as a problem only (SIM_VERSION 59; w.cough {k, n, d, all, lost, y, yd, end, who, nu nursing parent ids}, p.cg tick
+  the cough ends, p.cgi had it; coughDay/coughs in sim.js, coughOpen/coughKept exported, COUGH_* constants; tech 'cough'; yearly `coughs`,
+  `coughDied`; doorstep sprite in render.js). Only island-born people who never had it can catch it (p.mother != null or under 14); grown-ups
+  catch it at 0.3x and never die of it. Seed 4242: an outbreak every 5-9 years, ~2 babies lost each at 100+ people. Answers it invites:
+  - Honey and thyme: a spoon of honey in warm water eases the fits (the bees are there already); the healer could learn it after the first
+    baby dies, halving the risk for a tended child, at a cost in honey.
+  - Keeping the coughers apart: one house (or a hut by the woods) for the whooping children, so it does not reach the babies in other houses.
+  - Far-isle guests bringing it at midsummer, or carrying it home (the far isle's children die, and its people blame Hais).
+  - A mother who lost a baby to it could take the healer's basket later, or tell the cough tale on the longest night.
+  - The parents sitting up lose sleep too: tired workers the next day, slower harvests in a bad outbreak.
+- Housekeeping: scripts/_cough.mjs (live/seed cough probe), _bench.mjs and _oldsim.mjs (a copy of the old sim.js for a speed check) are
+  throwaways this visit could not delete either; delete them with the older ones listed above.
