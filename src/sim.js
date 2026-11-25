@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 62;
+export const SIM_VERSION = 63;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -83,6 +83,7 @@ export const TECHS = {
   foglore:  { name: 'Fog signs', added: '2026-11-22T04:18Z', desc: 'The sky reader learns the fog as well as the storm. On the evening before a sea fog the wind dies away, the sea lies flat and oily, the far isle stands up sharp and close, and the dew comes down heavy before dark. When the eldest says "fog by morning", the goats stay shut in the pen next day and the small children and the old are kept by the houses, so the wolves that walk in the grey find nothing to take. Once the fog is down, anyone can see it, and the goats stay in until it lifts. Some fogs come in with no sign the evening before.', req: ['lore', 'goats'] },
   drought:  { name: 'Dry spring', added: '2026-11-22T04:45Z', desc: 'The spring by the village is fed by the rain. A hot, dry summer draws it down, and the more mouths there are the faster it goes, until one morning there is only cracked mud between the stones. Then the water comes from a deep pool in the woods, a long walk each way with a skin bag, or a jar once there is a potter. On a day with too few carries the small children and the old go thirsty and some sicken, and the goats give less milk. The autumn rains fill the spring again. Nobody has an answer for it yet.', req: ['fire'] },
   bear:     { name: 'The bear', added: '2026-11-24T20:06Z', desc: 'Some summers, when the bees are heavy with comb, a brown bear wades over the sand bar from the far isle at low tide and lies up in a thicket near the village until the first frosts. On quiet nights it comes out of the trees for the honey logs and the cheese rack: it tears the comb out with its claws, sometimes knocks a log over and splits it, and pulls the rounds off the rods. If a dog barks or someone sleeping nearby wakes, they run out with a burning brand and shout it back into the dark, and now and then it turns and swipes before it goes. A bear nobody kills comes back. Nobody has an answer for it yet.', req: ['bees'] },
+  bearpit:  { name: 'Bear pit', added: '2026-11-25T21:15Z', desc: 'A pit as deep as a man is tall, dug between the bee logs and the trees the bear comes out of, with a wattle hurdle over it while no bear is on the island. When the clawed prints come in off the bar again, the hunters drive sharpened stakes into its floor and hide it under hazel rods and turf. A bear walking in for the comb may go straight through it, and in the morning the spears finish it from the rim: meat for the stores, a great skin for one hearth. A wary bear smells the fresh earth and goes round, and a child running about in the dark can find it too.', req: ['bear', 'hunting'] },
   seals:    { name: 'Seals', added: '2026-11-24T20:41Z', desc: 'Grey seals that followed the dugout in from the deep water. They haul out on a quiet beach out of sight of the village, lie on the sand groaning to each other, and slide into the sea when anyone comes near. They eat from the same deep water as the dugout all year round, and every early winter they pup on the sand, so the herd grows and the catch out past the surf grows thin.', req: ['canoe'] },
   sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
@@ -191,6 +192,16 @@ const BEAR_WAKE = 0.22;      // chance per hour that someone sleeping near wakes
 const BEAR_BARK = 0.65;      // the same with a grown dog near
 const BEAR_NEAR = 100;       // a house this close (squared) is close enough to hear it
 const BEAR_SWIPE = 0.12;     // chance it turns and swipes at whoever drives it off (a wound, never worse)
+// the bear pit: dug once a bear has been in the village often enough, staked and covered whenever one is on the island
+const PIT_NIGHTS = 5;        // nights in the village over one visit (or a split log) before the hunters dig for it
+export const PIT_DIG = 64;   // work hours to dig it
+const PIT_SPELL = 4;         // hours in one spell of digging
+const PIT_FALL = 0.2;        // chance a bear walking in by it goes through the cover
+const PIT_WISE = 0.06;       // the same for a bear that has once smelled it out and gone round
+const PIT_DAWN = 7;        // the hour the spears come to the rim
+const PIT_MEAT = 300;        // meat and fat off a bear
+const PIT_HIDES = 2;         // hides' worth of skin
+const PIT_CHILD = 0.003;     // chance per day, while it is covered, that a child running about after dusk drops through
 const BEAR_NAMES = [['Old Brown', 'a coat the colour of wet bark'], ['Honey-Paw', 'one forepaw pale as a peeled stick'], ['the Grey Sow', 'a grizzled back and a sow\'s heavy belly'],
   ['Broad-Back', 'shoulders as wide as a doorway'], ['Notch-Ear', 'a notch bitten out of one ear']];
 
@@ -2144,7 +2155,9 @@ function bearDay(w, c) {
     const C = B.cur, b = w.beasts.find((o) => o.id === C.id);
     if (!b) { B.cur = null; return; }
     if (!C.at || tile(w, C.at.x, C.at.y) !== T.FOREST) C.at = loneBed(w) || C.at;
-    if (c.doy === BEAR_LEAVE) bearGoes(w, b, c);
+    if (b.pit) return; // in the pit: the spears come at dawn
+    if (c.doy >= BEAR_LEAVE) { bearGoes(w, b, c); return; }
+    pitChild(w, c);
     return;
   }
   if (c.doy !== BEAR_DAY || c.year < BEAR_YEAR || !w.fauna || !bearSweet(w)) return;
@@ -2167,19 +2180,24 @@ function bearDay(w, c) {
   b.x = b.px = at.x + 0.5; b.y = b.py = at.y + 0.5;
   B0.n++; B0.y = c.year;
   B0.cur = { id: b.id, nm, look, at, t: w.t, r: 0, hc: 0, cc: 0, k: 0, dv: 0, m: 0, back };
+  if (back && B0.last.wise) B0.cur.wise = 1; // it went round the pit last time, and remembers
   const first = !w.techs.includes('bear'), Nm = Cap(nm), sweet = beesAlive(w) ? 'the honey' : 'the cheese';
   if (first) w.techs.push('bear');
   if (first) milestone(w, `${p.name} comes up from the beach at first light white in the face. In the wet sand below the tide line there are prints as long as a forearm, five claws pressed deep in front of each, coming in off the bar from the far isle and going straight up into the woods. ` +
     `At dusk something big breaks through the bracken at the edge of the trees, stands up on its hind legs to sniff the wind, and drops down again: a bear, with ${look}. Nobody alive on ${w.name} has ever seen one. It has smelled ${sweet} from across the water. The islanders call it ${nm}.`);
   else if (back) milestone(w, `The great clawed prints are in the sand below the tide line again, coming in off the bar. ${Nm} is back for ${sweet}, and the children are kept by the houses after dark.`);
   else milestone(w, `Clawed prints come in off the bar at low tide again, but this bear is a stranger, with ${look}. It goes up into the woods by the village. The islanders call it ${nm}.`);
+  pitCover(w, p);
 }
 // the first frosts: it goes back over the bar
 function bearGoes(w, b, c) {
   const B = w.bear, C = B.cur;
   w.beasts = w.beasts.filter((o) => o !== b);
   B.last = { nm: C.nm, look: C.look, y: c.year, how: 'gone' };
+  if (C.wise) B.last.wise = 1;
   B.cur = null;
+  if (B.pit && B.pit.s === 2) B.pit.s = 1; // the cover is lifted and the hurdle laid back over it
+  else if (!B.pit && w.techs.includes('hunting') && (C.r >= PIT_NIGHTS || C.k)) B.pd = 1; // next spring the hunters dig for it
   let split = 0;
   if (w.bees) for (const h of w.bees.h) if (h.tp != null) { h.tp = undefined; split++; }
   const took = [C.hc >= 1 && `${Math.round(C.hc)} comb from the logs`, C.cc && `${plural(C.cc, 'round', 'rounds')} of cheese off the rack`].filter(Boolean);
@@ -2192,11 +2210,13 @@ function bearGoes(w, b, c) {
 function bear(w, b, c, storm) {
   const C = w.bear && w.bear.cur;
   if (!C) return;
+  if (b.pit) { if (c.hour === PIT_DAWN) pitKill(w, b, c); return; } // down in the pit, roaring, until the spears come
   const h = c.hour, home = C.at || { x: Math.floor(b.x), y: Math.floor(b.y) };
   if (h === 22 && !b.raid && !storm && (b.rest || 0) <= w.t && rnd(w) < BEAR_NIGHT) {
     const g = bearPrey(w);
     if (g) {
       b.raid = g.k; b.tx = g.x; b.ty = g.y; b.hv = g.i; b.eat = 0; b.hc = 0; b.cc = 0; b.sp = 0;
+      b.vp = w.bear.pit && w.bear.pit.s === 2 ? 1 : 0; // the way in from the trees runs past the covered pit
       if (!b.out) { b.out = 1; b.x = b.px = home.x + 0.5; b.y = b.py = home.y + 0.5; }
     }
   }
@@ -2205,6 +2225,16 @@ function bear(w, b, c, storm) {
     return;
   }
   if (h >= 5 && h < 22) { bearNightEnds(w, b, null, null); return; } // dawn: back to the trees
+  if (b.vp) {
+    const P = w.bear.pit;
+    if (!P || P.s !== 2) b.vp = 0;
+    else {
+      if (!moveBeast(b, P.x + 0.5, P.y + 0.5, BEAR_SPEED)) return;
+      b.vp = 0;
+      pitStep(w, b, C);
+      return;
+    }
+  }
   const tx = b.tx + 0.5, ty = b.ty + 1.2; // it stands at the foot of the log or the rack
   if (!moveBeast(b, tx, ty, BEAR_SPEED)) return;
   b.eat++;
@@ -2256,6 +2286,115 @@ function bearNightEnds(w, b, p, bark) {
       : `In the morning the stone is off the top of a bee log and there are claw marks down its side: ${hc} comb is gone. ${Cap(C.nm)} has been at the hives in the night.`;
   } else text = `In the morning the cheese rack by the goat pen is dragged half down and ${plural(cc, 'round is', 'rounds are')} gone. In the mud below it are the prints of ${C.nm}.`;
   if (first) milestone(w, text + tail); else log(w, text, 'bad');
+}
+
+// ---------- the bear pit ----------
+// w.bear.pd: the hunters mean to dig one; w.bear.pit = { x, y tile (a BUILD tile, so no field or house goes on it), d hours dug,
+// s 0 digging | 1 open, a hurdle over it | 2 staked and covered | 3 a bear in it, nm who began it, at tick begun,
+// c bears taken, sk times a bear went round it, ch children who fell in }. w.bear.kl bears taken ever,
+// w.bear.skin { nm bear, by, id, y } the last skin, on the floor of the one whose spear finished it.
+// On the beast: b.vp the way in tonight runs past the covered pit; b.pit it is down in it.
+// a grass tile two or three steps out from the bee logs (or the cheese rack) on the side toward the trees
+function pitSite(w) {
+  const h0 = w.bees && w.bees.h.length ? w.bees.h[0] : w.cheese && w.cheese.r ? w.cheese.r : null;
+  if (!h0) return null;
+  let best = null, bs = 1e9;
+  for (let y = h0.y - 3; y <= h0.y + 3; y++) for (let x = h0.x - 3; x <= h0.x + 3; x++) {
+    if (Math.max(Math.abs(x - h0.x), Math.abs(y - h0.y)) < 2 || x < 2 || y < 2 || x >= MAP - 2 || y >= MAP - 2) continue;
+    const i = idx(x, y);
+    if (w.tiles[i] !== T.GRASS || (w.wear && w.wear[i] >= PATH_AT) || nearBuild(w, x, y, 1)) continue;
+    if (w.goats && w.goats.pen && d2(x, y, w.goats.pen.x, w.goats.pen.y) < 4) continue;
+    let fd = 50; // how far to the nearest trees
+    for (let yy = y - 5; yy <= y + 5; yy++) for (let xx = x - 5; xx <= x + 5; xx++) if (tile(w, xx, yy) === T.FOREST) fd = Math.min(fd, d2(x, y, xx, yy));
+    const sc = fd + hash(x, y, w.seed + 71);
+    if (sc < bs && lineOfLand(w, w.fire.x + 0.5, w.fire.y + 0.5, x + 0.5, y + 0.5)) { bs = sc; best = { x, y }; }
+  }
+  return best;
+}
+// a spell of digging, for two grown hands at a time, spring to autumn by day
+function pitTask(w, p, c) {
+  const B = w.bear;
+  if (!B || !B.pd || (B.pit && B.pit.s > 0) || c.season > 2 || c.hour < 7 || c.hour > 15) return null;
+  const a = ageY(w, p);
+  if (a < 16 || a > 50) return null;
+  const key = w.res.bp0 == null ? 'bp0' : w.res.bp1 == null ? 'bp1' : null;
+  if (!key) return null;
+  let P = B.pit;
+  if (!P) {
+    const s = pitSite(w);
+    if (!s) return null;
+    P = B.pit = { x: s.x, y: s.y, d: 0, s: 0, nm: p.name, at: w.t, c: 0, sk: 0, ch: 0 };
+    setTile(w, idx(s.x, s.y), T.BUILD);
+    log(w, `${p.name} paces out a square of turf between the bee logs and the trees, where the prints of the bear came in, and cuts the first sod. A pit is to be dug there, deep enough that a bear cannot climb out.`, 'info');
+  }
+  const side = key === 'bp1' && tile(w, P.x + 1, P.y) === T.GRASS ? 1 : 0;
+  return { k: 'pit', key, x: P.x + side, y: P.y, h: PIT_SPELL };
+}
+function pitDone(w, p, t, pop) {
+  const B = w.bear, P = B && B.pit;
+  if (!P || P.s !== 0) return;
+  P.d += PIT_SPELL;
+  pop('digging', 'wood');
+  if (P.d < PIT_DIG) return;
+  P.s = B.cur ? 2 : 1; B.pd = 0;
+  const first = !w.techs.includes('bearpit');
+  if (first) w.techs.push('bearpit');
+  const last = B.last && B.last.how === 'gone' ? B.last.nm : null;
+  if (first) milestone(w, `${p.name} climbs out of the pit by the bee logs on a notched pole and pulls it up after ${p.sex === 'f' ? 'her' : 'him'}. It is deeper than a man is tall, the sides cut sheer, the spoil carried off into the trees so nothing shows. ` +
+    (B.cur ? 'Sharpened stakes go into its floor that same evening, and hazel rods and turf over the top. ' : 'A wattle hurdle is laid over it for now. When the clawed prints come in off the bar again, stakes will go into its floor and turf over the top. ') +
+    `${last ? `Let ${last} come for the comb again. ` : ''}${w.name} has a bear pit.`);
+}
+// the prints are seen: the hurdle comes off, stakes go into the floor, rods and turf over the top
+function pitCover(w, p) {
+  const P = w.bear && w.bear.pit;
+  if (!P || P.s !== 1) return;
+  P.s = 2;
+  log(w, `By evening the hurdle is off the bear pit. ${p.name} drives sharpened stakes into its floor, and hazel rods and turf go over the top until it looks like the grass around it. The children are told where it is, and told again.`, 'info');
+}
+// it reaches the covered pit on the way in: through it, or it smells the fresh earth and goes round
+function pitStep(w, b, C) {
+  const P = w.bear.pit;
+  if (rnd(w) < (C.wise ? PIT_WISE : PIT_FALL)) {
+    b.pit = 1; b.raid = null; b.tx = null; b.ty = null; b.vp = 0;
+    b.x = b.px = P.x + 0.5; b.y = b.py = P.y + 0.5;
+    P.s = 3;
+    log(w, `In the dead of night there is a crash of rods by the bee logs and a roaring that wakes every house. ${Cap(C.nm)} is in the pit. Nobody goes near it in the dark.`, 'bad');
+    return;
+  }
+  P.sk++;
+  if (!C.wise) log(w, `In the morning the prints of ${C.nm} come down from the trees to the edge of the bear pit, stop, and go round it. A clawed hole is torn in the turf at one corner where it smelled the fresh earth.`, 'info');
+  C.wise = 1;
+}
+// dawn: the hunters come to the rim with spears and finish it
+function pitKill(w, b, c) {
+  const B = w.bear, C = B.cur, P = B.pit;
+  const kills = (p) => (p.dd ? (p.dd.b || 0) + (p.dd.d || 0) + (p.dd.w || 0) : 0);
+  const able = w.people.filter((p) => !p.dead && !p.sick && !p.hurt && !isLost(w, p) && ageY(w, p) >= 16 && ageY(w, p) <= 55)
+    .sort((a, z) => kills(z) - kills(a) || a.id - z.id);
+  w.beasts = w.beasts.filter((o) => o !== b);
+  B.cur = null;
+  P.s = 1; P.c++; B.kl = (B.kl || 0) + 1;
+  if (w.bees) for (const h of w.bees.h) if (h.tp != null) h.tp = undefined;
+  const p0 = able[0], p1 = able[1];
+  const by = p0 ? (p1 ? `${p0.name} and ${p1.name}` : p0.name) : 'the islanders';
+  B.last = { nm: C.nm, look: C.look, y: c.year, how: 'pit', by };
+  w.food += PIT_MEAT; w.hides = (w.hides || 0) + PIT_HIDES;
+  if (p0) { B.skin = { nm: C.nm, by: p0.name, id: p0.id, y: c.year }; deed(w, p0, 'b'); }
+  const text = `At first light ${by} stand at the rim of the bear pit with spears, and the whole village behind them. ${Cap(C.nm)} rears up against the stakes, and it is a long time before it lies still. ` +
+    `It takes six to haul it out on ropes: ${PIT_MEAT} meat and fat go into the stores, and the great skin is pegged out ${p0 ? `by the door of ${p0.name}` : 'by the hearth'}. ${C.r ? `It came into the village on ${plural(C.r, 'night', 'nights')}; it will not come again.` : 'It never reached the logs.'}`;
+  if (B.kl === 1) milestone(w, text + ` The first bear ever taken on ${w.name}.`); else log(w, text, 'good');
+}
+// while it is covered and a bear is about, a child playing out late may find it first
+function pitChild(w, c) {
+  const P = w.bear && w.bear.pit;
+  if (!P || P.s !== 2 || c.season > 2 || rnd(w) >= PIT_CHILD) return;
+  const kids = w.people.filter((p) => !p.dead && !p.sick && !p.hurt && !isLost(w, p) && ageY(w, p) >= 4 && ageY(w, p) < 13);
+  if (!kids.length) return;
+  const k = kids[ri(w, kids.length)];
+  k.hurt = w.t + 4 * TICKS_PER_DAY;
+  P.ch++;
+  if (w.bear.cur) w.bear.cur.wise = 1; // it heard the screaming from the trees
+  log(w, `At dusk ${k.name} runs after the others across the grass by the bee logs and drops through the turf into the bear pit, between the stakes. ${Cap(pron(k))} is pulled out by the arms, screaming, with a torn leg. The cover is mended in the morning, but the bear in the trees heard it all.`, 'bad');
 }
 
 // ---------- the wolf-skin cloak ----------
@@ -5474,6 +5613,9 @@ function pickTask(w, p, c) {
       return { k: 'build', key: 'b' + b.id, x: b.x, y: b.y, h: 4 };
     }
   }
+  // the bear pit by the bee logs, dug in the year after a bear has been at them
+  const bpk = pitTask(w, p, c);
+  if (bpk) return bpk;
   // the hunt
   const hk = hunt(w, p, c);
   if (hk) return hk;
@@ -6310,6 +6452,8 @@ function finish(w, p, t, c, fx) {
     cheeseDone(w, p, pop);
   } else if (t.k === 'crowman') {
     scareDone(w, p, t, pop);
+  } else if (t.k === 'pit') {
+    pitDone(w, p, t, pop);
   } else if (t.k === 'water') {
     waterDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
@@ -7382,6 +7526,13 @@ const MIGRATIONS = {
   61: (w) => {
     if (w.inc === undefined) w.inc = null;
   },
+  // v62 -> v63: the bear pit (w.bear.pd, pit, kl, skin). A village a bear has raided often enough sets the hunters digging next spring.
+  62: (w) => {
+    const B = w.bear;
+    if (!B) return;
+    if (B.pit === undefined) B.pit = null;
+    if (!B.pit && !B.cur && w.techs.includes('hunting') && (B.r >= PIT_NIGHTS || B.k)) B.pd = 1;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7477,6 +7628,11 @@ export function summary(w) {
     bear: w.bear && w.bear.cur ? w.bear.cur.nm : null, bearRaid: (w.bear && w.bear.cur && (w.beasts.find((b) => b.id === w.bear.cur.id) || {}).raid) || null,
     bearVisits: w.bear ? w.bear.n : 0, bearNights: w.bear ? w.bear.r : 0, bearYear: w.bear ? w.bear.yr || 0 : 0, bearComb: w.bear ? w.bear.hc : 0,
     bearCheese: w.bear ? w.bear.cc : 0, bearSplit: w.bear ? w.bear.k : 0, bearDriven: w.bear ? w.bear.dv : 0, bearSwipes: w.bear ? w.bear.m : 0,
+    bearPit: !w.bear ? null : w.bear.pit ? ['digging', 'open', 'covered', 'bear in it'][w.bear.pit.s] : w.bear.pd ? 'planned' : null,
+    pitDug: w.bear && w.bear.pit && !w.bear.pit.s ? Math.round(w.bear.pit.d / PIT_DIG * 100) : 0,
+    pitDigging: w.bear && w.bear.pit && !w.bear.pit.s ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'pit').length : 0,
+    pitRound: w.bear && w.bear.pit ? w.bear.pit.sk : 0, pitChildren: w.bear && w.bear.pit ? w.bear.pit.ch : 0,
+    bearsTaken: (w.bear && w.bear.kl) || 0, bearSkin: (w.bear && w.bear.skin) || null,
     cloaks: w.people.filter((p) => !p.dead && p.cl).map((p) => `${p.name} (${p.cl.nm})`), cloaksMade: w.cloak ? w.cloak.n : 0,
     rainbows: w.bow ? w.bow.n : 0, rainbowYear: w.bow ? w.bow.y : 0, rainbow: bowOn(w, c), rainbowReached: w.bow ? w.bow.k : 0,
     rainbowChasers: bowOn(w, c) ? w.people.filter((p) => p.task && p.task.k === 'bow').length : 0,

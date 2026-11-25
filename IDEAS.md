@@ -651,3 +651,11 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     midsummer ask after them by name.
   - A crowded Hais (70+) turns them away with a sack of grain; the far isle remembers who was refused.
   - The runaway pair: the girl's father paddles over at midsummer to fetch her back.
+- The bear pit is done (SIM_VERSION 63; w.bear.pd/pit/kl/skin, b.vp/b.pit on the beast; pitSite/pitTask/pitDone/pitCover/pitStep/pitKill/
+  pitChild, PIT_* in sim.js; tech 'bearpit'; pit is a BUILD tile). A wary bear (C.wise, remembered in last.wise) can dodge it for years.
+  Answers it invites:
+  - The bearskin: worn by the one who took it (like the wolf cloak), or laid on the eldest's bed so the old stay warm in cold snaps.
+  - Bear's grease for the healer (wounds heal faster) or for the dugout seams; claws strung as a necklace worn at midsummer.
+  - A fence of thorn round the pit after a child falls in, or the children taught a rhyme about it in the winter tale.
+  - A wary bear that keeps dodging could earn a legend ("the bear that cannot be taken") told on the longest night.
+  - Boars or a lone wolf could also go into a covered pit; the far isle could ask for a bearskin as a peace gift.

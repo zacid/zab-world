@@ -133,6 +133,7 @@ function doing(p) {
     if (!still) return `going to the ropes of the stone for ${C.nm}`;
     return C.w < S.STONE_LEVER ? 'levering a boulder out of the sand onto the logs' : p.task.pull ? `leaning on the ropes, dragging the stone for ${C.nm} up to the ring` : 'digging the pit and hauling the stone upright';
   }
+  if (p.task && p.task.k === 'pit') return p.x === p.px && p.y === p.py ? 'digging the bear pit by the bee logs' : 'going to dig at the bear pit';
   if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
   if (p.task && p.task.k === 'bow') return p.x === p.px && p.y === p.py ? 'standing where the rainbow came down' : 'running to find the end of the rainbow';
@@ -244,9 +245,9 @@ function work(k, id, X, Y, now) {
     const t = (now / 900 + id * 0.37) % 1;
     px(sc, X + 3, Y + 1, '#f1c9a5');
     if (t < 0.6) { const d = Math.floor(t * 6); px(sc, X + 4 + (d >> 1), Y + 1 + d, '#d9c27a'); px(sc, X + 3 + d, Y + 2 + (d >> 1), '#d9c27a'); }
-  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig' || k === 'crowman') { // a mallet (spade, for digging) rising and falling
-    const f = ph(200) % 3, spade = k === 'dig';
-    if (k !== 'build') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
+  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig' || k === 'crowman' || k === 'pit') { // a mallet (spade, for digging) rising and falling
+    const f = ph(200) % 3, spade = k === 'dig' || k === 'pit';
+    if (k !== 'build' && k !== 'pit') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
     if (k === 'crowman') { px(sc, X + 2, Y + 1, '#7a5a36', 5, 1); px(sc, X + 4, Y - 1, '#d9c79a', 1, 1); } // the cross going up, its straw head on top
     if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
     else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
@@ -422,6 +423,7 @@ function drawTerrain() {
   drawPen(pal);
   drawKiln(pal);
   drawHives(pal);
+  drawPit(pal);
   drawSpring(pal);
   drawSnowmen();
   drawWhales();
@@ -759,6 +761,33 @@ function drawHives(pal) {
     else if (!h.a) { px(tc, X + 2, Y + 1, '#4f7a3a', 2, 1); px(tc, X + 5, Y, '#4f7a3a'); }
     if (h.a && !pal.snow) px(tc, X + 3, Y + 5, '#c9a23a'); // a guard bee in the doorway
   }
+}
+// the bear pit: a heap of spoil and a dark hole while it is dug; a wattle hurdle over it while no bear is about;
+// staked and hidden it is only a square of turf a shade off the grass round it; with a bear in it, torn rods and the black hole
+function drawPit(pal) {
+  const P = w.bear && w.bear.pit;
+  if (!P) return;
+  const X = P.x * TILE, Y = P.y * TILE, snow = pal.snow;
+  if (P.s === 2) { // turf laid over rods: nearly the grass, a few wilted edges
+    px(tc, X + 1, Y + 1, snow ? '#d9e0e4' : pal.grass[2], 6, 6);
+    px(tc, X + 1, Y + 1, snow ? '#c9d0d4' : '#6d6a3a', 6, 1); px(tc, X + 1, Y + 6, snow ? '#c9d0d4' : '#6d6a3a', 6, 1);
+    if (!snow) { px(tc, X + 2, Y + 3, '#7a5a36', 3, 1); px(tc, X + 4, Y + 5, '#7a5a36', 2, 1); } // a rod end showing through
+    return;
+  }
+  const deep = P.s > 0 ? 1 : Math.min(1, P.d / S.PIT_DIG);
+  const hw = 2 + Math.round(deep * 4), hh = 2 + Math.round(deep * 3);
+  px(tc, X + 1, Y + 1, '#3d2a19', 6, 6); // the cut edge
+  px(tc, X + 4 - (hw >> 1), Y + 2, '#0e0a07', hw, hh); // the hole
+  if (P.s === 0) { px(tc, X + 6, Y + 6, '#6b4a2e', 2, 2); px(tc, X + 7, Y + 5, '#7a5636'); } // spoil at the lip
+  if (P.s === 1) { // the hurdle laid over it: woven hazel
+    for (let k = 0; k < 3; k++) px(tc, X + 1, Y + 2 + k * 2, '#8a6a44', 6, 1);
+    for (let k = 0; k < 3; k++) px(tc, X + 2 + k * 2, Y + 1, '#6b4f30', 1, 6);
+  }
+  if (P.s === 3) { px(tc, X, Y + 1, '#7a5a36', 2, 1); px(tc, X + 6, Y + 6, '#7a5a36', 2, 1); px(tc, X + 1, Y + 7, pal.grass[2], 3, 1); } // torn rods and turf
+}
+function pitAt(mx, my) {
+  const P = w.bear && w.bear.pit;
+  return P && P.x === Math.floor(mx) && P.y === Math.floor(my) ? P : null;
 }
 function hiveAt(mx, my) {
   if (!w.bees) return null;
@@ -1585,7 +1614,7 @@ function frame() {
         : beast.k === 'deer' ? (beast.run ? 'bounding away' : still ? 'grazing' : 'wandering the meadow')
         : (beast.f != null && still ? 'rooting in the grain' : 'trotting through the dark');
       const R = beast.k === 'bear' && w.bear && w.bear.cur;
-      tip.innerHTML = R ? `<b>${esc(R.nm)}</b><br><span class="m">bear · ${beast.raid && beast.eat ? `<span class="bad">${beast.raid === 'hive' ? 'tearing the comb out of a bee log' : 'pulling the cheese off the rack'}</span>` : beast.raid ? 'coming out of the trees for the village' : 'going back to the trees'}${R.r ? ` · ${R.r} ${R.r === 1 ? 'night' : 'nights'} in the village this year` : ''}</span>`
+      tip.innerHTML = R ? `<b>${esc(R.nm)}</b><br><span class="m">bear · ${beast.pit ? '<span class="fest">down in the bear pit among the stakes; the spears come at first light</span>' : beast.vp ? 'coming out of the trees, past the covered pit' : beast.raid && beast.eat ? `<span class="bad">${beast.raid === 'hive' ? 'tearing the comb out of a bee log' : 'pulling the cheese off the rack'}</span>` : beast.raid ? 'coming out of the trees for the village' : 'going back to the trees'}${R.r ? ` · ${R.r} ${R.r === 1 ? 'night' : 'nights'} in the village this year` : ''}</span>`
         : L ? `<b>${esc(L.nm)}</b><br><span class="m">lone wolf · ${what}${L.g || L.b ? ` · ${[L.g && `${L.g} ${L.g === 1 ? 'goat' : 'goats'} taken`, L.b && `${L.b} bitten`].filter(Boolean).join(' · ')}` : ''}</span>`
         : `<b>${beast.k === 'wolf' ? 'Grey wolf' : beast.k === 'deer' ? 'Red deer' : 'Wild boar'}</b><br><span class="m">${what}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
@@ -1678,6 +1707,14 @@ function frame() {
       const state = !best.a && best.tp != null ? `<span class="bad">knocked over and split open by ${esc((w.bear && w.bear.cur && w.bear.cur.nm) || 'the bear')} ${when(best.tp)}</span>` : !best.a ? 'an empty log: the bees died in it' : c.season === 3 || c.doy < 20 ? 'the bees are clustered inside for the winter'
         : best.c >= 50 ? 'a strong hive, heavy with comb' : best.c >= 20 ? 'a busy hive' : 'a weak hive, little comb';
       tip.innerHTML = `<b>${best.a ? 'Bee log' : 'Empty bee log'}</b><br>${state}<br><span class="m">${s.hives} ${s.hives === 1 ? 'hive' : 'hives'} · ${s.honey} honey kept · ${s.honeyEver.toLocaleString()} taken in all${s.swarms ? ` · ${s.swarms} ${s.swarms === 1 ? 'swarm' : 'swarms'} caught` : ''} · first found by ${esc(B.nm)} ${when(B.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = pitAt(mx, my))) {
+      const s = S.summary(w), B = w.bear;
+      const state = best.s === 0 ? `<span class="fest">being dug · ${s.pitDug}% down${s.pitDigging ? ` · ${s.pitDigging} at it` : ''}</span>`
+        : best.s === 1 ? 'open, a wattle hurdle laid over it until a bear comes'
+        : best.s === 2 ? `<span class="bad">staked and hidden under rods and turf${B.cur ? ` · ${esc(B.cur.nm)} lies up in the woods` : ''}</span>`
+        : `<span class="bad">${esc((B.cur && B.cur.nm) || 'a bear')} is down in it among the stakes</span>`;
+      tip.innerHTML = `<b>Bear pit</b><br>${state}<br><span class="m">first sod cut by ${esc(best.nm)} ${when(best.at)}${s.bearsTaken ? ` · ${s.bearsTaken} ${s.bearsTaken === 1 ? 'bear' : 'bears'} taken` : ''}${best.sk ? ` · gone round ${best.sk}x` : ''}${best.ch ? ` · ${best.ch} ${best.ch === 1 ? 'child' : 'children'} fell in` : ''}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
@@ -2045,6 +2082,9 @@ const DCOL = { b: '#9a6a3c', h: '#8a5c32', e: '#6e4a2a', n: '#2a1d15', t: '#efe6
 const BEAR = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', '.dd..dd.'];
 const BEAR_RUN = ['..hh..e.', '.bhhbbbb', 'bbbbbbbn', '.bbbbbb.', 'dd....dd'];
 const BEAR_UP = ['..e.e.', '..bbb.', '.pbnbp', '..hbb.', '..bbb.', '..bbb.', '..d.d.'];
+// down in the pit: only the head and the forepaws over the rim, now and then rearing at the stakes
+const BEAR_PIT = ['......', '......', '......', '..ee..', '.bbbb.', 'pbnnbp'];
+const BEAR_PIT_UP = ['......', '......', '..ee..', '.bbbb.', 'pbnnbp', '.p..p.'];
 const BEARCOL = { b: '#5e4129', h: '#46301d', e: '#3a2818', n: '#1a120c', d: '#2a1d13', p: '#3a2818' };
 const facing = new Map();
 function drawBeasts(frac, now) {
@@ -2062,7 +2102,7 @@ function drawBeasts(frac, now) {
     if (b.k === 'wolf') rows = moving && stepF ? WOLF_RUN : WOLF;
     else if (b.k === 'lone') rows = moving ? (stepF ? LONE_RUN : LONE) : LONE_SIT;
     else if (b.k === 'deer') rows = moving ? (stepF ? DEER_RUN : DEER) : Math.floor(now / 900 + b.id * 1.7) % 4 ? DEER_GRAZE : DEER;
-    else if (b.k === 'bear') rows = !moving && b.raid && b.eat ? BEAR_UP : moving && stepF ? BEAR_RUN : BEAR;
+    else if (b.k === 'bear') rows = b.pit ? (Math.floor(now / 700) % 3 ? BEAR_PIT : BEAR_PIT_UP) : !moving && b.raid && b.eat ? BEAR_UP : moving && stepF ? BEAR_RUN : BEAR;
     else rows = !moving && b.f != null ? (Math.floor(now / 380 + b.id) % 2 ? BOAR_ROOT : BOAR) : moving && stepF ? BOAR_RUN : BOAR;
     const map = b.k === 'wolf' ? WCOL : b.k === 'lone' ? LCOL : b.k === 'deer' ? DCOL : b.k === 'bear' ? BEARCOL : BCOL;
     const Yr = b.k === 'lone' ? Y - 1 : b.k === 'bear' ? Y - rows.length + 4 : Y, wd = rows[0].length; // the lone wolf stands a pixel taller, the bear reared up three
@@ -2341,7 +2381,9 @@ function updatePanels() {
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]
       : s.loneLast ? [['lone', 'Lone wolf', `<span class="m">${esc(s.loneLast.nm)} ${s.loneLast.how === 'killed' ? `killed by ${esc(s.loneLast.by)}` : 'moved on'}</span>`]] : []),
-    ...(s.bearVisits ? [['bear', 'Bear', `${s.bear ? `<span class="bad">${esc(s.bear)} ${s.bearRaid === 'hive' ? 'is at the bee logs' : s.bearRaid === 'rack' ? 'is at the cheese rack' : 'lies up in the woods'}</span> · ` : ''}<span class="m">${s.bearVisits} ${s.bearVisits === 1 ? 'summer' : 'summers'} · ${s.bearNights} ${s.bearNights === 1 ? 'night' : 'nights'} in the village${s.bearYear ? ` (${s.bearYear} this year)` : ''} · ${s.bearComb.toLocaleString()} comb · ${s.bearCheese.toLocaleString()} cheese${s.bearSplit ? ` · ${s.bearSplit} ${s.bearSplit === 1 ? 'log' : 'logs'} split` : ''} · driven off ${s.bearDriven}x${s.bearSwipes ? ` · ${s.bearSwipes} hurt` : ''}${!s.bear && w.bear.last ? ` · ${esc(w.bear.last.nm)} went back over the bar in year ${w.bear.last.y}` : ''}</span>`]] : []),
+    ...(s.bearVisits ? [['bear', 'Bear', `${s.bear ? `<span class="bad">${esc(s.bear)} ${s.bearRaid === 'hive' ? 'is at the bee logs' : s.bearRaid === 'rack' ? 'is at the cheese rack' : 'lies up in the woods'}</span> · ` : ''}<span class="m">${s.bearVisits} ${s.bearVisits === 1 ? 'summer' : 'summers'} · ${s.bearNights} ${s.bearNights === 1 ? 'night' : 'nights'} in the village${s.bearYear ? ` (${s.bearYear} this year)` : ''} · ${s.bearComb.toLocaleString()} comb · ${s.bearCheese.toLocaleString()} cheese${s.bearSplit ? ` · ${s.bearSplit} ${s.bearSplit === 1 ? 'log' : 'logs'} split` : ''} · driven off ${s.bearDriven}x${s.bearSwipes ? ` · ${s.bearSwipes} hurt` : ''}${!s.bear && w.bear.last ? ` · ${esc(w.bear.last.nm)} ${w.bear.last.how === 'pit' ? `taken in the pit in year ${w.bear.last.y}` : `went back over the bar in year ${w.bear.last.y}`}` : ''}</span>` +
+      (s.bearPit === 'digging' ? ` · <span class="fest">digging a bear pit (${s.pitDug}%)</span>` : s.bearPit === 'bear in it' ? ` · <span class="fest">${esc(s.bear || 'a bear')} is in the pit</span>`
+        : s.bearPit ? ` <span class="m">· pit ${s.bearPit === 'covered' ? 'staked and covered' : s.bearPit === 'planned' ? 'to be dug' : 'ready'}${s.bearsTaken ? ` · ${s.bearsTaken} taken` : ''}${s.bearSkin ? ` · skin of ${esc(s.bearSkin.nm)} by ${esc(s.bearSkin.by)}'s door` : ''}</span>` : '')]] : []),
     ...(s.lore ? [['lore', 'Sky lore', `${s.stormCalled ? `<span class="bad">${esc(s.skyReader)} calls a storm by morning</span>${s.roping ? ` · <span class="fest">${s.roping} at work by firelight</span>` : ''} · ` : s.roofsTied ? `<span class="fest">${s.roofsTied} ${s.roofsTied === 1 ? 'roof' : 'roofs'} roped with stones</span> · ` : ''}<span class="m">${s.loreRight} of ${s.loreRight + s.loreMissed} storms called · ${s.loreFalse} false ${s.loreFalse === 1 ? 'alarm' : 'alarms'} · ${s.loreHeld} ${s.loreHeld === 1 ? 'roof' : 'roofs'} held${s.loreHeldYear ? ` (${s.loreHeldYear} this year)` : ''}${s.loreReaped ? ` · ${s.loreReaped} ${s.loreReaped === 1 ? 'field' : 'fields'} cut by firelight` : ''}</span>`]] : []),
     ...(s.fogLore ? [['fogl', 'Fog signs', `${s.fogCalled ? `<span class="fest">${esc(s.skyReader)} calls fog by morning</span> · ` : s.fogKept ? '<span class="fest">goats and little ones kept in from the fog</span> · ' : ''}<span class="m">${s.fogRight} of ${s.fogRight + s.fogMissed} fogs called · ${s.fogFalse} false · ${s.fogPenned} ${s.fogPenned === 1 ? 'day' : 'days'} the herd kept in${s.fogStayed ? ` · ${s.fogStayed} kept from straying` : ''}</span>`]] : []),
     ...(s.rainbows ? [['bow', 'Rainbows', `${s.rainbows} <span class="m">seen${s.rainbowYear ? ` · ${s.rainbowYear} this year` : ''} · the children reached the end of ${s.rainbowReached}</span>${s.rainbow ? ' · <span class="fest">one stands now</span>' : ''}`]] : []),
