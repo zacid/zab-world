@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 70;
+export const SIM_VERSION = 71;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -603,7 +603,7 @@ export function genesis(seed, epoch) {
     learned: { fire: 0, shelter: 0, gather: 0, farming: 0, woodcut: 0 },
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
-    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 },
+    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 }, lie: { d: 0, t: 0, f: -1 },
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
@@ -878,6 +878,7 @@ function daily(w, c, fx) {
   if (w.beasts) wilds(w, c);
   const was = w.wx ? w.wx.k : 'clear', wasN = w.wx ? w.wx.n : 0;
   weather(w, c);
+  if (w.lie) lieDay(w, c);
   if (w.blaze !== undefined) blazeDay(w, c, was, wasN);
   festDay(w, c);
   taleDay(w, c);
@@ -7262,7 +7263,35 @@ const SNOW_PROP = [ // what the children give a snowman named after someone, by 
   ['Finder', 'with a burnt stick held up like a torch'], ['Builder', 'with a stone axe stuck in its belly'],
   ['Fisher', 'with a dried fish for a nose'], ['Reaper', 'with a crown of straw'], ['Swift', 'with a wreath of holly where the oak leaves should be'], ['','with a beard of dry grass'],
 ];
-const snowOk = (w, c) => c.season === 3 && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'fog';
+const snowOk = (w, c) => c.season === 3 && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'fog' && (!w.lie || w.lie.d >= LIE_PLAY);
+
+// ---------- lying snow ----------
+// Snow settles and builds up over a snowy spell, holds through a cold snap and goes in a thaw: grey and patchy
+// first, then mud. Early winter is bare brown ground until the first fall; the last of it goes in spring.
+// The children only go out to the snowmen while there is snow on the ground, and a thaw slumps the snowmen.
+// w.lie { d depth (0..LIE_MAX), t deepest since the ground was last bare, f year of the first lying snow }
+export const LIE_MAX = 12;   // deepest it gets
+export const LIE_FULL = 6;   // at this depth the whole island is white; below it the ground shows through
+const LIE_PLAY = 3;          // enough to roll a snowman
+const LIE_FALL = 3;          // added each day of snow
+const LIE_THAW = { clear: 2, fog: 1, cold: 0, storm: 3, rain: 4, heat: 6, snow: 0 }; // lost each day, in winter
+const LIE_SPRING = 2;        // and this much more each day once winter is over
+function lieDay(w, c) {
+  const L = w.lie, k = w.wx.k, was = L.d;
+  if (k === 'snow') L.d = Math.min(LIE_MAX, L.d + LIE_FALL);
+  else L.d = Math.max(0, L.d - (LIE_THAW[k] ?? 2) - (c.season !== 3 && L.d ? LIE_SPRING : 0));
+  if (L.d > L.t) L.t = L.d;
+  if (was < LIE_PLAY && L.d >= LIE_PLAY && c.season === 3 && L.f !== c.year) {
+    L.f = c.year;
+    log(w, `The first snow of the winter settles on ${w.name}. By noon the green is white and the paths are trodden black.`, 'info');
+  }
+  if (!L.d && was) {
+    if (L.t >= LIE_FULL) log(w, c.season === 3
+      ? 'A thaw. The snow goes grey and then to mud, and only the drifts in the lee of the houses are left.'
+      : `The last of the snow is gone from the hollows. The ground on ${w.name} is bare and wet.`, 'info');
+    L.t = 0;
+  }
+}
 function learnSnow(w, c) {
   if (w.snow || c.season !== 3 || !w.wx || w.wx.k !== 'snow' || !w.techs.includes('fire')) return;
   const kids = w.people.filter((p) => !p.dead && ageY(w, p) >= 4 && ageY(w, p) < 14);
@@ -7326,7 +7355,7 @@ function snowDay(w, c) {
   for (const m of S.men) {
     const tt = tile(w, m.x, m.y);
     if (tt !== T.GRASS && tt !== T.SAND) { m.s = 0; m.m = 1; }
-    else if (c.season !== 3 && m.s > 0) { // spring: they slump, lean and shrink into the mud
+    else if ((c.season !== 3 || (w.lie && !w.lie.d)) && m.s > 0) { // spring or a thaw: they slump, lean and shrink into the mud
       if (!m.m) m.m = 1;
       if (rnd(w) < (SNOW_MELT[w.wx.k] ?? 0.4)) m.s--;
     }
@@ -8608,6 +8637,13 @@ const MIGRATIONS = {
   69: (w) => {
     if (w.wreck === undefined) w.wreck = null;
   },
+  // v70 -> v71: lying snow (w.lie). A world mid-winter starts under the snow it already has (deep if it is snowing now),
+  // so the map does not go bare at once; at any other time of year the ground is bare.
+  70: (w) => {
+    if (w.lie !== undefined) return;
+    const c = clock(w.t), k = w.wx ? w.wx.k : 'clear', d = c.season !== 3 ? 0 : k === 'snow' ? Math.min(LIE_MAX, LIE_FULL + LIE_FALL * (w.wx.n || 1)) : LIE_FULL;
+    w.lie = { d, t: d, f: d ? c.year : -1 };
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8633,7 +8669,7 @@ export function summary(w) {
     houses: w.buildings.filter((b) => b.progress >= 1 && isHouse(b)).length, fields: w.fields.length,
     granaries: w.buildings.filter((b) => b.progress >= 1 && b.kind === 'granary').length, safe: storeCap(w),
     births: w.stats.births, deaths: w.stats.deaths, peak: w.stats.peak,
-    weather: w.wx ? WEATHER[w.wx.k].name : 'clear', weatherDays: w.wx ? w.wx.n : 1,
+    weather: w.wx ? WEATHER[w.wx.k].name : 'clear', weatherDays: w.wx ? w.wx.n : 1, snowLie: w.lie ? w.lie.d : 0,
     roofsDown: w.buildings.filter((b) => b.dmg && isHouse(b)).length,
     wolves: (w.beasts || []).filter((b) => b.k === 'wolf').length, boars: (w.beasts || []).filter((b) => b.k === 'boar').length,
     afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,

@@ -10,6 +10,13 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
+// winter with no snow on the ground: dead grass, dark wet woods, grey sand
+const BARE = { grass: ['#56593f', '#62654a', '#4a4d36'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#b5a37c', '#c4b38e'], snow: 0 };
+// how much of the ground is under snow (0..1) and the palette for the whole scene and for one tile:
+// tiles go white one by one as the snow deepens and come back the same way in a thaw
+function snowCover() { return w.lie ? Math.min(1, w.lie.d / S.LIE_FULL) : clockNow().season === 3 ? 1 : 0; }
+function scenePal(season, cover) { return cover >= 0.5 ? PAL[3] : season === 3 ? BARE : PAL[season]; }
+function tilePal(season, cover, x, y) { return cover > 0 && S.hash(x, y, 97) < cover ? PAL[3] : season === 3 ? BARE : PAL[season]; }
 const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', race: '#f0f0a0', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c', stone: '#b9b4aa', weave: '#c9bfa8', brew: '#d9a650', vigil: '#b9b4aa' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
 // the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
@@ -394,8 +401,8 @@ function drawTide() {
   }
 }
 function drawTerrain() {
-  const c = clockNow();
-  const pal = PAL[c.season];
+  const c = clockNow(), cover = snowCover();
+  const pal = scenePal(c.season, cover);
   tc.clearRect(0, 0, PX, PX);
   surf = [];
   ashAt = new Map();
@@ -412,25 +419,26 @@ function drawTerrain() {
       }
       continue;
     }
+    const tp = tilePal(c.season, cover, x, y); // this tile under snow, or bare
     if (t === S.T.SAND) {
-      px(tc, X, Y, pal.sand[0], 8, 8);
-      for (let k = 0; k < 4; k++) { const hh = S.hash(x * 4 + k, y, 11); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, pal.sand[1]); }
+      px(tc, X, Y, tp.sand[0], 8, 8);
+      for (let k = 0; k < 4; k++) { const hh = S.hash(x * 4 + k, y, 11); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, tp.sand[1]); }
       continue;
     }
     // grass base for everything else
-    px(tc, X, Y, pal.grass[0], 8, 8);
-    for (let k = 0; k < 5; k++) { const hh = S.hash(x * 5 + k, y, 17); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, k < 3 ? pal.grass[1] : pal.grass[2]); }
+    px(tc, X, Y, tp.grass[0], 8, 8);
+    for (let k = 0; k < 5; k++) { const hh = S.hash(x * 5 + k, y, 17); px(tc, X + ((hh * 8) | 0), Y + ((hh * 64) | 0) % 8, k < 3 ? tp.grass[1] : tp.grass[2]); }
     const ash = ashAt.get(i);
-    if (ash) drawAsh(X, Y, x, y, ash, pal);
-    if (t === S.T.FOREST && S.isStool(w, i)) drawStool(X, Y, w.wood[i] / 12, pal, h);
-    else if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, pal, h);
-    else if (t === S.T.GRASS && w.wear && w.wear[i] >= S.WEAR_SEEN) drawPath(x, y, X, Y, w.wear[i], pal);
+    if (ash) drawAsh(X, Y, x, y, ash, tp);
+    if (t === S.T.FOREST && S.isStool(w, i)) drawStool(X, Y, w.wood[i] / 12, tp, h);
+    else if (t === S.T.FOREST) drawTree(tc, X, Y, w.wood[i] / 12, tp, h);
+    else if (t === S.T.GRASS && w.wear && w.wear[i] >= S.WEAR_SEEN) drawPath(x, y, X, Y, w.wear[i], tp);
   }
   // fields
   for (const f of w.fields) {
-    const X = f.x * TILE, Y = f.y * TILE;
-    px(tc, X, Y, pal.snow ? '#8a7f74' : '#5a3d24', 8, 8);
-    for (let r = 0; r < 4; r++) px(tc, X, Y + r * 2 + 1, pal.snow ? '#b9b2a8' : '#6e4b2c', 8, 1);
+    const X = f.x * TILE, Y = f.y * TILE, fp = tilePal(c.season, cover, f.x, f.y);
+    px(tc, X, Y, fp.snow ? '#8a7f74' : '#5a3d24', 8, 8);
+    for (let r = 0; r < 4; r++) px(tc, X, Y + r * 2 + 1, fp.snow ? '#b9b2a8' : '#6e4b2c', 8, 1);
     if (f.stage === 'planted') {
       const g = Math.max(1, Math.round(f.growth * 3));
       for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) px(tc, X + k * 2, Y + r * 2 + 2 - g, f.growth > 0.7 ? '#9bbf3c' : '#5fae47', 1, g);
@@ -441,7 +449,7 @@ function drawTerrain() {
     } else if (f.flat) { // storm-flattened grain lying in the mud
       for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
     }
-    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !pal.snow) { // mucked: dark forkfuls spread over the furrows
+    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !fp.snow) { // mucked: dark forkfuls spread over the furrows
       for (let k = 0; k < 7; k++) { const hh = S.hash(f.x * 7 + k, f.y * 3 + k, 83); px(tc, X + ((hh * 7) | 0), Y + ((((hh * 64) | 0) % 4) * 2) + 1, k & 1 ? '#2e2014' : '#3d2a19', 2, 1); }
     } else if (f.mk && f.stage === 'planted' && f.growth > 0.15) { // and the shoots on it come up a darker, richer green
       const g = Math.max(1, Math.round(f.growth * 3));
@@ -2653,7 +2661,8 @@ function updatePanels() {
   const s = S.summary(w), c = S.clock(w.t);
   const named = w.people.filter((p) => p.dd && p.dd.by).sort((a, b) => a.born - b.born);
   $('title').textContent = w.name;
-  const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '');
+  const lie = s.snowLie >= 9 ? 'snow lying deep' : s.snowLie >= S.LIE_FULL ? 'snow on the ground' : s.snowLie ? (s.weather === 'snow' ? 'the snow settling' : 'patchy snow') : '';
+  const sky = s.weather + (s.weather !== 'clear' && s.weatherDays > 1 ? ` (day ${s.weatherDays})` : '') + (lie ? `, ${lie}` : '');
   const lc = S.clock(Math.max(0, w.t - 1)); // the hour now under way (the island is worked out one hour ahead)
   $('when').innerHTML = `Year ${lc.year} · ${S.SEASONS[lc.season]}, day ${lc.dos} · ${String(lc.hour).padStart(2, '0')}:00 · <span class="wx ${wxNow()}">${sky}</span>` + (s.hour >= 18 || s.hour < 6 ? ` · <span class="m">${S.moonName(Math.max(0, s.hour < 6 ? c.day - 1 : c.day))}</span>` : '') + (s.rainbow ? ` · <span class="fest">a rainbow${s.rainbowChasers ? `, ${s.rainbowChasers === 1 ? 'a child runs' : `${s.rainbowChasers} children run`} to find its end` : ''}</span>` : '') + (s.stormCalled ? ` · <span class="bad">${esc(s.skyReader)} reads the sky: a storm by morning</span>` : '') + (s.festival ? ' · <span class="fest">midsummer fire</span>' : '') + (s.racing ? ` · <span class="fest">${s.racing} running the race</span>` : s.raceWin ? ` · <span class="fest">${esc(s.raceWin)} wears the oak wreath</span>` : '') + (s.blaze ? ' · <span class="bad">wildfire</span>' : '') + (s.raiders && s.raiders !== 'gone' ? ` · <span class="bad">${s.raiders === 'in' ? 'a dugout creeps in from the dark' : s.raiders === 'ashore' ? 'raiders at the granary' : s.raiders === 'flee' ? 'raiders driven off' : 'the raiders row away'}</span>` : '') + (S.taleNow(w, c) ? ` · <span class="fest">the longest night${s.teller ? `: ${esc(s.teller)} tells a tale` : ''}</span>` : '');
   $('res').innerHTML = resPanel([

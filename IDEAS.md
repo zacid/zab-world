@@ -737,3 +737,15 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Planks of split oak are better than adzed logs: a plank boat once the island has a castaway who knows how.
   - The Nameless graves could get a carved post on the beach where they were found.
 - Housekeeping: scripts/_wreck.mjs (wreck probe) could not be deleted either (gitignored).
+- Lying snow is done (SIM_VERSION 71; w.lie {d 0..LIE_MAX, t, f}; LIE_FULL/LIE_MAX exported; snowCover/scenePal/tilePal and the BARE
+  winter palette in render.js; only grass, sand, trees, stools, paths, ash and field ground are drawn per tile, everything else
+  switches on the scene palette at half cover). Snowmen need depth >= 3 and slump in a thaw. Answers it invites:
+  - Footprints and tracks in fresh snow: wolf and deer trails the hunters follow (hunts go better the morning after a snowfall).
+  - Deep snow slows walking off the paths (like fog) and keeps the goats in the pen on hay.
+  - Snow on roofs: a heavy fall can break an old roof; houses shovelled off; drifts against the lee walls drawn on the map.
+  - A sledge: children on the slope, and later timber and stone hauled on runners over the snow.
+  - Meltwater in the thaw tops up the spring (SPRING_GAIN from lying snow) and floods the low fields if a storm tide follows.
+  - Snow could fall in late autumn or early spring in rare cold years (WX_ODDS change; drifts the sun cannot reach).
+- Speed: check.mjs at 100 years ran ~1.9-2.3 s/yr averaged over the whole run here (pop 243-337 at Y100); the live world verifies at
+  ~1.1 s/yr. Worth a profiling pass on late-game years before more per-hour systems are added.
+- Housekeeping: scripts/_lie.mjs (snow probe) could not be deleted (gitignored).

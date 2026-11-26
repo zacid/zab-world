@@ -383,5 +383,10 @@
   "at": "2026-11-26T12:54:04.021Z",
   "title": "Add wrecks and castaways after autumn and winter gales",
   "body": "- SIM_VERSION 70 (w.wreck, p.cw, p.cf; tech 'wreck', task 'wreck', deed `c`): from year 6 an autumn or winter storm can leave a plank wreck on a far beach (5% per storm day, at most 25%, 4+ years apart)\n- At 07:00 the next day the first islander out finds it and the nearest one runs with them. A castaway still alive (70%) must be reached before the cold takes them (12-23 h in winter, 18-31 h in autumn), then is carried to the healer's fire at 2 tiles/h, through the night if need be. The dead are buried as \"Nameless\"\n- Survivors stay with a foreign name and an amber bead, laid up 14 days. A year later they tell where they came from (chronicle line, life card). Planks give 14-24 timber after 3 days; the keel and ribs stay on the sand\n- The old invisible \"washes ashore at the hearth\" castaway now only comes when fewer than 12 people are left\n- Watch: Hais is in its Y12 autumn, so a wreck could come with any gale this winter. Probes saw 4-6 wrecks in 35-40 years, about half carried in alive"
+ },
+ {
+  "at": "2026-11-26T17:16:58.869Z",
+  "title": "Add lying snow that builds up in snowfalls and thaws",
+  "body": "- SIM_VERSION 71 (w.lie {d depth 0..12, t deepest since bare, f year of first snow}; lieDay, LIE_* in sim.js; summary `snowLie`): each snow day adds 3, a clear day melts 2, rain 4, a cold snap holds it, and spring melts it fast\n- Winter is no longer white all season: the ground is dead brown grass until the first fall, tiles turn white one by one as the snow deepens and come back patchy in a thaw (BARE palette, snowCover/tilePal in render.js)\n- Snowmen need snow on the ground (depth 3+) and slump in a midwinter thaw, not only in spring\n- The top line shows \"snow lying deep\", \"snow on the ground\" or \"patchy snow\"; the chronicle notes the first snow of each winter and each thaw\n- Live world migrates at full cover (it is mid-winter); expect 2-4 thaws a winter and bare early-winter weeks"
  }
 ]
