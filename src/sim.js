@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 71;
+export const SIM_VERSION = 72;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -97,6 +97,7 @@ export const TECHS = {
   ale:      { name: 'Ale', added: '2026-11-26T06:44Z', desc: 'Grain that gets wet in the jar sprouts; dried by the fire, cracked on a flat stone and steeped in hot water, it turns sweet, and a few days later it froths and turns to ale. One brewer keeps a wooden vat against the wall of their house and mashes a sack of the spare grain whenever the jugs run low. Ale is poured at midsummer and on the night the last sheaf comes in, the harvest home, when the whole village sits up late round the hearth. When the spring fails the children drink small ale and fewer skins have to come in from the pool. Ale goes sour in the summer heat, and a jug too many can turn words into blows.', req: ['pottery'] },
   well:     { name: 'The well', added: '2026-11-26T11:43Z', desc: 'The water of the spring does not come from the stones but up from under them. Once the spring has failed, it is dug down in the dry of the year while the water is low: one islander in the shaft with a digging stick, another hauling up the clay in a basket, the sides lined ring on ring with round stones from the beach. A ring is dug in a summer when the water gets down near the bottom, four at most before the rock. Each ring lets the spring fall further before there is only mud, and past two rings a sweep pole on a forked post dips the bucket. A wet side can slump in on the digger. More mouths draw it down faster, and in a long hot summer the deepest well can still go dry.', req: ['drought'] },
   wreck:    { name: 'Castaways', added: '2026-11-26T12:19Z', desc: 'Some autumn and winter gales out of the open sea throw up more than weed: the broken planks of a boat from no shore anyone on the island knows, and now and then someone still alive among them, face down in the surf and blue with cold. The morning after, whoever walks the beach first runs for help, and two of them carry the stranger up between them to the herb-healer\'s fire. Out on the sand in winter the cold kills in hours, so a long walk can come too late; the drowned are buried with the island\'s own. Those who live stay. For a year they have only their own name and a few island words; after that they can tell where the sea took them from. The planks are dragged up above the tide line and the ribs of the boat are left on the sand.', req: ['fishing'] },
+  tracks:   { name: 'Tracks in the snow', added: '2026-11-26T17:34Z', desc: 'Once the snow stops falling, everything that walks on the island writes it down: the paired slots of deer, the round pads of wolves, the trough a boar ploughs. The prints can be read for a day and a half, until new snow fills them or a thaw takes them. At first light the best hunter goes out to read them. Wolf prints right up to the doors or the goat pen mean the pack came in close in the night, and the village keeps by the houses and is in by mid-afternoon. A hunt that sets out while the prints are fresh follows them straight to the beast and comes home with it more often, and the deer can be hunted on a fresh trail in winter too.', req: ['hunting'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -603,7 +604,7 @@ export function genesis(seed, epoch) {
     learned: { fire: 0, shelter: 0, gather: 0, farming: 0, woodcut: 0 },
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
-    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 }, lie: { d: 0, t: 0, f: -1 },
+    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 }, lie: { d: 0, t: 0, f: -1 }, trk: { pr: [], n: 0, t: 0, k: 0, wl: null, ww: null },
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
@@ -1997,6 +1998,7 @@ function prowl(w, c) {
     else if (b.k === 'bear') bear(w, b, c, storm);
     else boar(w, b, boarOut);
   }
+  if (w.trk) trackHour(w, c);
   if (h === 6 && !F.hit && F.turned && !F.held) {
     F.held = 1;
     milestone(w, `Boars snuffle along the new fences all night and find no way in. In the morning the grain stands untouched.`);
@@ -3619,7 +3621,7 @@ function quarry(w, c) {
   if (L && L.at && (L.g || L.b || L.k)) return 'lone'; // once it has drawn blood, every hunt goes after the lone wolf
   if (F.den && wolves >= HUNT_KEEP && (c.season === 3 || F.fear > w.t)) return 'wolf';
   if (F.lair && boars >= HUNT_KEEP) return 'boar';
-  if (F.mead && deer >= DEER_KEEP && c.season === 2 && !(F.dy && F.dy[0] === c.year && F.dy[1] >= DEER_YEAR)) return 'deer'; // the autumn deer hunt, when they are fat from summer grass
+  if (F.mead && deer >= DEER_KEEP && (c.season === 2 || (c.season === 3 && trailOf(w, 'deer'))) && !(F.dy && F.dy[0] === c.year && F.dy[1] >= DEER_YEAR)) return 'deer'; // the autumn deer hunt, when they are fat from summer grass
   return null;
 }
 // can a hunter setting out now reach the lair and finish before the village comes in for the evening?
@@ -3651,7 +3653,10 @@ function strike(w, p, t) {
   const herd = w.beasts.filter((b) => b.k === q);
   if (herd.length < (q === 'deer' ? DEER_KEEP : HUNT_KEEP)) return;
   const mate = w.people.find((o) => o !== p && !o.dead && o.task && o.task.key === 'h1' && d2(o.x, o.y, p.x, p.y) < 9);
-  const odds = (q === 'boar' ? 0.5 : q === 'deer' ? 0.45 : 0.35) * (mate ? 1 : 0.55);
+  const trail = trailOf(w, q); // fresh prints in the snow lead them straight to it
+  const odds = (q === 'boar' ? 0.5 : q === 'deer' ? 0.45 : 0.35) * (mate ? 1 : 0.55) * (trail ? TRK_ODDS : 1);
+  const onTrail = trail ? ` ${mate ? 'They' : p.sex === 'f' ? 'She' : 'He'} followed the prints in the fresh snow straight to it.` : '';
+  if (trail) w.trk.t++;
   const harm = (q === 'boar' ? 0.08 : q === 'deer' ? 0.02 : 0.1) * (mate ? 1 : 2);
   const r = rnd(w), who = mate ? `${p.name} and ${mate.name}` : p.name;
   if (q === 'deer') {
@@ -3664,7 +3669,8 @@ function strike(w, p, t) {
       F.sd = (F.sd || 0) + 1;
       const yr = clock(w.t).year;
       F.dy = F.dy && F.dy[0] === yr ? [yr, F.dy[1] + 1] : [yr, 1];
-      const text = `${who} ${mate ? 'creep' : 'creeps'} up through the long grass downwind and ${mate ? 'bring' : 'brings'} down a deer.`;
+      if (trail) w.trk.k++;
+      const text = `${who} ${mate ? 'creep' : 'creeps'} up ${trail ? 'through the snow' : 'through the long grass'} downwind and ${mate ? 'bring' : 'brings'} down a deer.${onTrail}`;
       if (F.sd === 1) milestone(w, `${text} The first venison on ${w.name}; the hide is pegged out to dry and the bones are kept for needles.`);
       else log(w, text, 'good');
       deed(w, p, 'd'); deed(w, mate, 'd');
@@ -3681,9 +3687,10 @@ function strike(w, p, t) {
     w.stats.yk = (w.stats.yk || 0) + 1;
     p.haul = q;
     const n = q === 'boar' ? (F.sb = (F.sb || 0) + 1) : (F.sw = (F.sw || 0) + 1);
-    const text = q === 'boar'
+    if (trail) w.trk.k++;
+    const text = (q === 'boar'
       ? `${who} ${mate ? 'spear' : 'spears'} a boar in its wallow and ${mate ? 'carry' : 'drags'} it home.`
-      : `${who} ${mate ? 'track' : 'tracks'} the pack to its den and ${mate ? 'kill' : 'kills'} a wolf. Its pelt will hang by the fire.`;
+      : `${who} ${mate ? 'track' : 'tracks'} the pack to its den and ${mate ? 'kill' : 'kills'} a wolf. Its pelt will hang by the fire.`) + onTrail;
     if (n === 1) milestone(w, q === 'boar' ? `${text} The first boar taken on ${w.name}; there is roast pork at the fire tonight.` : `${text} The first wolf ever slain on ${w.name}.`);
     else log(w, text, 'good');
     const dk = q === 'boar' ? 'b' : 'w';
@@ -7302,6 +7309,84 @@ function learnSnow(w, c) {
   milestone(w, `The snow lies knee-deep and the houses are full of smoke and squabbling, so the children are sent out to the green. ` +
     `${a.name} and ${b.name} pack a snowball, roll it until it will not move, and heave a second one on top. By dusk a white figure stands by the hearth with pebble eyes and a stick for a nose, and the children of ${w.name} build snowmen every winter from now on.`);
 }
+
+// ---------- tracks in the snow ----------
+// Snow that has stopped falling keeps every step. While it lies, each beast that moves leaves a line of prints
+// that can be read for a day and a half, until the next fall covers it or a thaw takes it. At first light the
+// best hunter out reads them: wolf prints close by the houses or the goat pen mean the pack came in during the
+// night, and the village keeps close from mid-afternoon; a hunt while the prints are fresh follows them
+// straight to the beast. w.trk { pr [[beast id, x0, y0, x1, y1 (quarter tiles), kind, tick]] oldest first,
+// n wolf warnings, t hunts on a trail, k beasts taken on one, wl tick of the last warning, ww where it was }
+const TRK_AGE = 36;          // hours a print stays readable
+const TRK_MAX = 240;         // stretches of trail kept at once
+const TRK_KIND = { wolf: 0, boar: 1, deer: 2, lone: 3, bear: 4 };
+const TRK_READ = 7;          // the hour they are read
+const TRK_NIGHT = 11;        // wolf prints made in the dark, from this many hours before the reading
+const TRK_NEAR = 3 * 3;      // wolf prints this close (squared) to a house or the pen are a warning
+const TRK_GAP = 20;          // days between warnings (two or so a winter: the pack is always about, it is news when it comes right in)
+const TRK_FEAR = 17;         // hours the village keeps close after a warning (till midnight)
+const TRK_ODDS = 1.4;        // a hunt on a fresh trail
+export const trkFresh = (w) => !!(w.lie && w.lie.d >= LIE_PLAY && w.wx && w.wx.k !== 'snow');
+function trackHour(w, c) {
+  const K = w.trk;
+  if (!trkFresh(w)) { if (K.pr.length) K.pr = []; return; } // falling snow fills them in; a thaw takes them
+  while (K.pr.length && K.pr[0][6] < w.t - TRK_AGE) K.pr.shift();
+  for (const b of w.beasts) {
+    const k = TRK_KIND[b.k];
+    if (k === undefined || (b.x === b.px && b.y === b.py) || tile(w, Math.floor(b.x), Math.floor(b.y)) === T.WATER) continue;
+    K.pr.push([b.id, Math.round(b.px * 4), Math.round(b.py * 4), Math.round(b.x * 4), Math.round(b.y * 4), k, w.t]);
+  }
+  while (K.pr.length > TRK_MAX) K.pr.shift();
+  if (c.hour === TRK_READ) trackRead(w);
+}
+// the one who reads them: whoever has taken the most beasts, the eldest of them if none has
+function trackReader(w) {
+  let best = null, bs = -1;
+  for (const p of w.people) {
+    if (p.dead || p.sick || p.hurt) continue;
+    const a = ageY(w, p);
+    if (a < 14 || a >= 65) continue;
+    const s = p.dd ? (p.dd.w || 0) + (p.dd.b || 0) + (p.dd.d || 0) : 0;
+    if (s > bs || (s === bs && p.born < best.born)) { best = p; bs = s; }
+  }
+  return best;
+}
+function trackRead(w) {
+  const K = w.trk, F = w.fauna;
+  if (!K.pr.length || !w.techs.includes('hunting')) return;
+  const R = trackReader(w);
+  if (!R) return;
+  const she = R.sex === 'f' ? 'She' : 'He';
+  // last night's wolf prints near the houses or the pen
+  const spots = [];
+  if (w.goats && w.goats.pen) spots.push({ x: w.goats.pen.x + 1, y: w.goats.pen.y + 1, what: 'the goat pen' });
+  for (const b of w.buildings) if (isHouse(b) && b.progress >= 1) spots.push({ x: b.x + 0.5, y: b.y + 0.5, what: 'the doors' });
+  let near = null;
+  for (const e of K.pr) {
+    if ((e[5] !== 0 && e[5] !== 3) || e[6] < w.t - TRK_NIGHT || e[6] > w.t - 2) continue; // 20:00 to 05:00
+    near = spots.find((s) => d2(e[3] / 4, e[4] / 4, s.x, s.y) < TRK_NEAR);
+    if (near) break;
+  }
+  if (!w.techs.includes('tracks')) {
+    w.techs.push('tracks');
+    const seen = [];
+    if (K.pr.some((e) => e[5] === 2)) seen.push('the paired slots of deer along the meadow edge');
+    if (K.pr.some((e) => e[5] === 0 || e[5] === 3)) seen.push(`the round four-toed pads of wolves in a line out of the trees${near ? ` and right up to ${near.what}` : ''}`);
+    if (K.pr.some((e) => e[5] === 1)) seen.push('the deep scuffed trough a boar leaves');
+    if (K.pr.some((e) => e[5] === 4)) seen.push('a bear\'s broad prints, each as long as a forearm');
+    milestone(w, `The snow stopped before dawn. ${R.name} is first out of doors and finds ${w.name} written over in the night: ` +
+      `${seen.length > 1 ? seen.slice(0, -1).join(', ') + ' and ' + seen[seen.length - 1] : seen[0]}. ` +
+      `${she} follows one line until the prints are so fresh the snow is still crumbling at their edges. ${w.name} learns to read tracks in the snow.`);
+  }
+  if (!near || (K.wl != null && w.t - K.wl < TRK_GAP * TICKS_PER_DAY)) return;
+  K.wl = w.t; K.n++; K.ww = { x: Math.floor(near.x), y: Math.floor(near.y) };
+  F.fear = Math.max(F.fear, w.t + TRK_FEAR);
+  log(w, K.n === 1
+    ? `Wolf prints in the new snow, right up to ${near.what} and away again. ${R.name} crouches over them at first light: the pack came in close while everyone slept. Nobody goes far from the houses today, and everyone is in by mid-afternoon with the doors barred.`
+    : `Wolf prints again by ${near.what} in the morning snow. ${R.name} reads them and the village keeps close till dark.`, 'bad');
+}
+// is there a fresh trail of this beast to follow?
+const trailOf = (w, q) => !!(w.trk && trkFresh(w) && w.techs.includes('tracks') && w.trk.pr.some((e) => e[5] === TRK_KIND[q] && e[6] >= w.t - 24));
 function snowSite(w) {
   const S = w.snow;
   for (let tries = 0; tries < 14; tries++) {
@@ -8644,6 +8729,10 @@ const MIGRATIONS = {
     const c = clock(w.t), k = w.wx ? w.wx.k : 'clear', d = c.season !== 3 ? 0 : k === 'snow' ? Math.min(LIE_MAX, LIE_FULL + LIE_FALL * (w.wx.n || 1)) : LIE_FULL;
     w.lie = { d, t: d, f: d ? c.year : -1 };
   },
+  // v71 -> v72: tracks in the snow (w.trk). The snow lying now carries no prints yet; they start with the next hour.
+  71: (w) => {
+    if (w.trk === undefined) w.trk = { pr: [], n: 0, t: 0, k: 0, wl: null, ww: null };
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8670,6 +8759,9 @@ export function summary(w) {
     granaries: w.buildings.filter((b) => b.progress >= 1 && b.kind === 'granary').length, safe: storeCap(w),
     births: w.stats.births, deaths: w.stats.deaths, peak: w.stats.peak,
     weather: w.wx ? WEATHER[w.wx.k].name : 'clear', weatherDays: w.wx ? w.wx.n : 1, snowLie: w.lie ? w.lie.d : 0,
+    tracks: w.techs.includes('tracks'), trackPrints: w.trk && trkFresh(w) ? w.trk.pr.length : 0, trackWarns: w.trk ? w.trk.n : 0,
+    trackHunts: w.trk ? w.trk.t : 0, trackTaken: w.trk ? w.trk.k : 0,
+    trackWarnNow: !!(w.trk && w.trk.wl != null && w.t - w.trk.wl < TRK_FEAR && w.fauna && w.fauna.fear > w.t),
     roofsDown: w.buildings.filter((b) => b.dmg && isHouse(b)).length,
     wolves: (w.beasts || []).filter((b) => b.k === 'wolf').length, boars: (w.beasts || []).filter((b) => b.k === 'boar').length,
     afraid: !!(w.fauna && w.fauna.fear > w.t), hurt: w.people.filter((p) => p.hurt).length,

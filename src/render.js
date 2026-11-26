@@ -496,6 +496,7 @@ function drawTerrain() {
   drawHives(pal);
   drawPit(pal);
   drawSpring(pal);
+  drawTracks(c, cover);
   drawSnowmen();
   drawWhales();
   drawWrecks();
@@ -1133,6 +1134,33 @@ function wreckSpots() {
   for (const h of W.hulks) out.push({ ...at(h), o: h, old: true });
   if (W.cur) out.push({ ...at(W.cur), o: W.cur, old: false });
   return out;
+}
+// tracks in the snow: a dotted line of prints behind every beast since the snow stopped, fading over a day and
+// a half. Wolves leave staggered pads, deer neat paired slots, a boar a dragged trough, a bear big blots.
+const TRACK_COL = [[66, 76, 90], [84, 66, 50], [104, 88, 74], [66, 76, 90], [58, 50, 44]];
+function drawTracks(c, cover) {
+  if (!w.trk || !w.trk.pr.length || !S.trkFresh(w)) return;
+  for (const e of w.trk.pr) {
+    const [, x0, y0, x1, y1, k, t] = e, age = w.t - t;
+    const [r, g, b] = TRACK_COL[k], al = age < 12 ? 0.7 : age < 24 ? 0.48 : 0.28;
+    const col = `rgba(${r},${g},${b},${al})`;
+    const X0 = x0 * 2, Y0 = y0 * 2, dx = x1 * 2 - X0, dy = y1 * 2 - Y0; // quarter tiles to pixels
+    const len = Math.sqrt(dx * dx + dy * dy), n = Math.floor(len / (k === 2 ? 2.5 : 3));
+    const side = Math.abs(dx) > Math.abs(dy); // stagger the prints across the line of travel
+    for (let s = 1; s <= n; s++) {
+      const X = Math.round(X0 + (dx * s) / n), Y = Math.round(Y0 + (dy * s) / n);
+      const tx = X >> 3, ty = Y >> 3;
+      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+      const tt = w.tiles[ty * N + tx];
+      if (tt !== S.T.GRASS && tt !== S.T.SAND) continue; // under the trees and on the fields the snow is broken anyway
+      if (!tilePal(c.season, cover, tx, ty).snow) continue; // bare ground keeps no print
+      const o = (s + e[0]) & 1 ? 1 : -1, ox = side ? 0 : o, oy = side ? o : 0;
+      if (k === 4) px(tc, X + ox, Y + oy, col, 2, 2);
+      else if (k === 1) px(tc, X, Y, col, side ? 3 : 1, side ? 1 : 3);
+      else if (k === 2) { px(tc, X + ox, Y + oy, col); px(tc, X + ox + (side ? 1 : 0), Y + oy + (side ? 0 : 1), col); }
+      else px(tc, X + ox, Y + oy, col);
+    }
+  }
 }
 function drawWrecks() {
   for (const s of wreckSpots()) {
@@ -2717,7 +2745,7 @@ function updatePanels() {
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
     ...(s.stones ? [['stones', 'Stones', `${s.stoneHauling ? `<span class="fest">${s.stoneHauling} on the ropes, the stone for ${esc(s.stoneHaul)}</span> · ` : ''}${s.vigilNow ? `<span class="fest">${esc(s.vigilNow)} sitting the night out</span> · ` : ''}${s.stonesUp} <span class="m">of ${S.STONE_RING.length} standing${s.stoneHaul && !s.stoneHauling ? ` · the stone for ${esc(s.stoneHaul)} is on its way` : ''}${s.stoneFeet ? ` · ${s.stoneFeet} ${s.stoneFeet === 1 ? 'foot' : 'feet'} crushed` : ''}${s.vigil ? ` · ${s.vigilSat} grown by a night there${s.vigilRan ? `, ${s.vigilRan} ran home` : ''}` : ''}</span>${s.vigilShy.length ? ` <span class="m">·</span> ${esc(s.vigilShy.join(', '))} <span class="m">must sit it again</span>` : ''}`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
-    ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
+    ...(s.hunting ? [['hunt', 'Hunt', `${s.trackWarnNow ? '<span class="bad">wolf prints by the houses: everyone in early</span> · ' : s.tracks && s.trackPrints ? '<span class="fest">fresh tracks in the snow</span> · ' : ''}${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})${s.tracks && (s.trackWarns || s.trackHunts) ? ` · tracks read: ${s.trackWarns} ${s.trackWarns === 1 ? 'warning' : 'warnings'}, ${s.trackTaken} of ${s.trackHunts} ${s.trackHunts === 1 ? 'hunt' : 'hunts'} on a trail` : ''}</span>`]] : []),
   ]);
   const kinds = { major: 'maj', bad: 'bad', good: 'good', birth: 'good', death: 'm', love: 'love', year: 'm', info: '' };
   $('log').innerHTML = w.log.slice(-40).reverse().map((e) => `<div class="${kinds[e.k] || ''}"><span class="when">${e.s}</span>${e.text}</div>`).join('');

@@ -388,5 +388,10 @@
   "at": "2026-11-26T17:16:58.869Z",
   "title": "Add lying snow that builds up in snowfalls and thaws",
   "body": "- SIM_VERSION 71 (w.lie {d depth 0..12, t deepest since bare, f year of first snow}; lieDay, LIE_* in sim.js; summary `snowLie`): each snow day adds 3, a clear day melts 2, rain 4, a cold snap holds it, and spring melts it fast\n- Winter is no longer white all season: the ground is dead brown grass until the first fall, tiles turn white one by one as the snow deepens and come back patchy in a thaw (BARE palette, snowCover/tilePal in render.js)\n- Snowmen need snow on the ground (depth 3+) and slump in a midwinter thaw, not only in spring\n- The top line shows \"snow lying deep\", \"snow on the ground\" or \"patchy snow\"; the chronicle notes the first snow of each winter and each thaw\n- Live world migrates at full cover (it is mid-winter); expect 2-4 thaws a winter and bare early-winter weeks"
+ },
+ {
+  "at": "2026-11-26T17:59:10.665Z",
+  "title": "Add tracks in the snow that wolves leave and hunters follow",
+  "body": "- SIM_VERSION 72 (w.trk {pr stretches of trail, n warnings, t/k trail hunts and kills, wl, ww}; tech 'tracks', trkFresh/trackHour/trackRead in sim.js): once snow stops falling, every moving wolf, boar, deer, lone wolf or bear leaves prints that last 36 h, until new snow or a thaw clears them\n- At 07:00 the best hunter reads them. Wolf prints from the night within 3 tiles of a door or the goat pen keep the village in from mid-afternoon (at most one warning every 20 days, about 2-3 a winter)\n- A hunt on a fresh trail has 1.4x the odds, and deer can be hunted in winter on a fresh trail (herd floors unchanged)\n- Map: dotted trails on snow-covered grass and sand, fading with age (drawTracks in render.js); the Hunt row shows \"fresh tracks in the snow\" or the wolf warning\n- Watch: Hais is under deep snow now, so the first clear morning should bring the discovery; its herds are at the hunting floor, so expect warnings rather than trail hunts"
  }
 ]

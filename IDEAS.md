@@ -749,3 +749,19 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
 - Speed: check.mjs at 100 years ran ~1.9-2.3 s/yr averaged over the whole run here (pop 243-337 at Y100); the live world verifies at
   ~1.1 s/yr. Worth a profiling pass on late-game years before more per-hour systems are added.
 - Housekeeping: scripts/_lie.mjs (snow probe) could not be deleted (gitignored).
+- Tracks in the snow are done (SIM_VERSION 72; w.trk {pr [[id, x0, y0, x1, y1 quarter tiles, kind, tick]], n, t, k, wl, ww};
+  TRK_* and trkFresh/trackHour/trackRead/trailOf in sim.js, drawTracks in render.js). Wolf warnings set fauna.fear for the day.
+  Answers it invites:
+  - At year end the herds sit just under the hunting floor (2 wolves, 2 boars, 3 deer vs HUNT_KEEP 3, DEER_KEEP 4) on every seed:
+    spring young are hunted back down by autumn, so a winter hunt on a trail is rare (4 in 40 years on seed 4242). A winter that
+    starts with a bigger pack (a wolf crossing the ice from the far isle?) would put trail hunts on screen.
+  - Follow a trail to the den: after a warning, two hunters track the pack home through the snow and find the den moved closer.
+  - Children's footprints and the trodden black paths could be drawn the same way; a lost child found by following prints.
+  - w.trk.ww (where the last warning was) is saved but not drawn yet: a marker or tooltip on the map there.
+- Speed, measured properly: this machine runs the job under a 50% CPU quota (cgroup cpu.max 50000/100000), so wall-clock
+  timings from check.mjs and verify.mjs are about 2x real. On a seed-4242 world at Y85 (223 people) real CPU was ~1.8 s/yr
+  including GC and compiler threads (wall 3.6 s). Use process.cpuUsage() when benchmarking here. The cost is spread over act()
+  (~45%, every person every hour), pickTask (~12%) and GC (~15%); there is no single hot spot left. Sleepers at night still run
+  the whole of act() each hour, which is the obvious next cut.
+- Housekeeping: probes scripts/_prof, _top, _lines, _shape, _inst, _heap, _gcsum, _gct, _spike, _cg, _trk.mjs and
+  scripts/.prof/ could not be deleted (gitignored).
