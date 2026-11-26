@@ -4,6 +4,7 @@ world/
 scripts/.prof*/
 *.cpuprofile
 scripts/_*.mjs
+scripts/.*.mjs
 
 
 LAST_RUN.md
