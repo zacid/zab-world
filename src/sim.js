@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 65;
+export const SIM_VERSION = 66;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -92,6 +92,7 @@ export const TECHS = {
   peacecup: { name: 'The peace cup', added: '2026-11-25T20:06Z', desc: 'At midsummer or on the longest night the eldest who is not of either house brings the two heads of a feud into the firelight and makes them drink from one bowl, mead if there is any, in front of everyone. Once it has worked, it is the custom: a quarrel is brought to the next gathering and nearly always ended there, and fewer of them come to blows while they last. Often a match between the two houses seals it.', req: ['feud', 'midsummer'] },
   incomers: { name: 'Incomers', added: '2026-11-25T20:38Z', desc: 'The far isle is small and stony, and some springs a household there has nothing left to stay for: a thin year that ate the seed grain, a house burnt in the winter, a husband lost at sea, a match a father will not allow. They load their dugout with bundles and a pot of embers and come over by day. While the granaries are full and the island has room, the eldest takes them in. They sleep where there is space until a house is raised for them, their dugout is broken up for its roof-beams, and their children grow up to marry island children.', req: ['farisle'] },
   loom:     { name: 'Spinning and weaving', added: '2026-11-25T21:44Z', desc: 'Each spring, when the goats moult, the herder combs the loose winter coats out of them with a bone comb. The children and the old spin the hair into yarn on drop spindles, a stone whorl twirling on a thread, in every idle moment. One weaver keeps an upright loom against the wall of their house, the warp threads pulled straight by hanging weights, and on winter days and wet days the cloth grows on it a finger at a time. A blanket on every bed means a house keeps warm on less firewood, and the cold reaches the small and the old less hard. Blankets wear through in a few years and have to be woven again.', req: ['goats'] },
+  surge:    { name: 'Storm tides', added: '2026-11-26T00:44Z', desc: 'Twice a month, at new moon and full moon, the tide runs higher than on other days. When a gale out of the sea comes on top of such a tide, the water does not stop at the sand: it pours over the low ground behind the beach, through the hedges and over the nearest fields. In a day it drains away, and leaves the earth grey and crusted with salt. Grain sown in it comes up yellow and dies, so a drowned field lies bare until enough rain has fallen to wash the salt back out, most of a year. The tide line is left heaped with wrack and driftwood. Nobody has an answer for it yet.', req: ['farming'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -602,7 +603,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -682,7 +683,7 @@ const personShape = (o) => ({
 });
 const fieldShape = (o) => ({
   id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
-  lost: o.lost, root: o.root, flat: o.flat, mk: o.mk, fence: o.fence, hg: o.hg,
+  lost: o.lost, root: o.root, flat: o.flat, mk: o.mk, fence: o.fence, hg: o.hg, sa: o.sa, sw: o.sw,
 });
 const buildingShape = (o) => ({ id: o.id, kind: o.kind, x: o.x, y: o.y, progress: o.progress, hands: o.hands, dmg: o.dmg, tie: o.tie, burnt: o.burnt });
 // rebuild a list loaded from JSON in the shared shape, keeping any key the shape does not know about
@@ -827,7 +828,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}), ...(w.surge && w.surge.yt ? { tides: w.surge.yt, ...(w.surge.y ? { salted: w.surge.y } : {}) } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -845,6 +846,7 @@ function daily(w, c, fx) {
     if (w.quarrel) w.quarrel.y = w.quarrel.yf = 0;
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
+    if (w.surge) w.surge.y = w.surge.yt = 0;
     if (w.bear) w.bear.yr = 0;
     if (w.wade) w.wade.y = 0;
     if (w.smudge) w.smudge.y = 0;
@@ -875,6 +877,7 @@ function daily(w, c, fx) {
   if (w.stones !== undefined) stoneDay(w, c);
   if (w.wade !== undefined) wadeDay(w, c);
   const wx = w.wx.k;
+  if (w.surge !== undefined) surgeDay(w, c, wx);
   if (w.raid) raidNight(w, c, wx);
   if (w.raid && !w.watch && w.raid.n >= WATCH_RAIDS && raidSeason(c)) learnWatch(w);
   if (w.watch && !w.moon && w.watch.n >= MOON_WATCH && raidSeason(c) && moonLight(c.day) === 15) learnMoon(w, c);
@@ -1122,6 +1125,118 @@ function storm(w) {
       else { b.progress = 0.75; b.dmg = 1; b.tie = undefined; s.r++; }
     }
   }
+}
+
+// ---------- storm tides ----------
+// w.surge { n tides, k fields drowned in all, y this year, s fields salted now, g driftwood, last tick, nm who saw the first, at };
+// f.sa wet days still needed to wash the salt out, f.sw tick the sea came over it. A storm day at a spring tide (new or full
+// moon) can drive the sea over the low fields behind the beach; nothing is sown in them until the rain has washed them clean.
+const SURGE_YEAR = 3;        // never in the first years
+const SURGE_P = 0.06;        // chance per storm day at a spring tide (~1 tide in 4 years)
+const SURGE_LEVEL = 230;     // how high the sea comes, on the seaReach() scale (sand lies below 200), plus up to SURGE_VAR
+const SURGE_VAR = 80;
+const SURGE_LONG = 50;      // higher again once the storm has blown 3 days
+const SURGE_SHARE = 4;       // it drowns at most a quarter of the fields (at least 3, if that many lie low)
+const SURGE_DRIFT = 6;       // driftwood off the tide line, plus up to as much again
+const SURGE_WET = 30;        // hours the low ground lies under sea water
+const SURGE_GAP = 10;        // days before the next spring tide can bring the sea over again
+const SURGE_BOAT = 0.5;    // chance the dugout, drawn up on the landing, is taken by the tide
+const SALT_WASH = 45;        // wet days (rain, storm, snow) to wash a drowned field clean, plus up to SALT_MORE
+const SALT_MORE = 25;
+const SURGE_WRACK = 4;       // driftwood picked off the tide line per drowned field
+export const springTide = (day) => { const a = moonAge(day); return a <= 1 || a >= MOON_DAYS - 1 || (a >= 14 && a <= 16); };
+// For every tile, the lowest sea (in thousandths of the land height genesis drew the island from) at which the water
+// can run to it from the shore without climbing anything higher. Sand lies below 200. The ground and the sea never
+// change, so it is worked out once per world and kept in the cache.
+export function seaReach(w) {
+  const c = cacheOf(w);
+  if (c.reach) return c.reach;
+  const N = MAP * MAP, H = new Int16Array(N), R = new Int16Array(N).fill(32767), B = [];
+  for (let l = 0; l <= 1000; l++) B.push([]);
+  for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
+    const dx = (x - 31.5) / 29, dy = (y - 31.5) / 29, s = w.seed;
+    const n = vnoise(x, y, 16, s) * 0.6 + vnoise(x, y, 6, s + 1) * 0.3 + vnoise(x, y, 3, s + 2) * 0.1;
+    const h = 1 - Math.sqrt(dx * dx + dy * dy) * 1.1 + (n - 0.5) * 0.6, i = idx(x, y);
+    H[i] = Math.max(0, Math.min(1000, Math.round(h * 1000)));
+    if (w.tiles[i] === T.WATER) { R[i] = 0; B[0].push(i); }
+  }
+  for (let l = 0; l <= 1000; l++) {
+    const b = B[l];
+    for (let k = 0; k < b.length; k++) {
+      const i = b[k];
+      if (R[i] !== l) continue;
+      const x = i % MAP, y = (i / MAP) | 0;
+      for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + ax, ny = y + ay;
+        if (!inMap(nx, ny)) continue;
+        const j = idx(nx, ny), nl = Math.max(l, H[j]);
+        if (nl < R[j]) { R[j] = nl; B[nl].push(j); }
+      }
+    }
+  }
+  c.reach = R;
+  return R;
+}
+function surgeDay(w, c, wx) {
+  if (w.surge && w.surge.s) saltWash(w, w.surge, wx);
+  if (wx !== 'storm' || c.year < SURGE_YEAR || !springTide(c.day) || !w.fields.length) return;
+  if (w.surge && w.t - w.surge.last < SURGE_GAP * TICKS_PER_DAY) return; // one tide to a spring tide
+  if (rnd(w) >= SURGE_P) return;
+  const lv = SURGE_LEVEL + ri(w, SURGE_VAR) + (w.wx.n >= 3 ? SURGE_LONG : 0), R = seaReach(w), near = [];
+  for (const f of w.fields) if (f.sa == null && R[idx(f.x, f.y)] <= lv) near.push(f);
+  near.sort((a, b) => R[idx(a.x, a.y)] - R[idx(b.x, b.y)] || a.id - b.id);
+  const hit = near.slice(0, Math.max(3, Math.floor(w.fields.length / SURGE_SHARE)));
+  let crop = 0, wattle = 0, land = 0;
+  for (let i = 0; i < MAP * MAP; i++) if (w.tiles[i] !== T.WATER && R[i] <= lv) land++;
+  for (const f of hit) {
+    if (f.stage === 'planted' || f.stage === 'ripe') crop++;
+    if (f.fence) { f.fence = undefined; wattle++; }
+    f.stage = 'fallow'; f.growth = 0; f.lost = f.root = f.flat = f.mk = undefined;
+    f.sa = SALT_WASH + ri(w, SALT_MORE); f.sw = w.t;
+  }
+  const first = !w.surge, who = elder(w), n = hit.length, wood = SURGE_DRIFT + ri(w, SURGE_DRIFT) + n * SURGE_WRACK;
+  const S = w.surge || (w.surge = { n: 0, k: 0, y: 0, yt: 0, s: 0, g: 0, b: 0, last: 0, lv: 0, nm: who ? who.name : '', at: w.t });
+  S.n++; S.yt++; S.k += n; S.y += n; S.s += n; S.g += wood; S.last = w.t; S.lv = lv;
+  w.timber = Math.round((w.timber + wood) * 100) / 100;
+  const K = w.canoe, boat = !!(K && K.ok && K.at == null && R[idx(K.bx, K.by)] <= lv && rnd(w) < SURGE_BOAT);
+  if (boat) { K.ok = 0; K.wk = -1; K.lost++; S.b++; }
+  const bed = !!(w.wade && w.wade.c >= 1);
+  if (bed) w.wade.c = 0;
+  const shore = (boat ? ' The dugout is lifted off the landing and thrown up into the dunes, split from end to end.' : '') + (bed ? ' The cockle bed is scoured down to bare shingle.' : '');
+  const moon = moonLight(c.day) >= 8 ? 'full moon' : 'new moon', low = lowFields(w, R, lv);
+  const near2 = low ? ` The water stopped a stone's throw below ${low === 1 ? 'the lowest field' : low <= 5 ? `the ${low} lowest fields` : 'the lowest fields'}.` : '';
+  if (first) {
+    if (!w.techs.includes('surge')) w.techs.push('surge');
+    milestone(w, `On ${w.wx.n === 1 ? 'the first day' : `day ${w.wx.n}`} of the storm, with the ${moon} pulling the tide high, the sea does not stop at the sand. ` +
+      (n ? `${who ? who.name : 'The village'} watches grey water pour in over the dunes and spread across ${plural(n, 'field', 'fields')} behind the beach${crop ? ', over the standing grain' : ''}${wattle ? ', and the wattle fences go out with it' : ''}. ` +
+        `By evening it has drained back, leaving the ground crusted white and the tide line heaped with weed and ${wood} armfuls of driftwood. ${who ? `${who.name} scoops up a handful of earth, tastes it and spits` : 'The earth tastes of the sea'}: nothing will grow there until the rain has washed it out.`
+        : `It comes up over the beach, into the hollows behind the dunes and ${land >= 300 ? 'far up the low ground' : 'up the low ground'} in a sheet of grey water, and by evening it has drained back and left a long line of weed and ${wood} armfuls of driftwood. No field lay low enough to drown.${near2 || ` ${who ? who.name : 'The eldest'} looks from the tide line up to the fields and says grain must never be sown down there.`}`) +
+      `${shore} ${w.name} learns what a storm tide can do.`);
+  } else {
+    const text = (n ? `A storm tide at the ${moon} comes in over the low ground: ${plural(n, 'field', 'fields')} drowned in salt water${crop ? (crop === n ? (n === 1 ? ', grain and all' : ', all of them in grain') : `, ${crop} of them in grain`) : ''}.`
+      : `A storm tide at the ${moon} runs up over the beach and into the hollows behind it.${near2}`) + `${shore} ${wood} driftwood is dragged up off the tide line.`;
+    if (n >= 5 || boat) milestone(w, text); else log(w, text, n || bed ? 'bad' : 'info');
+  }
+}
+// fields that a sea a little higher than this one would have reached
+function lowFields(w, R, lv) {
+  let k = 0;
+  for (const f of w.fields) { const r = R[idx(f.x, f.y)]; if (r > lv && r <= lv + SURGE_VAR) k++; }
+  return k;
+}
+export const surgeWet = (w) => !!(w.surge && w.surge.last && w.t - w.surge.last < SURGE_WET);
+// each wet day rinses the drowned fields a little
+function saltWash(w, S, wx) {
+  if (wx !== 'rain' && wx !== 'storm' && wx !== 'snow') return;
+  let left = 0;
+  for (const f of w.fields) {
+    if (f.sa == null) continue;
+    if (--f.sa > 0) { left++; continue; }
+    f.sa = f.sw = undefined;
+  }
+  const was = S.s;
+  S.s = left;
+  if (was && !left) log(w, 'The rain has washed the last of the salt out of the drowned fields. They can be dug over and sown again.', 'good');
 }
 
 // a spell ends: tell the chronicle if it was one people will remember
@@ -3455,7 +3570,7 @@ function muckTask(w, p) {
   if (wx === 'snow' || wx === 'storm') return null;
   const cc = cacheOf(w);
   if (cc.muckNone === w.t) return null; // nothing bare and unmucked this hour: don't search again
-  const f = nearest(w.fields, penMid(w.goats), (o) => !o.mk && (o.stage === 'harvested' || o.stage === 'fallow') && o.fr == null && w.res['m' + o.id] == null);
+  const f = nearest(w.fields, penMid(w.goats), (o) => !o.mk && (o.stage === 'harvested' || o.stage === 'fallow') && o.fr == null && o.sa == null && w.res['m' + o.id] == null);
   if (!f) { cc.muckNone = w.t; return null; }
   M.h = Math.round((M.h - MUCK_FIELD) * 10) / 10; // the basket is filled at the heap; spilt if the work is broken off
   return { k: 'muck', key: 'm' + f.id, x: f.x, y: f.y, h: MUCK_WORK };
@@ -5788,7 +5903,7 @@ function workLists(w) {
     c.wt = w.t; c.wf = w.fields.length; c.wb = w.buildings.length;
     c.ripe = []; c.fallow = []; c.raw = [];
     const frozen = w.wx && w.wx.k === 'cold'; // nobody sows the frost-black rows again while the cold holds
-    for (const f of w.fields) if (f.stage === 'ripe') c.ripe.push(f); else if (f.stage === 'fallow' && !(frozen && f.fr != null)) c.fallow.push(f);
+    for (const f of w.fields) if (f.stage === 'ripe') c.ripe.push(f); else if (f.stage === 'fallow' && f.sa == null && !(frozen && f.fr != null)) c.fallow.push(f);
     for (const b of w.buildings) if (b.progress < 1) c.raw.push(b);
   }
   return c;
@@ -6713,7 +6828,7 @@ function finish(w, p, t, c, fx) {
     pop('+' + y, 'food');
   } else if (t.k === 'plant') {
     const f = w.fields.find((o) => 'f' + o.id === t.key);
-    if (f && f.stage === 'fallow') {
+    if (f && f.stage === 'fallow' && f.sa == null) {
       const fr = f.fr != null;
       f.stage = 'planted'; f.growth = 0; f.flat = f.root = f.fr = f.ru = f.rl = f.rg = f.lost = undefined; pop(fr ? 'sown again' : 'sown', 'muted');
       if (fr && w.wx.k !== 'cold' && !w.fields.some((o) => o.fr != null)) log(w, 'The last of the frost-black fields is dug over and sown again.', 'good');
@@ -7867,6 +7982,10 @@ const MIGRATIONS = {
   64: (w) => {
     if (w.quarrel && w.quarrel.cur && w.quarrel.cur.lv === undefined) w.quarrel.cur.lv = null;
   },
+  // v65 -> v66: storm tides (w.surge, f.sa/f.sw). None yet; a storm at a new or full moon can bring the sea over the low fields.
+  65: (w) => {
+    if (w.surge === undefined) w.surge = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -7946,6 +8065,9 @@ export function summary(w) {
     whaleCutting: w.whale && w.whale.cur ? w.people.filter((p) => p.task && p.task.k === 'whale').length : 0,
     frosts: w.frost ? w.frost.n : 0, frostKilled: w.frost ? w.frost.k : 0, frostYear: w.frost ? w.frost.y : 0,
     frostBlack: w.fields.filter((f) => f.fr != null).length,
+    surges: w.surge ? w.surge.n : 0, saltNow: w.surge && w.surge.s ? w.fields.filter((f) => f.sa != null).length : 0,
+    saltEver: w.surge ? w.surge.k : 0, saltYear: w.surge ? w.surge.y : 0, surgeWood: w.surge ? w.surge.g : 0,
+    surgeBoats: w.surge ? w.surge.b : 0, surgeNow: surgeWet(w),
     wading: !!w.wade, waders: w.wade ? w.people.filter((p) => p.task && p.task.k === 'wade').length : 0,
     cockles: w.wade ? w.wade.g : 0, cocklesYear: w.wade ? w.wade.y : 0, cockleBed: w.wade ? w.wade.c : 0, wadeScares: w.wade ? w.wade.s : 0,
     smudge: !!w.smudge, smudgeFires: w.smudge ? w.smudge.on.length : 0, smudgeNights: w.smudge ? w.smudge.n : 0,

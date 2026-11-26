@@ -679,3 +679,17 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Lovers could use the island's own dugout if no guests come, and the island goes without it until they bring it back.
 - Housekeeping: scripts/_love.mjs and scripts/_love2.mjs (lovers probes) also could not be deleted. Earlier: deleting files is still blocked on this machine; scripts/_loom.mjs (loom probe) joins the scripts/_*.mjs and
   scripts/.deerpeek.mjs that should all be deleted. check.mjs ran 1.5-2.5 s/yr here on all three seeds; verify on the live world 866 ms/yr.
+- Storm tides are done, as a problem only (SIM_VERSION 66; w.surge {n, k, y, yt, s salted now, g driftwood, b dugouts, last, lv level, nm, at};
+  f.sa wet days left, f.sw; seaReach(w) in sim.js rebuilds genesis heights and gives each tile the lowest sea that can run to it, cached,
+  never saved; surgeDay/saltWash, SURGE_*/SALT_*; surgeWet exported; drawTide/saltAt in render.js). Village fields start at height ~700
+  and the tide reaches 230-360, so early on only the beach suffers; coastal fields from ~Y40 do. Answers it invites:
+  - Tide lore: the sky reader learns that a storm at new or full moon brings the sea up, and the dugout is hauled up to the houses on
+    those nights (sky lore and moon lore already exist; this would close the dugout losses).
+  - A sea bank: a turf-and-stone dyke along the low edge of the fields, built a stretch each winter; it raises the level the sea must reach.
+  - Seaweed: the wrack line is hauled up in baskets and spread on the fields (like goat muck, a yield bonus), giving the tide a gift too.
+  - Salt pans: sea water left in clay pans on the rocks to dry; salt for curing fish and meat, for the cheese, or to trade with the far isle.
+  - Samphire and sea beet on the salted ground as a famine food; a salt-tolerant grain (barley) brought by incomers for low fields.
+  - needFields still counts salted fields as if they will crop, so the village does not clear more land after a big tide; a lean year
+    after one could make it clear inland fields, adding to sprawl.
+- Housekeeping: scripts/_surge.mjs and scripts/_surge2.mjs (tide probes) could not be deleted either. check.mjs here: 20261114 2.2 s/yr,
+  777 2.7 s/yr at ~390 people, 4242 1.5 s/yr; verify on the live world 934 ms/yr.

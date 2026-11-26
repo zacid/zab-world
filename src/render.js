@@ -348,6 +348,27 @@ function drawPath(x, y, X, Y, v, pal) {
   if (!we) px(tc, X + 1, Y + 2 + ((h * 50) | 0) % 4, edge, 1, 2);
   if (!e) px(tc, X + 6, Y + 2 + ((h * 30) | 0) % 4, edge, 1, 2);
 }
+// a storm tide: grey sea water over the low ground for a day, then a line of weed and sticks where it stopped
+function drawTide() {
+  const T = w.surge;
+  if (!T || !T.last) return;
+  const age = w.t - T.last, wet = S.surgeWet(w);
+  if (age >= 24 * 20) return;
+  const R = S.seaReach(w), lv = T.lv, above = (x, y) => x >= 0 && y >= 0 && x < N && y < N && R[y * N + x] > lv;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x;
+    if (w.tiles[i] === S.T.WATER || R[i] > lv) continue;
+    const X = x * TILE, Y = y * TILE, h = S.hash(x, y, 71);
+    const edge = above(x + 1, y) || above(x - 1, y) || above(x, y + 1) || above(x, y - 1);
+    if (wet) {
+      px(tc, X, Y, '#16304a', 8, 8);
+      px(tc, X + ((h * 6) | 0), Y + ((h * 64) | 0) % 8, '#2c5172', 3, 1);
+      if (edge) px(tc, X + ((h * 40) | 0) % 6, Y + ((h * 90) | 0) % 7, '#c8d8e0', 2, 1); // foam where the water stops
+    } else if (edge) { // the wrack line: weed and driftwood, thinning as it is picked over and dries
+      for (let k = 0; k < (age < 24 * 8 ? 4 : 2); k++) { const hh = S.hash(x * 4 + k, y * 4 + k, 73); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 8, k & 1 ? '#7a5a36' : '#2f3a22', k & 1 ? 3 : 2, 1); }
+    }
+  }
+}
 function drawTerrain() {
   const c = clockNow();
   const pal = PAL[c.season];
@@ -414,6 +435,15 @@ function drawTerrain() {
         if (rime && hh > 0.55) px(tc, X + k * 2 + (hh > 0.8 ? 1 : 0), Y + r * 2, '#dde6ea');
       }
     }
+    if (f.sa != null) { // drowned by a storm tide: standing sea water for a day, then grey earth crusted white with salt and strewn with weed
+      const wet = w.t - f.sw < 30;
+      px(tc, X, Y, wet ? '#2c4d68' : pal.snow ? '#9a958c' : '#6d6558', 8, 8);
+      for (let k = 0; k < 9; k++) {
+        const hh = S.hash(f.x * 9 + k, f.y * 9 + k, 67), xx = X + ((hh * 8) | 0), yy = Y + ((hh * 64) | 0) % 8;
+        if (wet) px(tc, xx, yy, k < 5 ? '#4a7090' : '#c8d8e0', k < 5 ? 2 : 1, 1);
+        else px(tc, xx, yy, k < 6 ? '#e4e2da' : '#3b4a2a', k < 6 ? 1 : 2, 1);
+      }
+    }
     if (f.rg != null && f.ru != null && (f.stage === 'planted' || f.stage === 'ripe')) { // rogued: gaps in the rows where the spotted plants came out, a heap of them smouldering at the edge
       for (let k = 0; k < 5; k++) { const hh = S.hash(f.x * 8 + k, f.y * 8 + k, 61); px(tc, X + ((hh * 4) | 0) * 2, Y + ((((hh * 64) | 0) % 4) * 2), '#5a3d24', 1, 2); }
       const fresh = w.t - f.rg < 24;
@@ -427,6 +457,7 @@ function drawTerrain() {
       for (let k = 0; k < 6; k++) { const hh = S.hash(f.x * 6 + k, f.y, 23); px(tc, X + ((hh * 7) | 0), Y + ((hh * 56) | 0) % 7, k < 3 ? '#2a1a10' : '#7a5636', 2, 1); }
     }
   }
+  drawTide();
   drawYard(pal);
   drawPen(pal);
   drawKiln(pal);
@@ -1127,6 +1158,11 @@ function rustAt(mx, my) { // a rusted field under the pointer
   const x = Math.floor(mx), y = Math.floor(my);
   return w.fields.find((f) => f.ru != null && (f.stage === 'planted' || f.stage === 'ripe') && f.x === x && f.y === y) || null;
 }
+function saltAt(mx, my) { // a field the sea came over, under the pointer
+  if (!w.surge) return null;
+  const x = Math.floor(mx), y = Math.floor(my);
+  return w.fields.find((f) => f.sa != null && f.x === x && f.y === y) || null;
+}
 function frostAt(mx, my) { // a frost-killed field under the pointer
   if (!w.frost) return null;
   const x = Math.floor(mx), y = Math.floor(my);
@@ -1739,6 +1775,10 @@ function frame() {
       const s = S.summary(w), dry = w.wx && w.wx.k === 'heat';
       tip.innerHTML = best.rg != null ? `<b>Rogued grain</b><br>the spotted plants pulled up and burnt · ${Math.round((best.rl || 0) * 100)}% of the ears lost to rust first<br><span class="m">the rust goes no further from here · pulled ${when(best.rg)}${s.rusted ? ` · ${s.rusted} rusted ${s.rusted === 1 ? 'field' : 'fields'} still to pull` : ''}</span>`
         : `<b>Rusted grain</b><br>orange flecks on the leaves · ${Math.round((best.rl || 0) * 100)}% of the ears lost so far<br><span class="m">${dry ? 'the heat has stopped it for now' : 'wet days carry it to the fields beside it'} · ${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted · spotted ${when(best.ru)}${s.rogue ? (w.t - best.ru < S.ROGUE_SEEN ? ' · not noticed yet' : ' · waiting to be pulled') : ''}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = saltAt(mx, my))) {
+      const s = S.summary(w), wet = w.t - best.sw < 30;
+      tip.innerHTML = `<b>${wet ? 'Flooded field' : 'Salted ground'}</b><br>${wet ? 'sea water lying in the furrows after a storm tide' : 'grey earth crusted white where the sea came over'} · nothing will be sown here until the rain washes it out<br><span class="m">about ${best.sa} wet ${best.sa === 1 ? 'day' : 'days'} to go · ${s.saltNow} ${s.saltNow === 1 ? 'field' : 'fields'} like it · drowned ${when(best.sw)}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = frostAt(mx, my))) {
       const s = S.summary(w), cold = w.wx && w.wx.k === 'cold';
@@ -2394,7 +2434,7 @@ function glow(c, x, y, r, col) {
 const RES_CORE = ['pop', 'food', 'wood', 'house', 'field'];
 const RES_GROUPS = [
   ['Stores & crafts', ['gran', 'pot', 'loom', 'cheese', 'bee', 'copse', 'path', 'herb']],
-  ['Fields', ['muck', 'frost', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
+  ['Fields', ['muck', 'frost', 'tide', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
   ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
   ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
   ['Folk', ['by', 'race', 'tale', 'stones', 'grave']],
@@ -2438,6 +2478,7 @@ function updatePanels() {
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced${s.hedging ? ` · ${s.hedges} hedged, ${s.hedgesGrown} grown` : ''})</span>` : s.fields],
     ...(s.muck ? [['muck', 'Muck', `${s.mucking ? `<span class="fest">${s.mucking} forking muck</span> · ` : ''}${s.mucked} <span class="m">${s.mucked === 1 ? 'field' : 'fields'} mucked · heap for ${s.muckHeap} more · ${s.muckGrainYear.toLocaleString()} more grain this year, ${s.muckGrain.toLocaleString()} in all</span>`]] : []),
     ...(s.frosts ? [['frost', 'Frost', `${s.frostBlack ? `<span class="bad">${s.frostBlack} ${s.frostBlack === 1 ? 'field' : 'fields'} frost-black</span> · ` : ''}<span class="m">${s.frosts} late ${s.frosts === 1 ? 'frost' : 'frosts'} · ${s.frostKilled.toLocaleString()} fields killed · last ${when(w.frost.last)}</span>`]] : []),
+    ...(s.surges ? [['tide', 'Storm tides', `${s.surgeNow ? '<span class="bad">the sea is over the low ground</span> · ' : ''}${s.saltNow ? `<span class="bad">${s.saltNow} ${s.saltNow === 1 ? 'field' : 'fields'} salted</span> · ` : ''}<span class="m">${s.surges} ${s.surges === 1 ? 'tide' : 'tides'} over the low ground · ${s.saltEver.toLocaleString()} fields drowned${s.surgeBoats ? ` · ${s.surgeBoats} ${s.surgeBoats === 1 ? 'dugout' : 'dugouts'} lost` : ''} · ${s.surgeWood.toLocaleString()} driftwood · last ${when(w.surge.last)}</span>`]] : []),
     ...(s.rusts ? [['rust', 'Rust', `${s.rusted ? `<span class="bad">${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted</span> · ` : ''}<span class="m">${s.rusts} ${s.rusts === 1 ? 'outbreak' : 'outbreaks'} · ${s.rustEver.toLocaleString()} fields spotted · ~${s.rustGrain.toLocaleString()} grain lost · last ${when(w.rust.last)}</span>`]] : []),
     ...(s.rogue ? [['rogue', 'Rogueing', `${s.rogueing ? `<span class="fest">${s.rogueing} pulling rusted grain</span> · ` : ''}<span class="m">${s.rogueEver.toLocaleString()} ${s.rogueEver === 1 ? 'field' : 'fields'} pulled clean · ${s.rogueStopped} ${s.rogueStopped === 1 ? 'outbreak' : 'outbreaks'} stopped before the harvest${w.rogue.nm ? ` · taught by ${esc(w.rogue.nm)}` : ''}</span>`]] : []),
     ...(s.smudge ? [['smudge', 'Smudge', `${s.smudgeFires ? `<span class="fest">${s.smudgeFires} ${s.smudgeFires === 1 ? 'fire' : 'fires'} smouldering in the fields</span> · ` : ''}<span class="m">${s.smudgeNights} ${s.smudgeNights === 1 ? 'night' : 'nights'} lit · ${s.smudgeSaved.toLocaleString()} ${s.smudgeSaved === 1 ? 'field' : 'fields'} saved${s.smudgeYear ? ` (${s.smudgeYear} this year)` : ''}</span>`]] : []),
@@ -2592,11 +2633,11 @@ function drawHistChart() {
 // ---------- hard years: one cell per finished year and kind of trouble, darker red is worse ----------
 const pl = (k, one, many) => `${k} ${k === 1 ? one : many}`;
 const HARD = [
-  ['storms', (h) => (h.storms || 0) + (h.squalls || 0), (h) => [h.storms && pl(h.storms, 'storm day', 'storm days'), h.flattened && pl(h.flattened, 'field flattened', 'fields flattened'), h.squalls && pl(h.squalls, 'squall at sea', 'squalls at sea')]],
+  ['storms', (h) => (h.storms || 0) + (h.squalls || 0) + (h.tides || 0) * 5, (h) => [h.storms && pl(h.storms, 'storm day', 'storm days'), h.flattened && pl(h.flattened, 'field flattened', 'fields flattened'), h.squalls && pl(h.squalls, 'squall at sea', 'squalls at sea'), h.tides && pl(h.tides, 'storm tide over the low ground', 'storm tides over the low ground')]],
   ['fog', (h) => h.fog || 0, (h) => [h.fog && pl(h.fog, 'fog day', 'fog days'), h.lost && pl(h.lost, 'search in the fog', 'searches in the fog')]],
   ['sickness', (h) => (h.sick || 0) + (h.coughs || 0), (h) => [h.sick && `${h.sick} fell sick with fever`, h.coughs && pl(h.coughs, 'child whooping', 'children whooping'), h.coughDied && pl(h.coughDied, 'baby lost to the cough', 'babies lost to the cough')]],
   ['beasts', (h) => (h.wolves || 0) + (h.raids || 0) + (h.pens || 0) + (h.lone || 0) + (h.goatsLost || 0) + (h.bear || 0), (h) => [h.wolves && pl(h.wolves, 'wolf attack', 'wolf attacks'), h.lone && pl(h.lone, 'lone wolf attack', 'lone wolf attacks'), h.bear && pl(h.bear, 'night the bear came in', 'nights the bear came in'), h.raids && pl(h.raids, 'boar raid', 'boar raids'), h.pens && pl(h.pens, 'wolf night at the pen', 'wolf nights at the pen'), h.goatsLost && pl(h.goatsLost, 'goat lost', 'goats lost')]],
-  ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
+  ['fields', (h) => (h.flattened || 0) + (h.frosted || 0) + (h.rusted || 0) + (h.salted || 0) + (h.burnt ? 1 : 0), (h) => [h.frosted && pl(h.frosted, 'field killed by frost', 'fields killed by frost'), h.salted && pl(h.salted, 'field drowned by the sea', 'fields drowned by the sea'), h.rusted && pl(h.rusted, 'field rusted', 'fields rusted'), h.burnt && pl(h.burnt, 'acre burnt', 'acres burnt')]],
   ['grain', (h) => (h.rats || 0) + (h.stolen || 0) + (h.rooks || 0), (h) => [h.rats && `${h.rats} grain to rats`, h.stolen && `${h.stolen} grain stolen`, h.rooks && `${h.rooks} grain to rooks`]],
   ['feuds', (h) => (h.spats || 0) + (h.fights || 0) * 2, (h) => [h.spats && pl(h.spats, 'spat between feuding houses', 'spats between feuding houses'), h.fights && pl(h.fights, 'fight', 'fights')]],
   ['deaths', (h) => h.deaths || 0, (h) => [h.deaths && pl(h.deaths, 'death', 'deaths')]],
