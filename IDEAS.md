@@ -704,3 +704,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Bog myrtle or hops from the woods, found by the healer: ale that keeps through the summer (ALE_SOUR drops).
   - The straw figure could be ploughed into the first furrow in spring (a sowing rite), or burnt on the midsummer fire.
 - Housekeeping: scripts/_ale.mjs (ale probe) could not be deleted here either; verify on the live world 931 ms/yr with ale.
+- The night at the stones is done (SIM_VERSION 68; w.vigil {n sat, r ran, k nights, d, y, nm, at, cur {d, on [{id, x, y, nm stone for}],
+  ld eldest id, ln, ran [names]}}; p.vg year sat, p.vr times ran; vigilFire/vigilOn/vigilWas exported; vigilShy blocks matches()).
+  Lovers go to the beach instead of the stones on a vigil night. Answers it invites:
+  - The youth at the stones sees the lovers across the thorn branch (or the far-isle raiders' dugout on a dark night) and has to choose
+    whether to tell.
+  - A vision: one who sits it out comes home with a dream the eldest reads (a good harvest, a death, a name for a newborn).
+  - The sat-it-out could take a grown name or a first spear; the hunters take only those who have sat it out.
+  - A youth who runs twice is teased into a feud seed between houses, or slips off on the far-isle boat for shame.
+  - The winter tale: the eldest tells of their own night at the stones, or of the first one who ran.
+  - Incomers' children who sat the far isle's own rite instead (a night on a sea stack, a swim) and refuse to sit Hais's.
+- Housekeeping: scripts/_vg.mjs (vigil probe) could not be deleted either; it is gitignored like the other scripts/_*.mjs.

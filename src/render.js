@@ -10,7 +10,7 @@ const PAL = [
   { grass: ['#76763a', '#857f3f', '#6a6833'], tree: ['#b5652a', '#d08a2e', '#8a4a22'], sand: ['#c2a46a', '#d1b67e'], snow: 0 },
   { grass: ['#c9d1da', '#dbe2e9', '#b5c0cb'], tree: ['#24443a', '#2f5848', '#1a332b'], sand: ['#cfc6ad', '#ddd5bf'], snow: 1 },
 ];
-const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', race: '#f0f0a0', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c', stone: '#b9b4aa', weave: '#c9bfa8', brew: '#d9a650' };
+const ROLE = { harvest: '#f2cd4c', plant: '#f2cd4c', clear: '#f2cd4c', chop: '#e07b45', build: '#5fb4f0', forage: '#c08ae8', fish: '#5fd0c8', paddle: '#5fd0c8', dig: '#5fb4f0', hunt: '#d0574a', haul: '#d0574a', seal: '#d0574a', fest: '#e889b8', race: '#f0f0a0', mourn: '#7f86a8', idle: '#d9d9d9', gather: '#d9d9d9', tend: '#8fcf7e', herb: '#8fcf7e', herd: '#e3d6b0', horn: '#e9dcc0', tale: '#c9a77a', rogue: '#e08a2c', muck: '#f2cd4c', cheese: '#e3d6b0', shore: '#5fd0c8', honey: '#f2b52c', clay: '#c08a5a', shape: '#c08a5a', fire: '#c08a5a', blaze: '#ff8a3c', stone: '#b9b4aa', weave: '#c9bfa8', brew: '#d9a650', vigil: '#b9b4aa' };
 const FX = { food: '#f2cd4c', wood: '#e07b45', build: '#5fb4f0', fish: '#5fd0c8', meat: '#e8796b', muted: '#9aa', sick: '#b7c98a', herb: '#8fcf7e', pot: '#d08a5a' };
 // the kiln: a dome of turf and clay, the stoking mouth at the front; jars drying beside it
 const KILN = ['..kkkk..', '.kKKKKk.', 'kKKKKKKk', 'kKKKKKKk', 'kKKmmKKk', 'kKmmmmKk', 'kkmmmmkk', '........'];
@@ -139,6 +139,11 @@ function doing(p) {
     if (!still) return `going to the ropes of the stone for ${C.nm}`;
     return C.w < S.STONE_LEVER ? 'levering a boulder out of the sand onto the logs' : p.task.pull ? `leaning on the ropes, dragging the stone for ${C.nm} up to the ring` : 'digging the pit and hauling the stone upright';
   }
+  if (p.task && p.task.k === 'vigil') {
+    const C = w.vigil && w.vigil.cur, o = C && C.on.find((q) => q.id === p.id), still = p.x === p.px && p.y === p.py;
+    if (!o) return `walking ${C && C.on.length ? C.on.map((q) => (w.people.find((r) => r.id === q.id) || {}).name).filter(Boolean).join(' and ') : 'the young ones'} out to the standing stones`;
+    return still ? `sitting the night out alone by the stone for ${o.nm}` : 'walking out to the standing stones for the night, a cloak over one arm';
+  }
   if (p.task && p.task.k === 'pit') return p.x === p.px && p.y === p.py ? 'digging the bear pit by the bee logs' : 'going to dig at the bear pit';
   if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
@@ -198,6 +203,8 @@ function drawWho() {
   const dog = w.dogs && w.dogs.d.find((d) => d.own === p.id && w.t - d.b >= S.TICKS_PER_YEAR);
   if (dog) kin.push(['dog', esc(dog.nm)]);
   if (p.fi) kin.push(['came', `over from the far isle in year ${p.fi}`]);
+  const vg = a >= 13 && S.vigilWas(p);
+  if (vg) kin.push(['the stones', p.vg ? esc(vg) : `<span class="bad">${esc(vg)}</span>`]);
   if (p.cl) kin.push(['wears', esc(`the pelt of ${p.cl.nm}` + (p.cl.by !== p.name ? `, killed by ${p.cl.by} in year ${p.cl.y}` : `, killed in year ${p.cl.y}`))]);
   el.innerHTML = `<div class="hd">Following <span class="x" data-close>✕</span></div>` +
     `<b>${esc(p.name)}</b>${by ? ` <span class="by">${esc(by)}</span>` : ''} <span class="m">${p.sex === 'f' ? 'woman' : 'man'}${a < 14 ? ' (child)' : ''}, ${a} yrs</span>` +
@@ -1405,6 +1412,13 @@ function frame() {
     px(sc, wat.x, wat.y + 1, '#e0521f', 2, 2); px(sc, wat.x + (f2 === 1 ? 1 : 0), wat.y - (f2 === 2 ? 1 : 0), '#ffc23d', 1, 2);
     if (f2 === 0) px(sc, wat.x + 1, wat.y - 1, '#ffe48a');
   }
+  // the night at the stones: a small fire of sticks in the middle of the ring, lit from dusk to first light
+  const vf = S.vigilFire(w, c), vig = vf ? { x: sub(vf.x * TILE) - 1, y: sub(vf.y * TILE) - 1 } : null;
+  if (vig) {
+    const f2 = Math.floor(now / 190 + 2) % 3;
+    px(sc, vig.x - 1, vig.y + 2, '#5a3a22', 4, 1); // a few sticks
+    px(sc, vig.x, vig.y + 1, '#c8461c', 2, 1); px(sc, vig.x + (f2 === 1 ? 1 : 0), vig.y - (f2 === 2 ? 1 : 0), '#ffb23d', 1, 2);
+  }
   // smudge fires: a heap of damp straw smouldering between the rows, more smoke than flame
   const smudges = S.smudgeOn(w) ? w.smudge.on.map((o) => ({ x: o.x * TILE + 3, y: o.y * TILE + 4, id: o.id })) : [];
   for (const o of smudges) {
@@ -1486,6 +1500,12 @@ function frame() {
     if (p.task && p.task.k === 'tale' && !moving && !telling) { // sat on the ground facing the fire, knees drawn up
       const y0 = Y + (age < 14 ? 2 : 1);
       px(sc, X + 1, y0, '#f1c9a5'); px(sc, X, y0 + 1, col, 3, 1); px(sc, X, y0 + 2, '#5a4a3a', 3, 1);
+      shown.push({ p, x, y });
+      continue;
+    }
+    if (p.task && p.task.k === 'vigil' && !moving && !p.task.ld) { // sat hunched by a stone with a cloak round the shoulders; now and then a look over the shoulder
+      const look = Math.floor(now / 2300 + p.id * 7) % 5 === 0 ? (p.id & 1 ? -1 : 1) : 0;
+      px(sc, X + 1 + look, Y + 1, '#f1c9a5'); px(sc, X, Y + 2, '#6e5a44', 3, 1); px(sc, X, Y + 3, '#4e4034', 3, 1);
       shown.push({ p, x, y });
       continue;
     }
@@ -1650,6 +1670,7 @@ function frame() {
     if (kiln) glow(sc, kiln.x, kiln.y, kiln.firing ? 10 + Math.sin(now / 170) : 5, `rgba(255,120,40,${(dark * (kiln.firing ? 0.6 : 0.3)).toFixed(3)})`);
     for (let k = 0, st = Math.ceil(flames.length / 60); k < flames.length; k += st) { const o = flames[k]; glow(sc, o.x, o.y, (o.big ? 12 : 7) + Math.sin(now / 150 + o.x) * 1.2, `rgba(255,110,40,${(dark * (o.big ? 0.5 : 0.35)).toFixed(3)})`); }
     if (wat) glow(sc, wat.x + 1, wat.y + 2, 13 + Math.sin(now / 230) * 1.2, `rgba(255,140,50,${(dark * 0.55).toFixed(3)})`);
+    if (vig) glow(sc, vig.x + 1, vig.y + 1, 16 + Math.sin(now / 250) * 1.4, `rgba(255,140,50,${(dark * 0.5).toFixed(3)})`); // just reaches the stones
     for (const o of smudges) glow(sc, o.x + 1, o.y + 1, 6 + Math.sin(now / 260 + o.id) * 0.8, `rgba(255,120,40,${(dark * 0.4).toFixed(3)})`);
     // wolf eyes catch the firelight at the treeline
     if (dark > 0.25) for (const o of beasts) if (o.b.k === 'wolf' && Math.floor(now / 1700 + o.b.id * 0.37) % 7) {
@@ -1787,7 +1808,8 @@ function frame() {
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((haul && Math.abs(haul.x - mx) < 0.7 && Math.abs(haul.y - 0.1 - my) < 0.45) || (best = stoneAt(mx, my))) {
       const R = w.stones, C = R.cur, s = S.summary(w), left = S.STONE_RING.length - R.s.length;
-      const ring = `${R.s.length} of ${S.STONE_RING.length} stones up · ring marked by ${esc(R.nm)} ${when(R.at)}${R.hurt ? ` · ${R.hurt} ${R.hurt === 1 ? 'foot' : 'feet'} crushed` : ''}`;
+      const ring = `${R.s.length} of ${S.STONE_RING.length} stones up · ring marked by ${esc(R.nm)} ${when(R.at)}${R.hurt ? ` · ${R.hurt} ${R.hurt === 1 ? 'foot' : 'feet'} crushed` : ''}` +
+        (s.vigilNow ? `<br><span class="fest">${esc(s.vigilNow)} sitting the night out by the little fire</span>` : s.vigil ? `<br>${s.vigilSat} sat a night here and came home grown${s.vigilRan ? ` · ${s.vigilRan} ran home in the dark` : ''}` : '');
       if (!best || (!best.o && !best.shore && !best.ring)) { // the stone on the move
         const [tx, ty] = S.stoneSlot(R, C.k), d = Math.hypot(tx - C.x, ty - C.y);
         const what = C.w < S.STONE_LEVER ? (C.w ? 'being levered onto the rollers' : 'lying on the shore') : d > 0.01 ? `on the rollers, ${d < 1 ? 'nearly there' : `${Math.ceil(d)} tiles from the ring`}` : 'tipped into its pit, coming upright';
@@ -2571,7 +2593,7 @@ function updatePanels() {
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.race || s.racing ? [['race', 'Race', `${s.racing ? `<span class="fest">${s.racing} out to the stake and back</span> · ` : s.raceWin ? `<span class="fest">${esc(s.raceWin)} in the oak wreath</span> · ` : ''}<span class="m">${s.races} run at midsummer${s.raceLast ? ` · last won by ${esc(s.raceLast.nm)}, ${s.raceLast.a}, in year ${s.raceLast.y}` : ''}</span>`]] : []),
     ...(s.tales ? [['tale', 'Tales', `${s.tales} <span class="m">told on the longest night${w.tale.lore ? ' · the children heed the fog' : ''}</span>`]] : []),
-    ...(s.stones ? [['stones', 'Stones', `${s.stoneHauling ? `<span class="fest">${s.stoneHauling} on the ropes, the stone for ${esc(s.stoneHaul)}</span> · ` : ''}${s.stonesUp} <span class="m">of ${S.STONE_RING.length} standing${s.stoneHaul && !s.stoneHauling ? ` · the stone for ${esc(s.stoneHaul)} is on its way` : ''}${s.stoneFeet ? ` · ${s.stoneFeet} ${s.stoneFeet === 1 ? 'foot' : 'feet'} crushed` : ''}</span>`]] : []),
+    ...(s.stones ? [['stones', 'Stones', `${s.stoneHauling ? `<span class="fest">${s.stoneHauling} on the ropes, the stone for ${esc(s.stoneHaul)}</span> · ` : ''}${s.vigilNow ? `<span class="fest">${esc(s.vigilNow)} sitting the night out</span> · ` : ''}${s.stonesUp} <span class="m">of ${S.STONE_RING.length} standing${s.stoneHaul && !s.stoneHauling ? ` · the stone for ${esc(s.stoneHaul)} is on its way` : ''}${s.stoneFeet ? ` · ${s.stoneFeet} ${s.stoneFeet === 1 ? 'foot' : 'feet'} crushed` : ''}${s.vigil ? ` · ${s.vigilSat} grown by a night there${s.vigilRan ? `, ${s.vigilRan} ran home` : ''}` : ''}</span>${s.vigilShy.length ? ` <span class="m">·</span> ${esc(s.vigilShy.join(', '))} <span class="m">must sit it again</span>` : ''}`]] : []),
     ...(w.yard ? [['grave', 'Graves', `${s.lying} <span class="m">in the burying ground</span>`]] : []),
     ...(s.hunting ? [['hunt', 'Hunt', `${s.boarsTaken} boars · ${s.wolvesTaken} wolves <span class="m">(${s.hides} ${s.hides === 1 ? 'hide' : 'hides'})</span>`]] : []),
   ]);

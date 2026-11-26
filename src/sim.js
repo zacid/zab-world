@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 67;
+export const SIM_VERSION = 68;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -88,6 +88,7 @@ export const TECHS = {
   sealing:  { name: 'Sealing', added: '2026-11-24T20:41Z', desc: 'When the white pups are on the sand in early winter, a hunter walks out with a short blackthorn club and keeps between the seals and the sea. Most days they all flop into the water first; now and then one is taken and carried home: meat for the pot, blubber for the fires and a thick grey skin. An old bull may rear up and bite. After each try the herd keeps to the water for days, and it is never taken below eight, or it would not come back. A sealskin sewn up and blown full like a bladder rides in the dugout, and whoever a squall rolls into the sea hangs on to it; the sea keeps far fewer. A float perishes after a few years and is sewn again.', req: ['seals', 'hunting'] },
   goats:    { name: 'Goats', added: '2026-11-17T20:22Z', desc: 'A wattle pen beside the village and a child with a crook. The herd grazes the open grass by day and eats the saplings back, gives milk in spring and summer, eats spare grain in winter, and the surplus goes to the pot in autumn. Unminded goats get into the young grain; in fog the wolves come for them.', req: ['fencing'] },
   stones:   { name: 'Standing stones', added: '2026-11-25T03:47Z', desc: 'A ring of eight stakes on open grass away from the houses, and grey boulders as long as a man lying on the shore. Every summer, once the grain is in and the stores are full, the strongest go down with ropes of plaited hide and an armful of logs, lever one boulder onto the rollers and drag it up to the ring, a few steps at a time, moving the back log to the front as they go. A pit is dug, the stone tipped in and hauled upright, and that night there is a feast in the ring. Each stone is raised for one of the dead. Now and then it slews off the logs onto a foot.', req: ['burial', 'midsummer'] },
+  vigil:    { name: 'The night at the stones', added: '2026-11-26T07:51Z', desc: 'In the first autumn after turning thirteen, on a clear night near the full moon, a child of the island walks out to the standing stones after supper with a cloak and a heel of bread. The eldest goes as far as the ring and turns back. The child sits alone till first light by a stone raised for one of the dead, a small fire in the middle of the ring, and walks home at dawn to the first bowl at the hearth, counted among the grown. An owl, a howl in the woods or a stone that seems to lean in the firelight sends some running home in the dark; they must sit it again, and nobody is pledged to one who ran until they have.', req: ['stones'] },
   feud:     { name: 'Feuds', added: '2026-11-25T20:06Z', desc: 'Two households next door to each other fall out over something small: goats in the young grain, a trip at the race, comb gone from the bee log, a stone thrown at a dog. Then they stop speaking. A thorn branch lies across each doorstep, they sit apart at the fire, and no child of one is married to a child of the other. Now and then it comes to blows and somebody is laid up for a few days. It can last for years, and it ends at a graveside if nothing ends it sooner.', req: ['fire'] },
   peacecup: { name: 'The peace cup', added: '2026-11-25T20:06Z', desc: 'At midsummer or on the longest night the eldest who is not of either house brings the two heads of a feud into the firelight and makes them drink from one bowl, mead if there is any, in front of everyone. Once it has worked, it is the custom: a quarrel is brought to the next gathering and nearly always ended there, and fewer of them come to blows while they last. Often a match between the two houses seals it.', req: ['feud', 'midsummer'] },
   incomers: { name: 'Incomers', added: '2026-11-25T20:38Z', desc: 'The far isle is small and stony, and some springs a household there has nothing left to stay for: a thin year that ate the seed grain, a house burnt in the winter, a husband lost at sea, a match a father will not allow. They load their dugout with bundles and a pot of embers and come over by day. While the granaries are full and the island has room, the eldest takes them in. They sleep where there is space until a house is raised for them, their dugout is broken up for its roof-beams, and their children grow up to marry island children.', req: ['farisle'] },
@@ -604,7 +605,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, vigil: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -680,7 +681,7 @@ function findShore(w) {
 const personShape = (o) => ({
   id: o.id, name: o.name, sex: o.sex, born: o.born, mother: o.mother, father: o.father, partner: o.partner, home: o.home,
   wants: o.wants, lastBirth: o.lastBirth, hunger: o.hunger, x: o.x, y: o.y, px: o.px, py: o.py, task: o.task, asleep: o.asleep,
-  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi, fi: o.fi,
+  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi, fi: o.fi, vg: o.vg, vr: o.vr,
 });
 const fieldShape = (o) => ({
   id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
@@ -779,6 +780,7 @@ export function step(w, fx) {
   if (w.ale && w.ale.hd === c.day && c.hour === ALE_POUR) harvestHome(w, c, fx);
   if (w.blaze && w.blaze.cur) blazeHour(w, c);
   if (w.stones && w.stones.cur) stoneHour(w, c, fx);
+  if (w.vigil && w.vigil.cur) vigilHour(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
@@ -878,6 +880,7 @@ function daily(w, c, fx) {
   taleDay(w, c);
   snowDay(w, c);
   if (w.stones !== undefined) stoneDay(w, c);
+  if (w.vigil !== undefined) vigilDay(w, c);
   if (w.wade !== undefined) wadeDay(w, c);
   const wx = w.wx.k;
   if (w.surge !== undefined) surgeDay(w, c, wx);
@@ -2071,6 +2074,7 @@ function lone(w, b) {
     if (heard(w, p) && !isLost(w, p)) continue; // they can call back to the horn: not alone
     if (w.watch && w.watch.hid === p.id) continue; // no wolf comes near the beach fire
     if (p.task && p.task.k === 'smudge') continue; // nor near the smoke in the fields
+    if (p.task && p.task.k === 'vigil') continue; // nor in among the stones, round the little fire
     if (p.task && p.task.sea) continue; // out on the water in the dugout
     if (p.cl) continue; // walking in a wolf's skin: no wolf singles them out
     if (w.people.some((o) => o !== p && !o.dead && !o.asleep && d2(o.x, o.y, p.x, p.y) < 9 && ageY(w, o) >= 14)) continue;
@@ -3422,6 +3426,7 @@ function watchable(w, p) {
   const a = ageY(w, p);
   if (a < 16 || a >= 56) return false;
   if ((w.goats && w.goats.hid === p.id) || (w.heal && w.heal.id === p.id) || (w.horn && w.horn.hid === p.id)) return false;
+  if (w.vigil && w.vigil.cur && w.vigil.cur.on.some((o) => o.id === p.id)) return false; // out at the stones tonight
   return !(p.haul || (p.task && (p.task.k === 'hunt' || p.task.k === 'haul')));
 }
 function learnWatch(w) {
@@ -4092,7 +4097,7 @@ function loveDay(w, c, C, fx) {
   }
   L.on = null;
   if (c.day < L.k || f.sick || m.sick || f.hurt || m.hurt || wx === 'storm' || wx === 'snow' || wx === 'cold' || rnd(w) >= LOVE_NIGHT) return;
-  const R = w.stones && w.stones.s.length ? w.stones : null, B = !R && landing(w);
+  const R = w.stones && w.stones.s.length && !(w.vigil && w.vigil.cur) ? w.stones : null, B = !R && landing(w); // not among the stones on a night someone sits there
   if (!R && !B) return;
   L.on = c.day; L.n++;
   L.at = R ? 'stones' : 'beach';
@@ -6018,7 +6023,7 @@ function lifeAndDeath(w, c) {
 
 const sibling = (a, b) => (a.mother != null && a.mother === b.mother) || (a.father != null && a.father === b.father);
 const matches = (w, f, o) => !o.dead && o.sex === 'm' && o.partner == null && ageY(w, o) >= 17 &&
-  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id && !apart(w, f, o) && !inLove(w, f) && !inLove(w, o);
+  Math.abs(ageY(w, o) - ageY(w, f)) < 14 && !sibling(f, o) && f.mother !== o.id && o.mother !== f.id && !apart(w, f, o) && !inLove(w, f) && !inLove(w, o) && !vigilShy(f) && !vigilShy(o);
 function mate(w, f) {
   return w.people.find((o) => matches(w, f, o));
 }
@@ -6866,6 +6871,7 @@ function act(w, p, c, fx) {
     walk(w, p, p.task.x + 0.5, p.task.y + 0.5);
     return;
   }
+  if (w.vigil && w.vigil.cur && vigilAct(w, p, c)) return; // sitting the night out at the standing stones
   if (w.smudge && w.smudge.on.length) { // out among the young grain, keeping a smoky fire going till dawn
     const o = w.smudge.on.find((q) => q.id === p.id);
     if (o) {
@@ -6960,7 +6966,7 @@ function act(w, p, c, fx) {
     }
   }
   if (w.squall && w.squall.cur && shoreWatch(w, p, a)) return; // the dugout is out in a squall: down to the landing to watch
-  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || p.task.k === 'stone' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || p.task.k === 'stone' || p.task.k === 'vigil' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   if (w.stones && w.stones.cur && stoneRope(w, p, c)) return; // on the ropes, dragging this summer's stone up to the ring
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
@@ -7429,6 +7435,137 @@ function stoneRope(w, p, c) {
   sx = Math.round(sx * 1000) / 1000; sy = Math.round(sy * 1000) / 1000;
   p.task = { k: 'stone', x: Math.floor(sx), y: Math.floor(sy), h: 99, pull: pull ? 1 : 0 };
   walk(w, p, sx, sy);
+  return true;
+}
+
+// ---------- the night at the stones ----------
+// Once stones stand in the ring, a child does not become grown just by getting tall. On a clear night near the
+// full moon in autumn, every islander of 13 to 17 who has not done it walks out after supper, the eldest with
+// them as far as the ring, and sits alone till first light by a stone raised for one of the dead, with a small
+// fire in the middle. Whoever is still there at dawn is counted among the grown. A howl in the woods or a noise
+// in the dark sends some running home; they must sit it again, and nobody is pledged to one who ran until they
+// have. A storm or snow in the night sends them all home, and the night does not count either way.
+// w.vigil { n sat it out ever, r ran ever, k nights ever, d day of the last, y its year, nm first to sit it,
+//   at tick learned, cur null | { d day it began, on [{ id, x, y, nm stone for }], ld eldest id, ln eldest name,
+//   ran [names] } }; p.vg year they sat it out, p.vr times they ran home
+const VIGIL_AGE = 13, VIGIL_TO = 18; // ages who sit it the first time
+const VIGIL_LATE = 30;       // one who ran home keeps trying until this age
+const VIGIL_MOON = 13;       // moonlight it needs (15 = full)
+const VIGIL_GO = 0.5;        // chance a fit night is the night
+const VIGIL_GAP = 20;        // days between nights at the stones (one each moon at most)
+const VIGIL_OUT = 19;        // after supper they walk out; the eldest turns home at 21
+export const VIGIL_HOME = 6; // first light: home to the hearth
+const VIGIL_FEAR = 0.012;   // chance an hour (22:00 to 05:00) that a noise in the dark sends one running
+const VIGIL_SOUNDS = ['an owl shrieks right over the ring', 'the fire spits and sinks, and the stones stand up black all round', 'something moves out in the long grass and stops when they stop breathing',
+  'a stone seems to lean in when the fire flickers', 'the wind gets up and moans round the stones like a voice'];
+export const vigilOn = (w) => !!(w.vigil && w.vigil.cur && w.vigil.cur.on.length);
+export const vigilFire = (w, c) => { // the small fire in the middle of the ring, lit from the walk out till dawn
+  const C = vigilOn(w) && w.vigil.cur;
+  if (!C || !w.stones) return null;
+  return (c.day === C.d && c.hour >= VIGIL_OUT + 1) || (c.day === C.d + 1 && c.hour < VIGIL_HOME) ? { x: w.stones.cx + 0.5, y: w.stones.cy + 0.5 } : null;
+};
+export const vigilWas = (p) => (p.vg ? `sat the night out at the standing stones in year ${p.vg}` : p.vr ? `ran home from the stones in the dark${p.vr > 1 ? ` ${p.vr} times` : ''}; must sit it again` : null);
+const vigilShy = (p) => !!p.vr && !p.vg; // ran from the stones, and not sat it out since: nobody is pledged to them
+function vigilFit(w, p) {
+  if (p.dead || p.vg || p.sick || p.hurt || p.cg || p.home == null || isLost(w, p)) return false;
+  const a = ageY(w, p);
+  if (a < VIGIL_AGE || a >= (p.vr ? VIGIL_LATE : VIGIL_TO)) return false;
+  return !((w.watch && w.watch.hid === p.id) || (w.heal && w.heal.id === p.id));
+}
+function vigilDay(w, c) {
+  const V = w.vigil, R = w.stones;
+  if (V && V.cur) { // a night already under way: did the weather turn at midnight?
+    if (w.wx.k === 'storm' || w.wx.k === 'snow') vigilBroken(w);
+    return;
+  }
+  if (!R || !R.s.length || c.season !== 2 || moonLight(c.day) < VIGIL_MOON) return;
+  if (!w.wx || (w.wx.k !== 'clear' && w.wx.k !== 'cold') || (V && c.day - V.d < VIGIL_GAP)) return;
+  if ((w.lost && w.lost.cur) || (w.blaze && w.blaze.cur) || (w.ale && w.ale.hd === c.day)) return;
+  const can = w.people.filter((p) => vigilFit(w, p));
+  if (!can.length || rnd(w) >= VIGIL_GO) return;
+  can.sort((a, b) => a.born - b.born || a.id - b.id);
+  const ld = elder(w), take = can.slice(0, R.s.length); // one to a stone
+  const on = take.map((p, i) => {
+    const o = R.s[i], [ox, oy] = STONE_RING[o.k];
+    return { id: p.id, x: Math.round((R.cx + 0.5 + ox * 0.62) * 1000) / 1000, y: Math.round((R.cy + 0.5 + oy * 0.62 + 0.3) * 1000) / 1000, nm: o.nm };
+  });
+  if (!V) {
+    w.vigil = { n: 0, r: 0, k: 0, d: c.day, y: c.year, nm: take[0].name, at: w.t, cur: null };
+    w.techs.push('vigil');
+    const p = take[0], he = ld ? pron(ld) : 'they', His = p.sex === 'f' ? 'Her' : 'His';
+    milestone(w, `${ld ? ld.name : 'The eldest'} watches ${p.name} carry a full skin of water up from the spring without stopping, and says ${he} has seen ${p.sex === 'f' ? 'her' : 'him'} grow a hand taller since the spring. ` +
+      `But nobody on ${w.name} should become grown just by getting tall. Tonight the moon is full, and ${p.name} will walk out to the standing stones, sit alone till first light by the stone raised for ${on[0].nm}, with a small fire and ${poss(p)} back to the village, and walk home at dawn. ` +
+      `${His} mother packs ${poss(p)} cloak with a heel of bread. From now on every child of ${w.name} sits a night at the stones in the first autumn after turning thirteen.`);
+  }
+  const W = w.vigil;
+  W.d = c.day; W.y = c.year; W.k++;
+  W.cur = { d: c.day, on, ld: ld && !take.includes(ld) ? ld.id : null, ln: ld ? ld.name : null, ran: [] };
+}
+const vigilNames = (w, ids) => { const n = ids.map((id) => { const p = aliveId(w, id); return p ? p.name : null; }).filter(Boolean); return n.length > 1 ? `${n.slice(0, -1).join(', ')} and ${n[n.length - 1]}` : n[0] || ''; };
+function vigilBroken(w) {
+  const C = w.vigil.cur, ids = C.on.map((o) => o.id);
+  for (const id of ids) { const p = aliveId(w, id); if (p && p.task && p.task.k === 'vigil') release(w, p); }
+  w.vigil.cur = null;
+  if (ids.length) log(w, `${w.wx.k === 'snow' ? 'Snow comes on' : 'A storm gets up'} in the middle of the night, and ${vigilNames(w, ids)} ${ids.length === 1 ? 'is' : 'are'} fetched home from the stones by torchlight. It does not count either way; there will be another moon.`, 'info');
+}
+function vigilHour(w, c, fx) {
+  const V = w.vigil, C = V.cur, h = c.hour;
+  C.on = C.on.filter((o) => { const p = aliveId(w, o.id); return p && !p.sick && !p.hurt && !p.cg && !isLost(w, p); });
+  if (!C.on.length) { V.cur = null; return; }
+  if (c.day === C.d && h === VIGIL_OUT) {
+    const n = C.on.length, ids = C.on.map((o) => o.id), lead = C.ld != null && aliveId(w, C.ld);
+    if (V.k > 1) log(w, `After supper ${vigilNames(w, ids)} ${n === 1 ? 'walks' : 'walk'} out to the standing stones${lead ? ` with ${lead.name}` : ''} under a ${moonLight(c.day) >= 15 ? 'full' : 'fat'} moon, ${n === 1 ? 'a cloak' : 'cloaks'} over ${n === 1 ? 'one arm' : 'their arms'}, to sit the night out by ${n === 1 ? `the stone for ${C.on[0].nm}` : 'the stones of the dead'}.`, 'info');
+    return;
+  }
+  if (c.day === C.d + 1 && h === VIGIL_HOME) { vigilDawn(w, c, fx); return; }
+  if (!(c.day === C.d && h >= 22) && !(c.day === C.d + 1 && h < VIGIL_HOME - 1)) return;
+  const wolves = !!(w.beasts && w.beasts.some((b) => b.k === 'wolf')), big = !!((w.lone && w.lone.cur) || (w.bear && w.bear.cur));
+  const odds = VIGIL_FEAR * (wolves ? 1.6 : 1) * (big ? 2 : 1) * (w.wx && w.wx.k === 'cold' ? 1.3 : 1);
+  for (const o of [...C.on]) {
+    const p = aliveId(w, o.id);
+    if (d2(p.x, p.y, o.x, o.y) > 1 || rnd(w) >= odds * (ageY(w, p) < 15 ? 1.5 : 1)) continue; // still walking out, or holding fast
+    const sound = big && w.bear && w.bear.cur ? 'something big crashes through the bracken at the edge of the trees' : big ? `${w.lone.cur.nm || 'the lone wolf'} howls close by, out past the ring` :
+      wolves && rnd(w) < 0.5 ? 'a wolf howls in the woods behind the ring' : VIGIL_SOUNDS[(c.day + o.id) % VIGIL_SOUNDS.length];
+    C.on = C.on.filter((q) => q !== o);
+    C.ran.push(p.name);
+    p.vr = (p.vr || 0) + 1; V.r++;
+    release(w, p);
+    if (fx) fx.push({ x: p.x, y: p.y - 0.5, text: 'runs home', color: 'sick' });
+    log(w, `In the dead of the night ${sound}, and ${p.name} runs all the way home through the dark${p.vr > 1 ? ' again' : ''}. ${Cap(pron(p))} will have to sit it again; until then nobody will be pledged to ${p.sex === 'f' ? 'her' : 'him'}.`, 'bad');
+    if (!C.on.length) { V.cur = null; return; }
+  }
+}
+function vigilDawn(w, c, fx) {
+  const V = w.vigil, C = V.cur, ids = C.on.map((o) => o.id), n = ids.length, ld = elder(w);
+  for (const id of ids) {
+    const p = aliveId(w, id);
+    p.vg = c.year; V.n++;
+    if (p.task && p.task.k === 'vigil') p.task = null;
+    if (fx) fx.push({ x: p.x, y: p.y - 0.5, text: 'grown', color: 'food' });
+  }
+  V.cur = null;
+  const names = vigilNames(w, ids), again = ids.filter((id) => { const p = aliveId(w, id); return p && p.vr; });
+  const text = `At first light ${names} ${n === 1 ? 'walks' : 'walk'} home from the standing stones, stiff with cold and grey with ash, and ${ld ? ld.name : 'the eldest'} hands ${n === 1 ? (aliveId(w, ids[0]).sex === 'f' ? 'her' : 'him') : 'them'} the first bowl at the hearth. ` +
+    `${n === 1 ? `${names} is` : 'They are'} counted among the grown now${again.length ? `, and nobody says a word about the night ${vigilNames(w, again)} ran` : ''}.` +
+    (C.ran.length ? ` ${C.ran.join(' and ')} ${C.ran.length === 1 ? 'keeps' : 'keep'} to the house all day.` : '');
+  if (V.n === n) milestone(w, text);
+  else log(w, text, 'good');
+}
+// sitting the night out: by a stone, cloak round the shoulders. The eldest walks them out and turns home at 21:00
+function vigilAct(w, p, c) {
+  const C = w.vigil.cur, h = c.hour, R = w.stones;
+  if (!((c.day === C.d && h >= VIGIL_OUT) || (c.day === C.d + 1 && h < VIGIL_HOME))) return false;
+  const o = C.on.find((q) => q.id === p.id);
+  if (!o) {
+    if (p.id !== C.ld || c.day !== C.d || h >= VIGIL_OUT + 2 || p.sick || p.hurt) return false;
+    if (!p.task || p.task.k !== 'vigil') { release(w, p); p.task = { k: 'vigil', x: R.cx, y: R.cy + 1, h: 99, ld: 1 }; }
+    p.asleep = false;
+    walk(w, p, R.cx + 0.5, R.cy + 1.6);
+    return true;
+  }
+  if (!p.task || p.task.k !== 'vigil') { release(w, p); p.task = { k: 'vigil', x: Math.floor(o.x), y: Math.floor(o.y), h: 99 }; }
+  p.asleep = false;
+  walk(w, p, o.x, o.y);
   return true;
 }
 
@@ -8173,6 +8310,11 @@ const MIGRATIONS = {
   66: (w) => {
     if (w.ale === undefined) w.ale = null;
   },
+  // v67 -> v68: the night at the stones (w.vigil; p.vg, p.vr). Not begun; the first clear autumn night near the full moon
+  // with a stone in the ring and an islander of 13 to 17 begins it. Nobody alive has run from it, so nobody is barred from a match.
+  67: (w) => {
+    if (w.vigil === undefined) w.vigil = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8323,6 +8465,9 @@ export function summary(w) {
     sealer: (w.seal && (w.people.find((p) => !p.dead && p.task && p.task.k === 'seal') || {}).name) || null,
     stones: !!w.stones, stonesUp: w.stones ? w.stones.s.length : 0, stoneHaul: w.stones && w.stones.cur ? w.stones.cur.nm : null,
     stoneHauling: stoneOn(w, c) ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'stone').length : 0, stoneFeet: w.stones ? w.stones.hurt : 0,
+    vigil: !!w.vigil, vigilSat: w.vigil ? w.vigil.n : 0, vigilRan: w.vigil ? w.vigil.r : 0, vigilNights: w.vigil ? w.vigil.k : 0,
+    vigilNow: vigilFire(w, c) ? vigilNames(w, w.vigil.cur.on.map((o) => o.id)) : null,
+    vigilShy: w.people.filter((p) => vigilShy(p)).map((p) => p.name),
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }
