@@ -715,3 +715,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The winter tale: the eldest tells of their own night at the stones, or of the first one who ran.
   - Incomers' children who sat the far isle's own rite instead (a night on a sea stack, a swim) and refuse to sit Hais's.
 - Housekeeping: scripts/_vg.mjs (vigil probe) could not be deleted either; it is gitignored like the other scripts/_*.mjs.
+- The well is done (SIM_VERSION 69; w.well {d, h, yr, nm, at, n, c, hit, sp, bl}; the spring level w.spring.l may now go below 0, down to
+  -d*WELL_RING; wellDeep/wellWork/WELL_DEPTHS exported; waterNow() in render.js feeds the Spring/Well row and the spring/pool tooltip).
+  Once it is 4 rings deep, failures come back past ~55 people (draw grows with pop). Answers it invites:
+  - A second well on the far side of the village once it is crowded (halves the draw on each), or a cistern of clay jars filled in winter.
+  - Bad water: a dead rat or a lamb fallen into the well, a fever that follows (the healer reads it; a wattle cover over the shaft).
+  - A child who falls in, and the rope rescue; a well-dressing at midsummer, flowers on the well head.
+  - The well as the gossip place: feuds started or mended at the well (quarrel spots already include "by the spring").
+  - The spring row shows the level as % of the whole depth; a small level gauge drawn on the well head would show it on the map.
+- Housekeeping: scripts/_well.mjs and scripts/_peek.mjs (well probes) could not be deleted either (gitignored).

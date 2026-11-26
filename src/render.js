@@ -144,6 +144,7 @@ function doing(p) {
     if (!o) return `walking ${C && C.on.length ? C.on.map((q) => (w.people.find((r) => r.id === q.id) || {}).name).filter(Boolean).join(' and ') : 'the young ones'} out to the standing stones`;
     return still ? `sitting the night out alone by the stone for ${o.nm}` : 'walking out to the standing stones for the night, a cloak over one arm';
   }
+  if (p.task && p.task.k === 'well') return p.x === p.px && p.y === p.py ? (p.task.key === 'wl0' ? 'down in the well shaft with a digging stick' : 'hauling baskets of clay up out of the well') : 'going to dig at the well';
   if (p.task && p.task.k === 'pit') return p.x === p.px && p.y === p.py ? 'digging the bear pit by the bee logs' : 'going to dig at the bear pit';
   if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
@@ -258,9 +259,14 @@ function work(k, id, X, Y, now) {
     const t = (now / 900 + id * 0.37) % 1;
     px(sc, X + 3, Y + 1, '#f1c9a5');
     if (t < 0.6) { const d = Math.floor(t * 6); px(sc, X + 4 + (d >> 1), Y + 1 + d, '#d9c27a'); px(sc, X + 3 + d, Y + 2 + (d >> 1), '#d9c27a'); }
-  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig' || k === 'crowman' || k === 'pit') { // a mallet (spade, for digging) rising and falling
-    const f = ph(200) % 3, spade = k === 'dig' || k === 'pit';
-    if (k !== 'build' && k !== 'pit') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
+  } else if (k === 'haul') { // at the lip, hand over hand on the rope, a basket of clay coming up
+    const f = ph(260) % 4;
+    px(sc, X + 3, Y + 1 + (f >> 1), '#f1c9a5'); px(sc, X + 4, Y + 2 - (f >> 1), '#f1c9a5');
+    px(sc, X + 4, Y + 3, '#cfc3a0', 1, 3 - (f % 3)); // the rope
+    px(sc, X + 3, Y + 6 - (f % 3), '#8a6a44', 3, 2); px(sc, X + 4, Y + 6 - (f % 3), '#6b4a2e'); // the basket, clay heaped in it
+  } else if (k === 'build' || k === 'fence' || k === 'hedge' || k === 'dig' || k === 'crowman' || k === 'pit' || k === 'well') { // a mallet (spade, for digging) rising and falling
+    const f = ph(200) % 3, spade = k === 'dig' || k === 'pit' || k === 'well';
+    if (k !== 'build' && k !== 'pit' && k !== 'well') px(sc, X + 4, Y, k === 'hedge' ? '#5f9a3e' : WOOD, 1, 4); // the stake or the slip being set
     if (k === 'crowman') { px(sc, X + 2, Y + 1, '#7a5a36', 5, 1); px(sc, X + 4, Y - 1, '#d9c79a', 1, 1); } // the cross going up, its straw head on top
     if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
     else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
@@ -919,7 +925,14 @@ function drawSpring(pal) {
   if (!P) return;
   const X = P.x * TILE, Y = P.y * TILE, r = P.l / S.SPRING_FULL;
   const ice = pal.snow, stone = ice ? '#c9ced4' : '#7d7a72', stone2 = ice ? '#e4e8ec' : '#9a978d';
-  if (P.dry) { // cracked mud between the stones
+  const W = w.well, rings = W ? W.d : 0, digging = !!(W && w.res && w.res.wl0 != null);
+  if (digging) { // the shaft open, a dark hole with the clay heaped at the lip
+    px(tc, X + 2, Y + 2, '#3d2a19', 4, 4); px(tc, X + 3, Y + 3, '#0e0a07', 2, 2);
+    px(tc, X + 1, Y + 7, '#8a7a5a', 3, 1); px(tc, X, Y + 6, '#a08a62', 2, 1);
+  } else if (rings && !P.dry && P.l < 0) { // down the well: the water a dark glint far below the stones
+    px(tc, X + 2, Y + 2, '#1c1712', 4, 4);
+    px(tc, X + 3, Y + 3, ice ? '#8a9aa6' : '#1d3346', 2, 2);
+  } else if (P.dry) { // cracked mud between the stones
     px(tc, X + 2, Y + 2, '#6e5638', 4, 4);
     px(tc, X + 2, Y + 3, '#3e2e1e', 2, 1); px(tc, X + 4, Y + 4, '#3e2e1e', 2, 1); px(tc, X + 3, Y + 5, '#3e2e1e'); px(tc, X + 5, Y + 2, '#3e2e1e');
   } else {
@@ -929,7 +942,18 @@ function drawSpring(pal) {
     if (r > 0.6 && !ice) px(tc, X + 3, Y + 3, '#7fb0d8');
   }
   for (const [a, b] of [[1, 1], [3, 1], [5, 1], [6, 2], [6, 4], [6, 6], [4, 6], [2, 6], [1, 5], [1, 3]]) px(tc, X + a, Y + b, (a + b) & 2 ? stone : stone2);
-  if (!ice) px(tc, X + 7, Y + 5, P.dry ? '#8a6a3c' : '#4f9a48'); // cress on the bank, brown when the spring fails
+  if (rings) { // the well head: the beach stones built up into a low wall round the shaft, closer set for each ring
+    const st3 = ice ? '#aeb4ba' : '#5f5c55';
+    for (const [a, b] of [[2, 1], [4, 1], [6, 3], [6, 5], [5, 6], [3, 6], [1, 4], [1, 2]]) px(tc, X + a, Y + b, rings >= 2 ? stone2 : stone);
+    for (let k = 0; k < Math.min(rings, 4); k++) px(tc, X + 1 + k, Y, st3, 1, 1); // a row of capstones, one for each ring
+  }
+  if (W && W.sp) { // the sweep: a forked post, a long pole with a stone lashed on the low end and the bucket rope at the other
+    px(tc, X - 1, Y + 1, WOOD, 1, 6);
+    for (let k = 0; k <= 7; k++) px(tc, X - 4 + k, Y + 5 - Math.floor(k * 0.75), '#a07448');
+    px(tc, X - 5, Y + 5, stone, 2, 2);
+    px(tc, X + 3, Y, '#cfc3a0', 1, 3); px(tc, X + 3, Y + 3, '#6b4a2e', 2, 1);
+  }
+  if (!ice && !digging) px(tc, X + 7, Y + 5, P.dry ? '#8a6a3c' : '#4f9a48'); // cress on the bank, brown when the spring fails
   if (P.dry && P.c) { // the day's water, set down in a row by the stones
     const jar = w.techs.includes('pottery');
     for (let k = 0; k < Math.min(4, P.c); k++) px(tc, X + k * 2, Y + 7, jar ? '#a0623a' : '#5a3d24', 1, 1);
@@ -939,6 +963,16 @@ function drawSpring(pal) {
     px(tc, PX0 + 1, PY0 + 2, ice ? '#b8cfdc' : '#1f3f5e', 6, 4); px(tc, PX0 + 2, PY0 + 1, ice ? '#b8cfdc' : '#1f3f5e', 4, 1); px(tc, PX0 + 2, PY0 + 6, ice ? '#b8cfdc' : '#1f3f5e', 4, 1);
     if (!ice) { px(tc, PX0 + 3, PY0 + 3, '#2f5a80', 2, 1); px(tc, PX0 + 6, PY0 + 1, '#5f8f3a', 1, 2); px(tc, PX0 + 7, PY0 + 2, '#6fa044', 1, 3); px(tc, PX0, PY0 + 4, '#5f8f3a', 1, 2); }
   }
+}
+// the spring and well in a line: right-now trouble or digging first, then how full it is and its story
+function waterNow(s) {
+  const P = w.spring, floor = -s.wellRings * S.WELL_RING;
+  const full = Math.max(0, Math.min(100, Math.round(((P.l - floor) / (S.SPRING_FULL - floor)) * 100)));
+  const now = P.dry ? `<span class="bad">${s.wellRings ? 'the well is dry' : 'the spring is dry'}${s.springCarrying ? ` · ${s.springCarrying} carrying from the pool` : ''}</span>`
+    : s.wellDigging ? `<span class="fest">${s.wellDigging} digging ring ${s.wellRings + 1} of the well (${s.wellDug}%)</span>` : '';
+  const story = `${P.dry ? '' : `${full}% full · `}${s.wellRings ? `well ${s.wellRings} ${s.wellRings === 1 ? 'ring' : 'rings'} deep (${S.WELL_DEPTHS[s.wellRings]})` : s.well ? 'to be dug down into a well' : 'no well'}` +
+    ` · failed ${s.springFailed}x${s.springDryYear ? ` · ${s.springDryYear} dry ${s.springDryYear === 1 ? 'day' : 'days'} this year` : ''}${s.springLoads ? ` · ${s.springLoads.toLocaleString()} loads carried` : ''}${s.wellCaves ? ` · ${s.wellCaves} ${s.wellCaves === 1 ? 'cave-in' : 'cave-ins'}` : ''}${s.wellHit ? ` · struck water ${s.wellHit}x in a drought` : ''}`;
+  return { now, story };
 }
 function springAt(mx, my) {
   const P = w.spring;
@@ -1549,7 +1583,7 @@ function frame() {
       }
     } else {
       px(sc, X + 1, Y, '#f1c9a5'); px(sc, X, Y + 1, col, 3, 2); px(sc, X + step * 2, Y + 3, '#3a3a3a', 1, 1); px(sc, X + 2 - step * 2, Y + 3, '#3a3a3a', 1, 1);
-      if (p.task && !moving) work(p.task.k, p.id, X, Y, now);
+      if (p.task && !moving) work(p.task.k === 'well' && p.task.key === 'wl1' ? 'haul' : p.task.k, p.id, X, Y, now);
       if (p.task && p.task.k === 'fish' && !moving) { // rod held out toward the water, line bobbing
         const bob = Math.floor(now / 500 + p.id) % 3 === 0 ? 1 : 0;
         px(sc, X + 3, Y, '#8a5a32', 1, 1); px(sc, X + 4, Y - 1, '#8a5a32', 1, 1);
@@ -1895,6 +1929,12 @@ function frame() {
         : best.s === 2 ? `<span class="bad">staked and hidden under rods and turf${B.cur ? ` · ${esc(B.cur.nm)} lies up in the woods` : ''}</span>`
         : `<span class="bad">${esc((B.cur && B.cur.nm) || 'a bear')} is down in it among the stakes</span>`;
       tip.innerHTML = `<b>Bear pit</b><br>${state}<br><span class="m">first sod cut by ${esc(best.nm)} ${when(best.at)}${s.bearsTaken ? ` · ${s.bearsTaken} ${s.bearsTaken === 1 ? 'bear' : 'bears'} taken` : ''}${best.sk ? ` · gone round ${best.sk}x` : ''}${best.ch ? ` · ${best.ch} ${best.ch === 1 ? 'child' : 'children'} fell in` : ''}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = springAt(mx, my))) {
+      const s = S.summary(w), v = waterNow(s), P = w.spring;
+      tip.innerHTML = best === 'pool'
+        ? `<b>Pool in the woods</b><br>${P.dry ? '<span class="bad">every cup on the island comes from here while the spring is dry</span>' : 'where the deer drink'}<br><span class="m">found by ${esc(P.nm || 'the eldest')} ${when(P.at)} · ${s.springLoads.toLocaleString()} loads carried home</span>`
+        : `<b>${s.wellRings ? 'The well' : 'The spring'}</b><br>${v.now ? v.now + '<br>' : ''}<span class="m">${v.story}${s.wellBy ? ` · first sod cut by ${esc(s.wellBy)} ${when(w.well.at)}` : ''}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = graveAt(mx, my))) {
       const kin = [best.m, best.f].map((id) => id != null && known.get(id)).filter(Boolean).map((k) => k.name);
@@ -2508,7 +2548,7 @@ function glow(c, x, y, r, col) {
 // New rows: add the row's icon key to a group here; a key not listed lands in "Other".
 const RES_CORE = ['pop', 'food', 'wood', 'house', 'field'];
 const RES_GROUPS = [
-  ['Stores & crafts', ['gran', 'pot', 'ale', 'loom','cheese', 'bee', 'copse', 'path', 'herb']],
+  ['Stores & crafts', ['gran', 'spring', 'pot', 'ale', 'loom','cheese', 'bee', 'copse', 'path', 'herb']],
   ['Fields', ['muck', 'frost', 'tide', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
   ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
   ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
@@ -2558,6 +2598,7 @@ function updatePanels() {
     ...(s.rogue ? [['rogue', 'Rogueing', `${s.rogueing ? `<span class="fest">${s.rogueing} pulling rusted grain</span> · ` : ''}<span class="m">${s.rogueEver.toLocaleString()} ${s.rogueEver === 1 ? 'field' : 'fields'} pulled clean · ${s.rogueStopped} ${s.rogueStopped === 1 ? 'outbreak' : 'outbreaks'} stopped before the harvest${w.rogue.nm ? ` · taught by ${esc(w.rogue.nm)}` : ''}</span>`]] : []),
     ...(s.smudge ? [['smudge', 'Smudge', `${s.smudgeFires ? `<span class="fest">${s.smudgeFires} ${s.smudgeFires === 1 ? 'fire' : 'fires'} smouldering in the fields</span> · ` : ''}<span class="m">${s.smudgeNights} ${s.smudgeNights === 1 ? 'night' : 'nights'} lit · ${s.smudgeSaved.toLocaleString()} ${s.smudgeSaved === 1 ? 'field' : 'fields'} saved${s.smudgeYear ? ` (${s.smudgeYear} this year)` : ''}</span>`]] : []),
     ...(s.crows ? [['rook', 'Rooks', `${s.crowDown ? `<span class="bad">${s.crowFlock} down on the grain</span>${s.scarers ? ` · <span class="fest">${s.scarers} ${s.scarers === 1 ? 'child' : 'children'} with clappers</span>` : ''} · ` : `${s.crowFlock} `}<span class="m">${s.crowDown ? '' : 'in the flock · '}${s.crowYear.toLocaleString()} grain eaten this year · ${s.crowStripped} ${s.crowStripped === 1 ? 'field' : 'fields'} picked bare${s.scaring ? ` · driven off ${s.scaredYear}x this year` : ''}${s.scarecrows ? ` · ${s.scarecrows} ${s.scarecrows === 1 ? 'scarecrow' : 'scarecrows'} turned them ${s.scareYear}x${s.scareFound ? ` · ${s.scareFound} found out` : ''}` : ''}</span>${s.scareMaking ? ` · <span class="fest">a scarecrow going up</span>` : ''}`]] : []),
+    ...(w.spring && (s.springFailed || s.well) ? [['spring', s.wellRings ? 'Well' : 'Spring', (({ now, story }) => `${now ? now + ' · ' : ''}<span class="m">${story}</span>`)(waterNow(s))]] : []),
     ['gran', 'Granaries',`${s.granaries} <span class="m">(${s.safe.toLocaleString()} kept dry)</span>`],
     ['wild', 'Wilds', `${s.wolves} wolves · ${s.boars} boars · ${s.deer} deer` + (s.hurt ? ` <span class="bad">(${s.hurt} bitten)</span>` : s.afraid ? ' <span class="m">(in by dusk)</span>' : '')],
     ...(s.lone ? [['lone', 'Lone wolf', `<span class="bad">${esc(s.lone)}</span> <span class="m">· out by day${s.loneGoats ? ` · ${s.loneGoats} ${s.loneGoats === 1 ? 'goat' : 'goats'} taken` : ''}${s.loneBit ? ` · ${s.loneBit} bitten` : ''} · hunted ${s.loneHunts}x</span>`]]

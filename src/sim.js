@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 68;
+export const SIM_VERSION = 69;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -95,6 +95,7 @@ export const TECHS = {
   loom:     { name: 'Spinning and weaving', added: '2026-11-25T21:44Z', desc: 'Each spring, when the goats moult, the herder combs the loose winter coats out of them with a bone comb. The children and the old spin the hair into yarn on drop spindles, a stone whorl twirling on a thread, in every idle moment. One weaver keeps an upright loom against the wall of their house, the warp threads pulled straight by hanging weights, and on winter days and wet days the cloth grows on it a finger at a time. A blanket on every bed means a house keeps warm on less firewood, and the cold reaches the small and the old less hard. Blankets wear through in a few years and have to be woven again.', req: ['goats'] },
   surge:    { name: 'Storm tides', added: '2026-11-26T00:44Z', desc: 'Twice a month, at new moon and full moon, the tide runs higher than on other days. When a gale out of the sea comes on top of such a tide, the water does not stop at the sand: it pours over the low ground behind the beach, through the hedges and over the nearest fields. In a day it drains away, and leaves the earth grey and crusted with salt. Grain sown in it comes up yellow and dies, so a drowned field lies bare until enough rain has fallen to wash the salt back out, most of a year. The tide line is left heaped with wrack and driftwood. Nobody has an answer for it yet.', req: ['farming'] },
   ale:      { name: 'Ale', added: '2026-11-26T06:44Z', desc: 'Grain that gets wet in the jar sprouts; dried by the fire, cracked on a flat stone and steeped in hot water, it turns sweet, and a few days later it froths and turns to ale. One brewer keeps a wooden vat against the wall of their house and mashes a sack of the spare grain whenever the jugs run low. Ale is poured at midsummer and on the night the last sheaf comes in, the harvest home, when the whole village sits up late round the hearth. When the spring fails the children drink small ale and fewer skins have to come in from the pool. Ale goes sour in the summer heat, and a jug too many can turn words into blows.', req: ['pottery'] },
+  well:     { name: 'The well', added: '2026-11-26T11:43Z', desc: 'The water of the spring does not come from the stones but up from under them. Once the spring has failed, it is dug down in the dry of the year while the water is low: one islander in the shaft with a digging stick, another hauling up the clay in a basket, the sides lined ring on ring with round stones from the beach. A ring is dug in a summer when the water gets down near the bottom, four at most before the rock. Each ring lets the spring fall further before there is only mud, and past two rings a sweep pole on a forked post dips the bucket. A wet side can slump in on the digger. More mouths draw it down faster, and in a long hot summer the deepest well can still go dry.', req: ['drought'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -605,7 +606,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, vigil: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, vigil: null, well: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -942,6 +943,7 @@ function daily(w, c, fx) {
   if (w.inc !== undefined) incDay(w, c);
   if (w.heal !== undefined) herbs(w, c);
   if (w.spring !== undefined) springDay(w, c, wx);
+  if (w.well !== undefined) wellDay(w, c);
   if (w.goats !== undefined) goatDay(w, c);
   if (w.loom !== undefined) loomDay(w, c, wx);
   if (w.ale !== undefined) aleDay(w, c, wx);
@@ -4820,11 +4822,13 @@ function springDay(w, c, wx) {
   let g = wx === 'clear' ? (c.season === 1 ? SPRING_SUN : SPRING_CLEAR) : 0;
   for (const [k, v] of SPRING_GAIN) if (k === wx) g = v;
   if (c.season < 2) g -= Math.min(SPRING_DRAW_MAX, Math.floor(pop / SPRING_DRAW)) + (w.harvest < 0.8 ? -SPRING_DRYYEAR : 0);
-  S.l = Math.max(0, Math.min(SPRING_FULL, S.l + g));
-  if (!S.dry && S.l <= 0) springFails(w, c, wx);
-  else if (S.dry && S.l >= SPRING_BACK) {
+  const floor = -wellDeep(w) * WELL_RING, was = S.l;
+  S.l = Math.max(floor, Math.min(SPRING_FULL, S.l + g));
+  if (!S.dry && S.l <= floor) springFails(w, c, wx);
+  else if (!S.dry && floor < 0 && S.l < 0 && was >= 0 && w.well.bl++ < 3) log(w, `The spring has sunk below its old stones, but the well under it still holds water. The ${w.techs.includes('pottery') ? 'jars go' : 'skins go'} down on a rope, and nobody has to walk to the woods.`, 'good');
+  else if (S.dry && S.l >= floor + SPRING_BACK) {
     S.dry = 0;
-    log(w, `Water wells up between the stones of the spring again after ${plural(S.k, 'dry day', 'dry days')}. The skins and jars are hung up${S.yt ? '. Nobody has to go thirsty now' : ''}.`, 'good');
+    log(w, `${floor < 0 ? 'Water rises in the well again' : 'Water wells up between the stones of the spring again'} after ${plural(S.k, 'dry day', 'dry days')}. The skins and jars are hung up${S.yt ? '. Nobody has to go thirsty now' : ''}.`, 'good');
     S.k = 0; S.tk = 0;
   } else if (!S.dry && S.l <= SPRING_BACK && S.l - g > SPRING_BACK && c.season === 1) log(w, 'The spring by the village runs low. The water comes up muddy and slow.', 'info');
   S.c = 0; S.o = 0;
@@ -4844,7 +4848,8 @@ function springFails(w, c, wx) {
     if (!w.techs.includes('drought')) w.techs.push('drought');
     milestone(w, `In the grey of the morning the first one down to the spring with a skin comes back with it empty. Between the stones there is only a skin of cracked mud, and the cress on the bank has gone brown. ${wx === 'heat' ? 'The sun has beaten down for days, and n' : 'N'}obody on ${w.name} has seen it fail before. ` +
       (S.px != null ? `${who} remembers a deep pool in the woods where the deer go to drink, a long walk under the trees, and by noon a line of islanders is going out to it with skins and ${w.techs.includes('pottery') ? 'jars' : 'gourds'} and coming back bent under the weight. Until the rain comes, every cup on ${w.name} is carried in from the woods.` : `Nobody knows where else to find water.`));
-  } else log(w, `The spring has failed again. The skins and ${w.techs.includes('pottery') ? 'jars' : 'gourds'} come down from the rafters, and the long walks to the pool in the woods begin.`, 'bad');
+  } else if (wellDeep(w)) log(w, `The bucket comes up from the bottom of the well with a scrape of mud in it. Even the well under the spring is dry, ${WELL_DEPTHS[wellDeep(w)]}, and the long walks to the pool in the woods begin again.`, 'bad');
+  else log(w, `The spring has failed again. The skins and ${w.techs.includes('pottery') ? 'jars' : 'gourds'} come down from the rafters, and the long walks to the pool in the woods begin.`, 'bad');
 }
 function waterTask(w, p, c) {
   const S = w.spring;
@@ -4859,6 +4864,83 @@ function waterDone(w, p, t, pop) {
   pop('water', 'muted');
   if (S.n === 1) log(w, `${p.name} sets the first ${w.techs.includes('pottery') ? 'jar' : 'skin'} of pool water down by the dry spring, and the children crowd round it with their cups.`, 'good');
   else if (S.n === 500 || S.n === 2000 || S.n === 10000) log(w, `${S.n} loads of water have been carried in from the pool in the woods.`, 'info');
+}
+// ---------- the well ----------
+// Once the spring has failed and come back, the islanders dig it down: a shaft under the old spring stones, lined
+// ring by ring with stones from the beach. Each ring lets the level fall WELL_RING further before the bottom is mud,
+// so a dry summer drains it later; but more mouths draw it faster, and the deepest well can still go dry.
+// w.well { d rings lined, h hours into the ring now being dug, yr year the last ring was finished, nm who cut the
+//   first sod, at when, n spells dug ever, c cave-ins, hit times the diggers struck water in a dry spell, sp sweep up (0/1),
+//   bl times the level has sunk below the old spring stones (told the first 3) }
+export const WELL_RING = 40;  // spring level points per ring (the spring holds SPRING_FULL above the old stones)
+export const WELL_MAX = 4;    // the bedrock: no deeper than this
+const WELL_WORK = 24;         // digger-hours for the first ring; each deeper ring takes WELL_DEEPER more
+const WELL_DEEPER = 8;
+const WELL_SPELL = 4;         // hours in one spell in the shaft
+const WELL_LOW = 40;          // they dig only while the water is within this of the bottom (or gone): a ring is dug when it was needed
+const WELL_CAVE = 0.025;     // chance per spell that a side gives way on the digger (more in rain)
+const WELL_HURT = 8;          // days laid up after a cave-in
+const WELL_SWEEP = 2;         // rings before the water is too far down to dip: a sweep pole goes up beside it
+export const WELL_DEPTHS = ['', 'knee deep', 'waist deep', 'deeper than the tallest islander', 'twice the height of the tallest islander', 'three times the height of the tallest islander'];
+export const wellDeep = (w) => (w.well ? w.well.d : 0);
+export const wellWork = (d) => WELL_WORK + WELL_DEEPER * d;
+const wellOn = (w, c) => {
+  const W = w.well, S = w.spring;
+  return !!(W && S && W.d < WELL_MAX && W.yr !== c.year && c.season < 3 && (S.dry || S.l < WELL_LOW - W.d * WELL_RING || (W.h > 0 && S.l < WELL_LOW - (W.d - 1) * WELL_RING)));
+};
+// the eldest says to dig, the first summer the spring runs low after it has once failed
+function wellDay(w, c) {
+  const S = w.spring;
+  if (w.well || !S || S.f < 1 || S.dry || c.season > 1 || S.l >= WELL_LOW) return;
+  const old = elder(w);
+  w.well = { d: 0, h: 0, yr: -1, nm: old ? old.name : null, at: w.t, n: 0, c: 0, hit: 0, sp: 0, bl: 0 };
+  log(w, `The spring is falling again. ${old ? old.name : 'The eldest'} stands over it with a digging stick and says the water does not come from the stones, it comes up from under them, and will be there still when the cress goes brown. While it is low, the spring is to be dug down.`, 'info');
+}
+// a spell in the shaft, two grown hands at a time (one digs, one hauls up the spoil), by day
+function wellTask(w, p, c) {
+  if (c.hour < 7 || c.hour > 15 || !wellOn(w, c)) return null;
+  const a = ageY(w, p);
+  if (a < 16 || a > 50) return null;
+  const key = w.res.wl0 == null ? 'wl0' : w.res.wl1 == null ? 'wl1' : null;
+  if (!key) return null;
+  const S = w.spring;
+  const side = key === 'wl1' && tile(w, S.x + 1, S.y) === T.GRASS ? 1 : 0; // the hauler at the lip
+  return { k: 'well', key, x: S.x + side, y: S.y, h: WELL_SPELL };
+}
+function wellDone(w, p, t, pop) {
+  const W = w.well, S = w.spring, c = clock(w.t);
+  if (!W || !S || !wellOn(w, c)) return;
+  W.n++;
+  if (t.key === 'wl0' && rnd(w) < WELL_CAVE * (w.wx && (w.wx.k === 'rain' || w.wx.k === 'storm') ? 3 : 1)) { // the side gives way
+    W.c++;
+    p.hurt = Math.max(p.hurt || 0, w.t + WELL_HURT * TICKS_PER_DAY);
+    W.h = Math.max(0, W.h - WELL_SPELL * 2);
+    log(w, W.c === 1
+      ? `A side of the shaft at the spring slumps in on ${p.name} with a wet sigh, up to ${poss(p)} chest. ${Cap(pron(p))} is dug out with bare hands, grey with clay and bruised all down one side. Stones go in to hold the wall before anyone goes down again.`
+      : `Part of the well side gives way under ${p.name}. ${Cap(pron(p))} is hauled out by the arms, bruised, and the fallen clay must be lifted out again.`, 'bad');
+    pop('cave-in', 'bad');
+    return;
+  }
+  W.h += WELL_SPELL;
+  pop('digging', 'wood');
+  if (W.h < wellWork(W.d)) return;
+  W.h = 0; W.d++; W.yr = c.year;
+  const ids = [w.res.wl0, w.res.wl1].filter((id) => id != null);
+  if (!ids.includes(p.id)) ids.push(p.id);
+  for (const id of ids) deed(w, aliveId(w, id), 'e');
+  const wet = S.dry; // dug down through the mud in a dry spell: water seeps in at the new bottom
+  if (wet) { S.dry = 0; S.l = -(W.d - 1) * WELL_RING; S.k = 0; S.tk = 0; W.hit++; }
+  if (W.d >= WELL_SWEEP && !W.sp) W.sp = 1;
+  const deep = WELL_DEPTHS[W.d];
+  if (W.d === 1) {
+    if (!w.techs.includes('well')) w.techs.push('well');
+    milestone(w, `${p.name} climbs out of the hole under the spring stones and hands the last basket of clay up to the light. ` +
+      `${wet ? 'At the bottom, in the cracked mud, dark water is already seeping in round the digging stick. ' : 'At the bottom the clay is wet and cold, and the water fills it slowly from below. '}` +
+      `The sides are lined with round stones carried up from the beach, one ring laid on the next, and the shaft is ${deep} below the old spring. When the summer draws the spring down now, there is water under it still. ${w.name} has a well.`);
+  } else log(w, `The well under the spring is dug down another ring and lined with beach stones; it is ${deep} now.` +
+    (wet ? ' The diggers strike water at the bottom, and the skins go down on a rope instead of out to the woods.' : '') +
+    (W.d === WELL_SWEEP ? ' The water is too far down to dip a jar by hand, so a long pole is set on a forked post beside it, a stone tied on one end and a bucket on the other.' : '') +
+    (W.d === WELL_MAX ? ' Under the last ring the digging stick hits rock. It will go no deeper.' : ''), 'good');
 }
 // half of each day's milk goes into the pails, as far as they hold; returns what was kept back
 function cheeseMilk(w, milk) {
@@ -5925,6 +6007,7 @@ export function deedsText(d) {
   if (d.n) out.push('tended the sick ' + n(d.n, 'time', 'times'));
   if (d.r) out.push('won the midsummer race ' + n(d.r, 'time', 'times'));
   if (d.s) out.push('hauled ' + n(d.s, 'stone', 'stones') + ' up to the ring');
+  if (d.e) out.push('dug and lined ' + n(d.e, 'ring', 'rings') + ' of the well');
   return out.join('; ');
 }
 function deed(w, p, k, v = 1) {
@@ -6240,6 +6323,9 @@ function pickTask(w, p, c) {
   // the bear pit by the bee logs, dug in the year after a bear has been at them
   const bpk = pitTask(w, p, c);
   if (bpk) return bpk;
+  // the spring dug down into a well while the water is low
+  const wlk = wellTask(w, p, c);
+  if (wlk) return wlk;
   // the hunt
   const hk = hunt(w, p, c);
   if (hk) return hk;
@@ -7084,6 +7170,8 @@ function finish(w, p, t, c, fx) {
     scareDone(w, p, t, pop);
   } else if (t.k === 'pit') {
     pitDone(w, p, t, pop);
+  } else if (t.k === 'well') {
+    wellDone(w, p, t, pop);
   } else if (t.k === 'water') {
     waterDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
@@ -8315,6 +8403,11 @@ const MIGRATIONS = {
   67: (w) => {
     if (w.vigil === undefined) w.vigil = null;
   },
+  // v68 -> v69: the well (w.well). Not begun; the first spring or summer the spring runs low after it has once failed,
+  // the eldest says to dig it down. The spring level may now fall below 0, down to the bottom of the well.
+  68: (w) => {
+    if (w.well === undefined) w.well = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8447,6 +8540,9 @@ export function summary(w) {
     aleVat: brewing(w), brews: w.ale ? w.ale.n : 0, aleGrain: w.ale ? w.ale.g : 0, aleGrainYear: w.ale ? w.ale.yg : 0, aleDrunk: w.ale ? w.ale.d : 0,
     aleSour: w.ale ? Math.round(w.ale.s) : 0, aleWater: w.ale ? w.ale.wa : 0, harvestHomes: w.ale ? w.ale.hh : 0, harvestHomeNow: !!(w.ale && aleNight(w, clock(w.t))),
     brewingNow: w.ale ? w.people.filter((p) => p.task && p.task.k === 'brew').length : 0,
+    well: !!w.well, wellRings: wellDeep(w), wellDug: w.well ? Math.round((w.well.h / wellWork(w.well.d)) * 100) : 0,
+    wellCaves: w.well ? w.well.c : 0, wellHit: w.well ? w.well.hit : 0, wellBy: w.well ? w.well.nm : null,
+    wellDigging: w.well ? w.people.filter((p) => p.task && p.task.k === 'well').length : 0,
     crows: !!w.crow, crowFlock: w.crow ? w.crow.b : 0, crowDown: crowsDown(w), crowLandings: w.crow ? w.crow.n : 0,
     crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
     scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
