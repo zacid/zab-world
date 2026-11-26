@@ -693,3 +693,14 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
     after one could make it clear inland fields, adding to sprawl.
 - Housekeeping: scripts/_surge.mjs and scripts/_surge2.mjs (tide probes) could not be deleted either. check.mjs here: 20261114 2.2 s/yr,
   777 2.7 s/yr at ~390 people, 4242 1.5 s/yr; verify on the live world 934 ms/yr.
+- Ale is done (SIM_VERSION 67; w.ale {id brewer, a jugs, v vat ready day, hh harvest homes, hd/hy this year's, wa cups for water, ws};
+  aleAt/aleNight/brewing exported; learnAle/aleDay/brewTask/brewDone/harvestHome/alePoured/aleWater, ALE_* in sim.js; quarrelHomes() and
+  quarrelBegin(..., ale)/quarrelSpat(..., ale) for ale-started and ale-fuelled feuds; drawVat/drawVatFroth/vatAt and the straw figure by
+  the hearth in render.js). The harvest home falls anywhere from summer day 1 to late autumn, whenever no field is still growing. Answers it invites:
+  - A drought drains the jugs in days (0.5 a head a day, one 20-jug vat every 4 days). A second vat, or brewing ahead when the spring runs low.
+  - Drunkenness: a reveller who wanders off from the harvest home into the fog or the woods (the search party), or falls in the fire.
+  - Ale for trade with the far isle at midsummer (jugs for hides), or as the wage for helping raise a house.
+  - Barley as a second crop for brewing, sown on the low or salted ground (ties to the storm tides).
+  - Bog myrtle or hops from the woods, found by the healer: ale that keeps through the summer (ALE_SOUR drops).
+  - The straw figure could be ploughed into the first furrow in spring (a sowing rite), or burnt on the midsummer fire.
+- Housekeeping: scripts/_ale.mjs (ale probe) could not be deleted here either; verify on the live world 931 ms/yr with ale.

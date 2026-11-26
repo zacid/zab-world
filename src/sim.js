@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 66;
+export const SIM_VERSION = 67;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -93,6 +93,7 @@ export const TECHS = {
   incomers: { name: 'Incomers', added: '2026-11-25T20:38Z', desc: 'The far isle is small and stony, and some springs a household there has nothing left to stay for: a thin year that ate the seed grain, a house burnt in the winter, a husband lost at sea, a match a father will not allow. They load their dugout with bundles and a pot of embers and come over by day. While the granaries are full and the island has room, the eldest takes them in. They sleep where there is space until a house is raised for them, their dugout is broken up for its roof-beams, and their children grow up to marry island children.', req: ['farisle'] },
   loom:     { name: 'Spinning and weaving', added: '2026-11-25T21:44Z', desc: 'Each spring, when the goats moult, the herder combs the loose winter coats out of them with a bone comb. The children and the old spin the hair into yarn on drop spindles, a stone whorl twirling on a thread, in every idle moment. One weaver keeps an upright loom against the wall of their house, the warp threads pulled straight by hanging weights, and on winter days and wet days the cloth grows on it a finger at a time. A blanket on every bed means a house keeps warm on less firewood, and the cold reaches the small and the old less hard. Blankets wear through in a few years and have to be woven again.', req: ['goats'] },
   surge:    { name: 'Storm tides', added: '2026-11-26T00:44Z', desc: 'Twice a month, at new moon and full moon, the tide runs higher than on other days. When a gale out of the sea comes on top of such a tide, the water does not stop at the sand: it pours over the low ground behind the beach, through the hedges and over the nearest fields. In a day it drains away, and leaves the earth grey and crusted with salt. Grain sown in it comes up yellow and dies, so a drowned field lies bare until enough rain has fallen to wash the salt back out, most of a year. The tide line is left heaped with wrack and driftwood. Nobody has an answer for it yet.', req: ['farming'] },
+  ale:      { name: 'Ale', added: '2026-11-26T06:44Z', desc: 'Grain that gets wet in the jar sprouts; dried by the fire, cracked on a flat stone and steeped in hot water, it turns sweet, and a few days later it froths and turns to ale. One brewer keeps a wooden vat against the wall of their house and mashes a sack of the spare grain whenever the jugs run low. Ale is poured at midsummer and on the night the last sheaf comes in, the harvest home, when the whole village sits up late round the hearth. When the spring fails the children drink small ale and fewer skins have to come in from the pool. Ale goes sour in the summer heat, and a jug too many can turn words into blows.', req: ['pottery'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -603,7 +604,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -775,6 +776,7 @@ export function step(w, fx) {
   if (w.lore && c.hour === LORE_READ) loreRead(w, c);
   if (w.fest && w.fest.on === c.day) midsummer(w, c, fx);
   if (w.tale && w.tale.on === c.day) longNight(w, c, fx);
+  if (w.ale && w.ale.hd === c.day && c.hour === ALE_POUR) harvestHome(w, c, fx);
   if (w.blaze && w.blaze.cur) blazeHour(w, c);
   if (w.stones && w.stones.cur) stoneHour(w, c, fx);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
@@ -828,7 +830,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}), ...(w.surge && w.surge.yt ? { tides: w.surge.yt, ...(w.surge.y ? { salted: w.surge.y } : {}) } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}), ...(w.surge && w.surge.yt ? { tides: w.surge.yt, ...(w.surge.y ? { salted: w.surge.y } : {}) } : {}), ...(w.ale ? { brewed: w.ale.yg, drunk: Math.round(w.ale.yd) } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -847,6 +849,7 @@ function daily(w, c, fx) {
     if (w.hedge) w.hedge.y = 0;
     if (w.frost) w.frost.y = 0;
     if (w.surge) w.surge.y = w.surge.yt = 0;
+    if (w.ale) w.ale.yg = w.ale.yd = 0;
     if (w.bear) w.bear.yr = 0;
     if (w.wade) w.wade.y = 0;
     if (w.smudge) w.smudge.y = 0;
@@ -938,6 +941,7 @@ function daily(w, c, fx) {
   if (w.spring !== undefined) springDay(w, c, wx);
   if (w.goats !== undefined) goatDay(w, c);
   if (w.loom !== undefined) loomDay(w, c, wx);
+  if (w.ale !== undefined) aleDay(w, c, wx);
   if (w.muck) muckDay(w);
   if (w.dogs !== undefined) dogDay(w, c);
   lifeAndDeath(w, c);
@@ -2840,6 +2844,7 @@ function midsummer(w, c, fx) {
   if (h === FEST_FROM) {
     F.k = 0; F.pairs = [];
     F.mead = meadPoured(w, pop);
+    F.ale = alePoured(w, pop, ALE_FEST);
     F.wood = Math.min(FEST_WOOD, Math.floor(w.timber / 4));
     w.timber = Math.round((w.timber - F.wood) * 100) / 100;
     if (fx) fx.push({ x: w.fire.x + 0.5, y: w.fire.y - 1, text: 'midsummer', color: 'food' });
@@ -2863,7 +2868,7 @@ function midsummer(w, c, fx) {
     F.n = (F.n || 0) + 1;
     const feast = F.feast >= pop ? ' and feast on the best of the stores' : F.feast > 0 ? ' and share what the stores can spare' : ' on empty stomachs';
     const fire = F.wood >= 6 ? 'a towering bonfire' : F.wood > 0 ? 'a small bonfire' : 'the hearth, with no wood to spare for more';
-    let text = `${F.wait ? `After ${plural(F.wait, 'day', 'days')} of waiting for the sky to clear, midsummer` : 'Midsummer'} on ${w.name}: ${pop} ${pop === 1 ? 'soul dances' : 'people dance'} around ${fire}${feast}${F.mead ? ', and the mead goes round' : ''}.`;
+    let text = `${F.wait ? `After ${plural(F.wait, 'day', 'days')} of waiting for the sky to clear, midsummer` : 'Midsummer'} on ${w.name}: ${pop} ${pop === 1 ? 'soul dances' : 'people dance'} around ${fire}${feast}${F.mead && F.ale ? ', and the mead and the ale go round' : F.mead ? ', and the mead goes round' : F.ale ? ', and the ale jugs go round' : ''}.`;
     if (F.mead && w.bees.m === 1) {
       const by = w.people.find((q) => q.name === w.bees.nm) || elder(w);
       milestone(w, `Last summer's honey has stood all year in ${w.pot ? 'a sealed jar' : 'a covered tub'} with water from the spring, and it has turned. ${by ? by.name : 'Somebody'} lifts the lid at midsummer and the smell fills the hearth: sweet, sharp and strong. A bowl goes from hand to hand round the bonfire, and the dancing gets louder and later than it has ever been. ${w.name} has mead.`);
@@ -2875,7 +2880,7 @@ function midsummer(w, c, fx) {
     if (F.n === 1) milestone(w, `${text} The first midsummer fire on ${w.name} burns until nearly midnight.`);
     else if (F.n % 25 === 0) milestone(w, `${text} It is the ${F.n}th midsummer kept on ${w.name}.`);
     else log(w, text, P.length ? 'love' : 'good');
-    delete F.pairs; delete F.feast; delete F.wood; delete F.wait; delete F.mead;
+    delete F.pairs; delete F.feast; delete F.wood; delete F.wait; delete F.mead; delete F.ale;
   }
 }
 
@@ -3899,13 +3904,19 @@ function quarrelDay(w, c, fx) {
     loveDay(w, c, C, fx);
     return;
   }
-  if (c.year < QUARREL_FROM || w.people.length < QUARREL_POP || (Q && Q.end != null && w.t - Q.end < QUARREL_GAP * TICKS_PER_YEAR)) return;
-  const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && occupants(w, b.id) >= 2 && houseHead(w, b.id));
-  if (homes.length < 3 || rnd(w) >= QUARREL_SEED * Math.min(3, homes.length / 8)) return;
+  const homes = quarrelHomes(w, c);
+  if (!homes || rnd(w) >= QUARREL_SEED * Math.min(3, homes.length / 8)) return;
   quarrelBegin(w, c, homes, fx);
 }
-function quarrelBegin(w, c, homes, fx) {
-  const lov = rnd(w) < LOVE_CAUSE ? loveCause(w, homes) : null; // a girl caught with a lad her father will not have
+// the households that could fall out now, or null if it is too soon (or too few) for a new quarrel
+function quarrelHomes(w, c) {
+  const Q = w.quarrel;
+  if ((Q && Q.cur) || c.year < QUARREL_FROM || w.people.length < QUARREL_POP || (Q && Q.end != null && w.t - Q.end < QUARREL_GAP * TICKS_PER_YEAR)) return null;
+  const homes = w.buildings.filter((b) => isHouse(b) && b.progress >= 1 && occupants(w, b.id) >= 2 && houseHead(w, b.id));
+  return homes.length >= 3 ? homes : null;
+}
+function quarrelBegin(w, c, homes, fx, ale) {
+  const lov = !ale && rnd(w) < LOVE_CAUSE ? loveCause(w, homes) : null; // a girl caught with a lad her father will not have
   let A = lov ? lov.A : homes[ri(w, homes.length)], B = lov ? lov.B : null, bd = Infinity; // or they fall out with the people next door
   if (!B) for (const o of homes) if (o !== A) { const d = d2(A.x, A.y, o.x, o.y); if (d < bd) { bd = d; B = o; } }
   const a = houseHead(w, A.id), b = houseHead(w, B.id);
@@ -3918,7 +3929,8 @@ function quarrelBegin(w, c, homes, fx) {
   if (w.bees && ay) why.push(['honey', `Comb has gone from the bee log, and ${b.name} says ${ay.name} of ${a.name}'s house was seen with sticky hands. ${a.name} calls ${b.name} a liar in front of the whole hearth.`]);
   if (w.dogs && w.dogs.d.length && by) why.push(['dog', `A dog from ${a.name}'s doorway snaps at ${by.name}, and ${b.name} throws a stone at it and lames it. ${a.name} sees it done.`]);
   if (w.techs.includes('hunting') && ageY(w, a) < 55 && ageY(w, b) < 55) why.push(['spear', `${a.name} and ${b.name} both swear it was their spear that brought down the last boar, and neither will give up the hide.`]);
-  const [k, text] = lov ? ['love', `${a.name} finds ${lov.f.name} after dark at the edge of the woods with ${lov.m.name} of ${b.name}'s house, and drags ${lov.f.sex === 'f' ? 'her' : 'him'} home by the arm. ${a.name} says before the whole hearth that no child of ${a.sex === 'f' ? 'hers' : 'his'} will go to ${b.name}'s house, and ${b.name} takes it as the insult it is.`]
+  const [k, text] = ale ? ['ale', `At the harvest home ${a.name} has had a jug too many, and says out loud by the fire what ${pron(a)} has always thought of ${b.name}'s house. ${b.name} stands up and knocks the jug out of ${poss(a)} hand, and the ale soaks into the ashes.`]
+    : lov ? ['love', `${a.name} finds ${lov.f.name} after dark at the edge of the woods with ${lov.m.name} of ${b.name}'s house, and drags ${lov.f.sex === 'f' ? 'her' : 'him'} home by the arm. ${a.name} says before the whole hearth that no child of ${a.sex === 'f' ? 'hers' : 'his'} will go to ${b.name}'s house, and ${b.name} takes it as the insult it is.`]
     : why.length > 1 && rnd(w) < 0.85 ? why[1 + ri(w, why.length - 1)] : why[0];
   let Q = w.quarrel;
   const first = !Q;
@@ -3932,18 +3944,18 @@ function quarrelBegin(w, c, homes, fx) {
   if (first) milestone(w, `${text} ${after} It is the first feud on ${w.name}, and nobody knows how to end it.`);
   else log(w, `${text} ${after}${Q.cup != null ? ' Everyone waits for the next gathering and the bowl.' : ''}`, 'bad');
 }
-function quarrelSpat(w, c, C, a, b, fx) {
+function quarrelSpat(w, c, C, a, b, fx, ale) {
   const Q = w.quarrel, flip = rnd(w) < 0.5, x = flip ? b : a, y = flip ? a : b;
   C.n++; Q.y++;
   const fit = (id) => { let best = null; for (const p of w.people) { const ag = ageY(w, p); if (!p.dead && p.home === id && ag >= 16 && ag <= 45 && !p.sick && !p.hurt && (!best || Math.abs(ag - 24) < Math.abs(ageY(w, best) - 24))) best = p; } return best; };
   const p = fit(C.a), q = fit(C.b);
-  if (!p || !q || rnd(w) >= QUARREL_BLOWS * (Q.cup != null ? 0.5 : 1)) return log(w, SPATS[ri(w, SPATS.length)](x.name, y.name), 'bad');
+  if (!p || !q || rnd(w) >= (ale ? ALE_BLOWS : QUARREL_BLOWS) * (Q.cup != null ? 0.5 : 1)) return log(w, ale ? `At the harvest home ${x.name} and ${y.name} sit on opposite sides of the hearth all night, and every time the jug comes round one of them says something the other pretends not to hear.` : SPATS[ri(w, SPATS.length)](x.name, y.name), 'bad');
   const lose = rnd(w) < 0.5 ? p : q, win = lose === p ? q : p, days = QUARREL_HURT + ri(w, 3);
   lose.hurt = Math.max(lose.hurt || 0, w.t + days * TICKS_PER_DAY);
   if (!Q.br.includes(lose.id)) Q.br.push(lose.id);
   C.f++; Q.f++; Q.yf++;
   if (fx) fx.push({ x: lose.x, y: lose.y - 0.5, text: 'blows', color: 'sick' });
-  const where = ['behind the granary', 'down at the landing', 'at the edge of the fields', 'by the spring', 'in the middle of the path'][ri(w, 5)];
+  const where = ale ? 'by the hearth at the harvest home, over the ale, with the whole village pulling them apart' : ['behind the granary', 'down at the landing', 'at the edge of the fields', 'by the spring', 'in the middle of the path'][ri(w, 5)];
   log(w, `Words turn to blows between ${win.name} and ${lose.name} ${where}. ${lose.name} comes home with a split lip and an eye swelling shut, and is no use for ${days} days.${C.f === 1 && Q.f === 1 ? ` Nobody on ${w.name} has struck anyone before.` : ''}`, 'bad');
 }
 // one head is dead: the other comes to the graveside, and the quarrel is buried with them
@@ -4811,7 +4823,7 @@ function springDay(w, c, wx) {
     S.k = 0; S.tk = 0;
   } else if (!S.dry && S.l <= SPRING_BACK && S.l - g > SPRING_BACK && c.season === 1) log(w, 'The spring by the village runs low. The water comes up muddy and slow.', 'info');
   S.c = 0; S.o = 0;
-  if (S.dry) { S.k++; S.dd++; S.yd++; S.nd = S.px != null ? Math.ceil(pop / carryFor(w)) : 0; }
+  if (S.dry) { S.k++; S.dd++; S.yd++; S.nd = S.px != null ? Math.ceil((pop - aleWater(w, S, pop)) / carryFor(w)) : 0; }
   else S.nd = 0;
 }
 function springFails(w, c, wx) {
@@ -5008,6 +5020,169 @@ function loomDone(w, p, pop) {
   pop('a blanket', 'muted');
   if (L.n === 1) milestone(w, `${p.name} cuts the first blanket down off the loom: goat hair, grey and brown, rough as a dog's back and as warm. It goes on the bed where the youngest sleep. Nobody on ${w.name} has slept under cloth before.`);
   else if (L.n === 50 || L.n === 200 || L.n === 1000) log(w, `${L.n} blankets have come off the loom.`, 'good');
+}
+// ---------- ale and the harvest home ----------
+// Once the stores run deep, a jar of grain left open in the wet sprouts. The potter (or the eldest) dries it by the
+// fire, cracks it on a flat stone and steeps it in hot water, and a few days later it froths: ale. From then on one
+// brewer keeps a wooden vat against the wall of their house and mashes a sack of spare grain whenever the jugs run
+// low (never while the stores are thin). Ale is poured at midsummer and at the harvest home, the night after the last
+// sheaf is in, when the whole village sits up late round the hearth: couples pair off, and a feud in the village may
+// come to blows over the jug, or a new one start. When the spring fails, small ale stands in for some of the water
+// carried in from the pool. In the summer heat a little of it sours every day.
+// w.ale { id brewer, nm, k brewers so far, at tick found, by who found it, a jugs in store, v day the vat is ready (0 empty),
+//   n brews ever, g grain brewed ever, yg this year, yd jugs drunk this year, d drunk ever, s soured ever,
+//   hh harvest homes kept, hd day of this year's harvest home, hy year of the last, wa jugs drunk for water, ws dry spell told }
+const ALE_RICH = 300;        // grain in store per islander before anyone has grain to spare for brewing
+const ALE_FIND = 0.08;       // daily chance on a wet day after the harvest
+const BREW_GRAIN = 120;      // grain mashed in one brew
+const ALE_BREW = 20;         // jugs of ale it makes
+const ALE_DAYS = 4;          // days in the vat before it is ready
+const ALE_KEEP = 250;        // grain per islander kept back: below this the brewer does not brew
+const ALE_PER = 1.5;         // jugs kept on hand per islander (plus ALE_BASE)
+const ALE_BASE = 12;
+const ALE_SOUR = 0.005;     // share of the jugs that turn sour each summer day
+const ALE_POUR = 20;         // hour the jugs come out at the harvest home
+export const ALE_LATE = 23;  // nobody goes to bed before this on the night of the harvest home
+const ALE_CUP = 0.6;         // jugs poured per islander at the harvest home
+const ALE_FEST = 0.4;        // and at midsummer, with the feast
+const ALE_SMALL = 0.5;       // islanders a day who drink small ale instead of pool water when the spring fails
+const ALE_PAIR = 0.15;       // chance a single woman is paired off at the harvest home
+const ALE_ROW = 0.5;         // chance a running feud flares up over the jug
+const ALE_BLOWS = 0.6;       // and that it comes to blows (half that with the peace cup)
+const ALE_FEUD = 0.12;       // chance a new feud starts at the harvest home, when one could
+const ALE_OLD = 70;
+const aleCap = (w) => ALE_BASE + Math.round(w.people.length * ALE_PER);
+export const aleNight = (w, c) => !!(w.ale && w.ale.hd === c.day && c.hour >= ALE_POUR && c.hour < ALE_LATE);
+export const brewing = (w) => !!(w.ale && w.ale.v);
+// the vat: against the brewer's house wall, on an open side, never where the loom stands
+export function aleAt(w) {
+  const L = w.ale, p = L && aliveId(w, L.id);
+  const b = p && p.home != null && w.buildings.find((o) => o.id === p.home);
+  if (!b || b.progress < 1) return null;
+  const lm = w.loom ? loomAt(w) : null;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) {
+    const x = b.x + dx, y = b.y + dy, t = inMap(x, y) ? tile(w, x, y) : T.WATER;
+    if (t !== T.BUILD && t !== T.WATER && !(lm && lm.x === x && lm.y === y)) return { x, y, b: b.id, s: dx };
+  }
+  return null;
+}
+// the brewer: a grown child or housemate of the last one first, then whoever with a roof of their own is nearest 35;
+// never the healer, the goatherd, the potter, the weaver or the keeper of the horn
+function pickBrewer(w, old) {
+  let best = null, bs = 1e9;
+  const busy = [w.heal && w.heal.id, w.goats && w.goats.hid, w.horn && w.horn.hid, w.pot && w.pot.id, w.loom && w.loom.id];
+  for (const p of w.people) {
+    const a = ageY(w, p);
+    if (p.dead || p === old || a < 18 || a >= ALE_OLD - 5 || p.sick || p.home == null || busy.includes(p.id)) continue;
+    const tier = old && (p.mother === old.id || p.father === old.id) ? 0 : old && old.home != null && p.home === old.home ? 1 : 2;
+    const sc = tier * 100 + Math.abs(a - 35) + (p.sex === 'f' ? 0 : 4);
+    if (sc < bs) { bs = sc; best = p; }
+  }
+  return best;
+}
+function learnAle(w, c, wx) {
+  const pop = w.people.length;
+  if (c.season < 1 || c.season > 2 || (wx !== 'rain' && wx !== 'storm') || !w.pot || pop < 10 || w.food < pop * ALE_RICH ||
+    !w.stats.yh || w.fields.some(growing) || rnd(w) >= ALE_FIND) return;
+  const po = aliveId(w, w.pot.id), old = po || elder(w), br = pickBrewer(w, null);
+  if (!old || !br) return;
+  w.ale = { id: br.id, nm: br.name, k: 1, at: w.t, by: old.name, a: 0, v: 0, n: 0, g: 0, yg: 0, yd: 0, d: 0, s: 0, hh: 0, hd: null, hy: c.year, wa: 0, ws: 0 };
+  w.techs.push('ale');
+  const B = br === old ? Cap(pron(br)) : br.name;
+  milestone(w, `The rain has got in under the lid of a jar of the new grain, and when ${old.name} tips it out the seed has sprouted, a pale beard on every grain. ${Cap(pron(old))} cannot bear to throw it to the goats, so ${pron(old)} dries it on a hide by the fire, cracks it on a flat stone and steeps it in a pot of hot water. It turns sweet as honey. ` +
+    `Three days later the pot is frothing and sour-smelling, and the first cup of it goes round the hearth to a great deal of coughing and laughing. ${B} hollows out a log for a vat and sets it against the wall of ${poss(br)} house. ${w.name} learns to brew ale.`);
+}
+function aleDay(w, c, wx) {
+  if (w.ale === null) { learnAle(w, c, wx); return; }
+  const L = w.ale;
+  if (L.v && dayNo(w) >= L.v) { // the vat has worked: into the jugs
+    L.v = 0; L.a += ALE_BREW;
+    if (L.n === 1) log(w, `${L.nm}'s vat has stopped frothing. The ale is ladled out into ${plural(ALE_BREW, 'jug', 'jugs')} and stoppered with clay. It will keep until the harvest is in.`, 'good');
+  }
+  if (c.season === 1 && L.a > 0) { // the summer heat sours it a little every day
+    const s = Math.round(L.a * ALE_SOUR * 100) / 100;
+    L.a = Math.round((L.a - s) * 100) / 100; L.s = Math.round((L.s + s) * 100) / 100;
+  }
+  // the day after the last sheaf is in: the harvest home, if there is ale for it
+  if (L.hy !== c.year && c.season >= 1 && c.season <= 2 && w.stats.yh > 0 && L.a >= 1 && wx !== 'storm' && !w.fields.some(growing) &&
+    !(w.fest && w.fest.on === c.day) && !(w.tale && w.tale.on === c.day)) { L.hd = c.day; L.hy = c.year; }
+  // a new brewer when the old one dies, grows too old, or takes on other work
+  const cur = aliveId(w, L.id);
+  const busy = cur && ((w.heal && w.heal.id === cur.id) || (w.goats && w.goats.hid === cur.id) || (w.horn && w.horn.hid === cur.id) || (w.pot && w.pot.id === cur.id) || (w.loom && w.loom.id === cur.id));
+  if (cur && !busy && ageY(w, cur) < ALE_OLD && cur.home != null) return;
+  const next = pickBrewer(w, cur || (L.id != null ? { id: L.id, home: null } : null));
+  if (!next) { if (!cur) L.id = null; return; }
+  const before = L.nm;
+  L.id = next.id; L.nm = next.name; L.k++;
+  if (cur && busy) log(w, `${cur.name} has no time for brewing now. ${next.name} rolls the ale vat over to ${poss(next)} own wall.`, 'info');
+  else if (cur) log(w, `${cur.name} is too old to lift the mash. ${next.name} takes over the ale vat.`, 'info');
+  else log(w, `With ${before} gone, ${next.name} scrubs out the ale vat and sets it against ${poss(next)} own wall.`, 'info');
+}
+// jugs poured at a gathering, if there are any: a share per islander
+function alePoured(w, pop, share) {
+  const L = w.ale;
+  if (!L || L.a < 1) return 0;
+  const n = Math.min(Math.floor(L.a), Math.ceil(pop * share));
+  L.a = Math.round((L.a - n) * 100) / 100; L.yd += n; L.d += n;
+  return n;
+}
+// the spring has failed: the children and the old drink small ale, and that many fewer cups come in from the pool
+function aleWater(w, S, pop) {
+  const L = w.ale;
+  if (!L || L.a < 1) return 0;
+  const n = Math.min(Math.floor(L.a), Math.ceil(pop * ALE_SMALL));
+  L.a = Math.round((L.a - n) * 100) / 100; L.yd += n; L.d += n; L.wa += n;
+  if (L.ws !== S.f) {
+    L.ws = S.f;
+    log(w, `With the spring dry, the ale jugs come down from the rafters. The small children are given small ale with their bread, and ${plural(n, 'cup', 'cups')} a day fewer have to be carried in from the pool.`, 'good');
+  }
+  return n;
+}
+function harvestHome(w, c, fx) {
+  const L = w.ale, pop = w.people.length;
+  const n = alePoured(w, pop, ALE_CUP);
+  if (!n) return;
+  L.hh++;
+  const pairs = [];
+  for (const f of w.people) {
+    if (f.dead || f.sex !== 'f' || f.partner != null || ageY(w, f) < 17 || rnd(w) >= ALE_PAIR) continue;
+    const m = mate(w, f);
+    if (!m) continue;
+    f.partner = m.id; m.partner = f.id; f.wants = true;
+    pairs.push(`${f.name} and ${m.name}`);
+  }
+  if (fx) fx.push({ x: w.fire.x + 0.5, y: w.fire.y - 1, text: 'harvest home', color: 'food' });
+  const wed = pairs.length === 1 ? ` By the end of the night ${pairs[0]} are sitting under one cloak.` : pairs.length > 1 ? ` By the end of the night ${plural(pairs.length, 'couple is', 'couples are')} paired off: ${pairs.slice(0, 3).join(', ')}${pairs.length > 3 ? ' and more' : ''}.` : '';
+  if (L.hh === 1) {
+    const by = aliveId(w, L.id);
+    milestone(w, `The last sheaf on ${w.name} is cut and carried in, and ${by ? by.name : 'the brewer'} twists a handful of its straw into a little figure with arms and hangs it over the hearth. That night nobody goes to bed. ${plural(n, 'jug', 'jugs')} of ale go round the fire, the old sing songs nobody has sung since they left the far shore, and the children fall asleep where they sit.${wed} From now on the end of the harvest is kept with ale: ${w.name} has a harvest home.`);
+  } else log(w, `Harvest home: the last sheaf is in and a new straw figure hangs over the hearth. ${plural(n, 'jug', 'jugs')} of ale go round, and the singing goes on until nearly midnight.${wed}`, pairs.length ? 'love' : 'good');
+  // a jug too many: a feud flares up, or a new one begins
+  const C = quarrelOf(w);
+  if (C) {
+    const a = aliveId(w, C.ai), b = aliveId(w, C.bi);
+    if (a && b && rnd(w) < ALE_ROW) quarrelSpat(w, c, C, a, b, fx, true);
+  } else {
+    const homes = quarrelHomes(w, c);
+    if (homes && rnd(w) < ALE_FEUD) quarrelBegin(w, c, homes, fx, true);
+  }
+}
+// the brewer at the vat: in daylight, while the jugs are low and the stores can spare a sack
+function brewTask(w, p, c) {
+  const L = w.ale;
+  if (!L || L.id !== p.id || L.v || c.hour < 8 || c.hour > 14 || w.res.ab != null) return null;
+  if (L.a + ALE_BREW > aleCap(w) || w.food < w.people.length * ALE_KEEP + BREW_GRAIN) return null;
+  const at = aleAt(w);
+  return at ? { k: 'brew', key: 'ab', x: at.x, y: at.y, h: 3 } : null;
+}
+function brewDone(w, p, pop) {
+  const L = w.ale;
+  if (!L || L.id !== p.id || L.v || w.food < BREW_GRAIN) return;
+  w.food = Math.round((w.food - BREW_GRAIN) * 100) / 100;
+  L.v = dayNo(w) + ALE_DAYS; L.n++; L.g += BREW_GRAIN; L.yg += BREW_GRAIN;
+  pop('mashing', 'muted');
+  if (L.n === 1) log(w, `${p.name} heats stones in the fire and drops them hissing into the vat, stirring a sack of sprouted grain into the water with a paddle. A sweet steam hangs round ${poss(p)} doorway all afternoon.`, 'info');
+  else if (L.n === 50 || L.n === 200 || L.n === 1000) log(w, `${L.n} brews have been mashed in the ale vat.`, 'info');
 }
 // ---------- foot rot ----------
 // A long wet spell turns a full pen into a wallow of mud and dung, and the hooves go soft in it. One goat
@@ -6027,6 +6202,11 @@ function pickTask(w, p, c) {
     const lk = loomTask(w, p, c);
     if (lk) return lk;
   }
+  // the brewer at the vat, when the jugs run low and the stores can spare a sack
+  if (w.ale && w.ale.id === p.id) {
+    const bk = brewTask(w, p, c);
+    if (bk) return bk;
+  }
   // the honey, from the logs that hold more than the bees need for the winter
   const ek = beeTask(w, p, c);
   if (ek) return ek;
@@ -6700,8 +6880,9 @@ function act(w, p, c, fx) {
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
   const warned = !!(w.lore && w.lore.on === c.day + 1) && h >= LORE_READ && h < LORE_LATE && a >= 14 && a < 65 && !p.hurt && !p.sick; // a storm is called: work on by firelight
-  const night = (h >= 21 && !warned) || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST) || (w.smudge && h < SMUDGE_REST && w.smudge.last.includes(p.id)); // the night's watcher sleeps late, and so do the smudgers
-  const evening = h >= (afraid ? 16 : 18) && h < 21;
+  const late = w.ale && w.ale.hd === c.day ? ALE_LATE : 21; // the harvest home: everyone sits up round the hearth
+  const night = (h >= late && !warned) || h < (afraid ? 7 : 6) || (w.watch && w.watch.last === p.id && h < WATCH_REST) || (w.smudge && h < SMUDGE_REST && w.smudge.last.includes(p.id)); // the night's watcher sleeps late, and so do the smudgers
+  const evening = h >= (afraid ? 16 : 18) && h < late;
   const storm = w.wx && w.wx.k === 'storm';
   if (w.fest && w.fest.on === c.day && h >= FEST_FROM && h < FEST_TO && !p.sick) { // midsummer: everyone (who can stand) to the bonfire
     const R = raceNow(w, c) ? w.fest.race : null, ri = R ? R.rs.findIndex((q) => q[0] === p.id) : -1;
@@ -6891,6 +7072,8 @@ function finish(w, p, t, c, fx) {
     cheeseDone(w, p, pop);
   } else if (t.k === 'weave') {
     loomDone(w, p, pop);
+  } else if (t.k === 'brew') {
+    brewDone(w, p, pop);
   } else if (t.k === 'crowman') {
     scareDone(w, p, t, pop);
   } else if (t.k === 'pit') {
@@ -7986,6 +8169,10 @@ const MIGRATIONS = {
   65: (w) => {
     if (w.surge === undefined) w.surge = null;
   },
+  // v66 -> v67: ale and the harvest home (w.ale). Not found yet; a wet day after the harvest once the stores are deep.
+  66: (w) => {
+    if (w.ale === undefined) w.ale = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8114,6 +8301,10 @@ export function summary(w) {
     loom: !!w.loom, weaver: w.loom ? w.loom.nm : null, weaverAlive: !!(w.loom && aliveId(w, w.loom.id)), blankets: w.loom ? w.loom.b : 0, blanketCover: loomCover(w),
     hair: w.loom ? Math.round(w.loom.h) : 0, yarn: w.loom ? Math.floor(w.loom.y) : 0, onLoom: w.loom ? w.loom.wv : 0, woven: w.loom ? w.loom.n : 0, wovenYear: w.loom ? w.loom.yb : 0,
     weaving: w.loom ? w.people.filter((p) => p.task && p.task.k === 'weave').length : 0,
+    ale: !!w.ale, brewer: w.ale ? w.ale.nm : null, brewerAlive: !!(w.ale && aliveId(w, w.ale.id)), aleJugs: w.ale ? Math.floor(w.ale.a) : 0, aleCap: w.ale ? aleCap(w) : 0,
+    aleVat: brewing(w), brews: w.ale ? w.ale.n : 0, aleGrain: w.ale ? w.ale.g : 0, aleGrainYear: w.ale ? w.ale.yg : 0, aleDrunk: w.ale ? w.ale.d : 0,
+    aleSour: w.ale ? Math.round(w.ale.s) : 0, aleWater: w.ale ? w.ale.wa : 0, harvestHomes: w.ale ? w.ale.hh : 0, harvestHomeNow: !!(w.ale && aleNight(w, clock(w.t))),
+    brewingNow: w.ale ? w.people.filter((p) => p.task && p.task.k === 'brew').length : 0,
     crows: !!w.crow, crowFlock: w.crow ? w.crow.b : 0, crowDown: crowsDown(w), crowLandings: w.crow ? w.crow.n : 0,
     crowYear: w.crow ? Math.round(w.crow.y) : 0, crowEver: w.crow ? Math.round(w.crow.g) : 0, crowStripped: w.crow ? w.crow.st : 0,
     scaring: !!(w.crow && w.crow.sc), scared: w.crow ? w.crow.s : 0, scaredYear: w.crow ? w.crow.ys : 0,
