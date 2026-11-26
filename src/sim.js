@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 72;
+export const SIM_VERSION = 73;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -98,6 +98,7 @@ export const TECHS = {
   well:     { name: 'The well', added: '2026-11-26T11:43Z', desc: 'The water of the spring does not come from the stones but up from under them. Once the spring has failed, it is dug down in the dry of the year while the water is low: one islander in the shaft with a digging stick, another hauling up the clay in a basket, the sides lined ring on ring with round stones from the beach. A ring is dug in a summer when the water gets down near the bottom, four at most before the rock. Each ring lets the spring fall further before there is only mud, and past two rings a sweep pole on a forked post dips the bucket. A wet side can slump in on the digger. More mouths draw it down faster, and in a long hot summer the deepest well can still go dry.', req: ['drought'] },
   wreck:    { name: 'Castaways', added: '2026-11-26T12:19Z', desc: 'Some autumn and winter gales out of the open sea throw up more than weed: the broken planks of a boat from no shore anyone on the island knows, and now and then someone still alive among them, face down in the surf and blue with cold. The morning after, whoever walks the beach first runs for help, and two of them carry the stranger up between them to the herb-healer\'s fire. Out on the sand in winter the cold kills in hours, so a long walk can come too late; the drowned are buried with the island\'s own. Those who live stay. For a year they have only their own name and a few island words; after that they can tell where the sea took them from. The planks are dragged up above the tide line and the ribs of the boat are left on the sand.', req: ['fishing'] },
   tracks:   { name: 'Tracks in the snow', added: '2026-11-26T17:34Z', desc: 'Once the snow stops falling, everything that walks on the island writes it down: the paired slots of deer, the round pads of wolves, the trough a boar ploughs. The prints can be read for a day and a half, until new snow fills them or a thaw takes them. At first light the best hunter goes out to read them. Wolf prints right up to the doors or the goat pen mean the pack came in close in the night, and the village keeps by the houses and is in by mid-afternoon. A hunt that sets out while the prints are fresh follows them straight to the beast and comes home with it more often, and the deer can be hunted on a fresh trail in winter too.', req: ['hunting'] },
+  thornfold: { name: 'Thorn fold', added: '2026-11-26T18:01Z', desc: 'Blackthorn brush cut at the wood\'s edge and heaped against the back wall of the goat pen, spines outward, where the winter wolves break in. A full fold turns nearly every wolf. It does not grow like a hedge: it rots and settles and blows about, and a wolf that forces its way through drags half of it out, so every autumn and winter it is cut again and heaped back up.', req: ['goats', 'hedges'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -457,6 +458,16 @@ const PEN_WAKE = 0.5;        // chance someone sleeping close by wakes to the go
 const PEN_NEAR = 36;         // a house this close to the pen (squared) is close enough to hear
 const PEN_BITE = 0.15;       // chance the one who runs out is bitten
 const PEN_MEND = 2;          // timber to weave the torn wattle back
+// the thorn fold: blackthorn brush heaped against the back of the pen. w.thorn {b loads heaped now, n loads ever,
+// k wolves turned, y turned this year, nm who thought of it, at tick}
+export const THORN_FULL = 12; // loads of brush for a fold as high as a man's waist all along the back
+const THORN_HOLD = 0.88;      // chance the pen holds against a wolf with a full fold (the wattle alone: PEN_HOLD)
+const THORN_WORK = 3;         // hours to cut a load at the wood's edge and drag it to the pen
+const THORN_TOP = 9;          // in autumn and winter the fold is topped up once it sinks below this
+const THORN_ROT = 0.025;      // loads a day that rot, settle and blow away
+const THORN_STORM = 0.3;      // and more on a storm day
+const THORN_TORN = 2.5;       // dragged out where a wolf forces its way through
+const THORN_SPENT = 0.4;      // pulled about by a wolf that gives up
 const DOG_CUB = 0.01;        // daily chance in spring and summer (year 3 on) that a cub is found at the edge of the woods
 const DOG_GROWN = 1;         // years before a pup is any use
 const DOG_SPEED = 6;         // tiles per hour, trotting at heel
@@ -604,7 +615,7 @@ export function genesis(seed, epoch) {
     learned: { fire: 0, shelter: 0, gather: 0, farming: 0, woodcut: 0 },
     log: [], chronicle: [], hist: { daily: [], yearly: [] },
     stats: { births: 0, deaths: 0, peak: 0, yb: 0, yd: 0, yh: 0, ys: 0, yf: 0, hungry: false, cold: false },
-    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 }, lie: { d: 0, t: 0, f: -1 }, trk: { pr: [], n: 0, t: 0, k: 0, wl: null, ww: null },
+    wx: { k: 'clear', n: 1, f: 0, r: 0, d: 0 }, lie: { d: 0, t: 0, f: -1 }, trk: { pr: [], n: 0, t: 0, k: 0, wl: null, ww: null }, thorn: null,
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
@@ -4682,6 +4693,7 @@ function goatDay(w, c) {
   const G = w.goats;
   if (c.doy === 0) { G.ym = 0; G.yf = 0; G.yl = 0; G.yp = 0; }
   if (G.gap && w.timber >= PEN_MEND) { w.timber -= PEN_MEND; G.gap = 0; } // the torn wattle is woven back
+  thornDay(w, c);
   pickHerder(w);
   const n = G.herd.length, m = penMid(G);
   // they strip the saplings creeping out onto their grazing
@@ -5515,11 +5527,15 @@ function penRaid(w, b) {
   G.pr = (G.pr || 0) + 1; G.yp = (G.yp || 0) + 1;
   const first = G.pr === 1, snow = w.wx && w.wx.k === 'snow';
   const tail = first ? ' The winter woods are empty, and the wolves have found the goat pen.' : '';
-  if (rnd(w) < PEN_HOLD) {
+  const r = rnd(w);
+  if (r < PEN_HOLD) {
     const text = 'A wolf comes out of the dark to the goat pen and digs and scrabbles at the wattle half the night. It never gets in, but in the morning the goats will not come out of the lean-to.';
     if (first) milestone(w, text + tail); else log(w, text, 'info');
+    if (w.thorn) w.thorn.b = Math.max(0, Math.round((w.thorn.b - THORN_SPENT) * 100) / 100);
     return;
   }
+  if (r < thornHold(w)) { thornTurned(w, snow); return; }
+  if (w.thorn) w.thorn.b = Math.max(0, Math.round((w.thorn.b - THORN_TORN) * 100) / 100);
   G.gap = 1;
   const p = penWaker(w), m = penMid(G), bark = dogNear(w, m.x, m.y, PEN_NEAR);
   if (p && rnd(w) < (bark ? DOG_WAKE : PEN_WAKE)) {
@@ -5540,6 +5556,64 @@ function penRaid(w, b) {
   G.lost++; G.yl++; G.pk = (G.pk || 0) + 1;
   const text = `A wolf tears through the back of the goat pen in the night and drags off ${kid ? 'a kid' : 'a goat'}. Nobody wakes until it is over; in the morning there is a hole in the wattle and a red trail ${snow ? 'across the snow' : 'into the trees'}.`;
   if (first) milestone(w, text + tail); else log(w, text, 'bad');
+}
+// ---------- the thorn fold ----------
+// Hawthorn hedges keep the boars out of the grain, so once wolves have taken goats out through the back
+// wall of the pen, someone thinks of thorn there too: cut blackthorn brush heaped against the wattle where
+// the village can't see. It does not grow; it rots, settles and blows about, and a wolf that forces its
+// way through drags half of it out, so every autumn and winter it is cut again and heaped back up.
+const thornShare = (w) => (w.thorn ? Math.min(1, w.thorn.b / THORN_FULL) : 0);
+const thornHold = (w) => PEN_HOLD + (THORN_HOLD - PEN_HOLD) * thornShare(w);
+function learnThorn(w, c) {
+  const H = w.hedge, hn = H && H.nm && w.people.find((p) => p.name === H.nm && ageY(w, p) >= 14);
+  const who = hn || elder(w);
+  w.thorn = { b: 0, n: 0, k: 0, y: 0, nm: who ? who.name : null, at: w.t };
+  w.techs.push('thornfold');
+  const G = w.goats, P = who ? pron(who) : 'they', Pc = P[0].toUpperCase() + P.slice(1);
+  milestone(w, who
+    ? `${G.pk} goats have gone out through the back of the pen in the night, and every time the hole is in the same place, the side away from the houses. ${who.name} stands looking at it with a torn hand from the hawthorn. The thorn keeps the boars out of the grain, ${P} says; let thorn keep the wolves out of the goats. ${Pc} cuts a great armful of blackthorn at the wood's edge, drags it back by the butts and heaps it against the wattle, spines outward. No wolf will put its face into that. ${w.name} builds a thorn fold.`
+    : `The islanders cut blackthorn at the wood's edge and heap it against the back of the goat pen, spines outward, where the wolves break in. ${w.name} builds a thorn fold.`);
+}
+function thornDay(w, c) {
+  const G = w.goats;
+  if (!w.thorn) {
+    if (w.hedge && w.hedge.n >= 1 && (G.pk || 0) >= 2 && c.season >= 2 && G.herd.length && w.wx && w.wx.k !== 'storm' && w.wx.k !== 'snow') learnThorn(w, c);
+    return;
+  }
+  const T0 = w.thorn;
+  if (c.doy === 0) T0.y = 0;
+  const lost = THORN_ROT + (w.wx && w.wx.k === 'storm' ? THORN_STORM : 0);
+  T0.b = Math.max(0, Math.round((T0.b - lost) * 100) / 100);
+}
+// a load of brush, for two grown hands at a time, by day in autumn and winter while the fold is low
+function thornTask(w, p, c) {
+  const T0 = w.thorn, G = w.goats;
+  if (!T0 || !G || !G.herd.length || c.season < 2 || c.hour < 8 || c.hour > 15 || T0.b >= THORN_TOP) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'storm' || wx === 'snow' || wx === 'fog') return null;
+  const a = ageY(w, p);
+  if (a < 15 || a > 55) return null;
+  const key = w.res.tf0 == null ? 'tf0' : w.res.tf1 == null ? 'tf1' : null;
+  if (!key) return null;
+  const B = penBack(w), x = Math.floor(B.x), y = Math.floor(B.y);
+  return { k: 'thorn', key, x: tile(w, x, y) === T.WATER ? G.pen.x : x, y: tile(w, x, y) === T.WATER ? G.pen.y : y, h: THORN_WORK };
+}
+function thornDone(w, p, t, pop) {
+  const T0 = w.thorn;
+  if (!T0) return;
+  const was = T0.b;
+  T0.b = Math.min(THORN_FULL, Math.round((T0.b + 1) * 100) / 100); T0.n++;
+  pop('+thorn', 'wood');
+  if (T0.n === 1) log(w, `${p.name} drags the first load of blackthorn round the back of the goat pen, swearing at the spines, and heaps it against the wattle.`, 'good');
+  else if (was < THORN_TOP && T0.b >= THORN_TOP && T0.n <= THORN_FULL) log(w, 'The thorn is heaped high along the back of the goat pen now, a grey tangle of spines no wolf could push its face into.', 'good');
+}
+function thornTurned(w, snow) {
+  const T0 = w.thorn;
+  T0.k++; T0.y++;
+  T0.b = Math.max(0, Math.round((T0.b - THORN_SPENT) * 100) / 100);
+  const text = `A wolf comes to the back of the goat pen in the night and finds the blackthorn heaped there. It circles and circles, and once it tries to push in. In the morning there is grey fur caught on the spines and ${snow ? 'a ring of prints trodden round the pen in the snow' : 'its prints all round the pen'}, and not one goat is missing.`;
+  if (T0.k === 1) milestone(w, `${text} The thorn fold has turned its first wolf.`);
+  else log(w, text, 'good');
 }
 function goatHour(w, c) {
   const G = w.goats, h = c.hour, wx = w.wx ? w.wx.k : 'clear';
@@ -6346,6 +6420,9 @@ function pickTask(w, p, c) {
   // fences around the grain by the woods
   const gk = fenceTask(w, p, c);
   if (gk) return gk;
+  // blackthorn brush heaped against the back of the goat pen, before the winter wolves come
+  const tfk = thornTask(w, p, c);
+  if (tfk) return tfk;
   // timber
   if (w.timber < woodTarget(w)) {
     const bt = nearestTimber(w, p);
@@ -7184,6 +7261,8 @@ function finish(w, p, t, c, fx) {
     pitDone(w, p, t, pop);
   } else if (t.k === 'well') {
     wellDone(w, p, t, pop);
+  } else if (t.k === 'thorn') {
+    thornDone(w, p, t, pop);
   } else if (t.k === 'water') {
     waterDone(w, p, t, pop);
   } else if (t.k === 'hedge') {
@@ -8733,6 +8812,11 @@ const MIGRATIONS = {
   71: (w) => {
     if (w.trk === undefined) w.trk = { pr: [], n: 0, t: 0, k: 0, wl: null, ww: null };
   },
+  // v72 -> v73: the thorn fold (w.thorn). Not thought of yet; with hedges known and 2+ goats taken from the pen,
+  // the next autumn or winter day someone heaps blackthorn against the back wall.
+  72: (w) => {
+    if (w.thorn === undefined) w.thorn = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8895,6 +8979,8 @@ export function summary(w) {
     vigil: !!w.vigil, vigilSat: w.vigil ? w.vigil.n : 0, vigilRan: w.vigil ? w.vigil.r : 0, vigilNights: w.vigil ? w.vigil.k : 0,
     vigilNow: vigilFire(w, c) ? vigilNames(w, w.vigil.cur.on.map((o) => o.id)) : null,
     vigilShy: w.people.filter((p) => vigilShy(p)).map((p) => p.name),
+    thorn: !!w.thorn, thornFull: w.thorn ? Math.round(thornShare(w) * 100) : 0, thornTurned: w.thorn ? w.thorn.k : 0, thornYear: w.thorn ? w.thorn.y : 0,
+    thornLoads: w.thorn ? w.thorn.n : 0, thornCutting: w.thorn ? w.people.filter((p) => !p.dead && p.task && p.task.k === 'thorn').length : 0,
     goatMilk: w.goats ? Math.round(w.goats.ym) : 0, herder: (w.goats && w.goats.hid != null && (w.people.find((p) => p.id === w.goats.hid) || {}).name) || null,
   };
 }

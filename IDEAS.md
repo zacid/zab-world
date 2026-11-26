@@ -765,3 +765,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   the whole of act() each hour, which is the obvious next cut.
 - Housekeeping: probes scripts/_prof, _top, _lines, _shape, _inst, _heap, _gcsum, _gct, _spike, _cg, _trk.mjs and
   scripts/.prof/ could not be deleted (gitignored).
+- The thorn fold is done (SIM_VERSION 73; w.thorn {b loads, n, k turned, y, nm, at}; learnThorn/thornDay/thornTask/thornDone/thornTurned
+  in sim.js, THORN_* constants, THORN_FULL exported; task 'thorn' keys tf0/tf1; thornRect/drawThorn/thornAt in render.js). Pen losses
+  on the live world drop from ~1 a year to ~0, so wolves at the pen are now mostly solved. Answers it invites:
+  - Hungry wolves shut out of the pen: with deer scarce and the goats out of reach, a bold winter wolf could turn on the dogs, the
+    hearth-side woodpile workers, or the far fields at dusk.
+  - A wolf caught in the brush: now and then one is tangled at dawn and the hunters finish it (a pelt, a story, a byname).
+  - Fire: a dry heap of cut thorn by the pen is tinder; a spark from a smudge fire or the kiln could set the pen alight.
+  - The fold could grow into a living blackthorn hedge (slips heeled into the brush), with sloes for the autumn store and sloe mead.
+  - Housekeeping: scripts/_thorn.mjs (live-world probe) could not be deleted (gitignored).

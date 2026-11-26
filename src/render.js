@@ -156,6 +156,7 @@ function doing(p) {
     return still ? `sitting the night out alone by the stone for ${o.nm}` : 'walking out to the standing stones for the night, a cloak over one arm';
   }
   if (p.task && p.task.k === 'well') return p.x === p.px && p.y === p.py ? (p.task.key === 'wl0' ? 'down in the well shaft with a digging stick' : 'hauling baskets of clay up out of the well') : 'going to dig at the well';
+  if (p.task && p.task.k === 'thorn') return p.x === p.px && p.y === p.py ? 'heaping blackthorn against the back of the goat pen' : 'dragging a load of blackthorn to the goat pen';
   if (p.task && p.task.k === 'pit') return p.x === p.px && p.y === p.py ? 'digging the bear pit by the bee logs' : 'going to dig at the bear pit';
   if (p.task && p.task.k === 'crowman') return p.x === p.px && p.y === p.py ? (p.task.o >= 0 ? 'standing the scarecrow up where the rooks have not seen it' : 'driving in the poles for a scarecrow') : p.task.o >= 0 ? 'carrying a found-out scarecrow to a new field' : 'carrying poles and an old hide out to the fields';
   if (p.task && p.task.k === 'scare') return p.x === p.px && p.y === p.py ? (w.crow && w.crow.cur ? 'swinging a clapper at the rooks' : 'keeping the rooks off the grain') : 'running out to scare the rooks';
@@ -283,6 +284,10 @@ function work(k, id, X, Y, now) {
     if (f === 0) { px(sc, X + 3, Y - 2, WOOD, 1, 2); px(sc, X + 2, Y - 3, spade ? IRON : WOOD, 3, 1); }
     else { px(sc, X + 3, Y, WOOD, 1, 2); px(sc, X + 3, Y + 2, spade ? IRON : WOOD, 2, 1); }
     if (f === 2) px(sc, X + 5 + (ph(200) % 2), Y + 2, spade ? '#6b4a2e' : 'rgba(230,230,230,0.7)'); // dust or a clod
+  } else if (k === 'thorn') { // a tangle of blackthorn dragged by the butts, then forked up onto the heap
+    const f = ph(240) % 3;
+    px(sc, X + 4, Y + 1 + (f === 1 ? -1 : 0), '#3a3028', 3, 2); px(sc, X + 5, Y + (f === 1 ? -1 : 0), '#2b2620'); px(sc, X + 7, Y + 2, '#4a3c2e');
+    if (f === 2) px(sc, X + 6, Y - 1, '#5a4a3a');
   } else if (k === 'muck') { // a wooden fork dug into the basket and swung out over the furrow, a dark clod flying off it
     const f = ph(260) % 3;
     px(sc, X - 1, Y + 2, WOOD, 2, 2); px(sc, X - 1, Y + 1, '#3d2a19', 2, 1); // the basket at the feet
@@ -812,8 +817,45 @@ function drawPen(pal) {
     const by = back === 'n' ? Y0 - 1 : back === 's' ? Y0 + H : Y0 + H / 2 - 1;
     px(tc, bx, by, rod); px(tc, bx + (back === 'n' || back === 's' ? 2 : 0), by + (back === 'w' || back === 'e' ? 2 : 0), rod);
   }
+  drawThorn(pal);
   drawFold(pal, rod, stake);
   drawRack(pal, rod, stake);
+}
+// the thorn fold: cut blackthorn heaped against the outside of the back wall and round both corners,
+// a band up to 3 px deep that thins as it rots or is dragged out; sloes on it in autumn, snow on top in winter
+function thornRect() {
+  const G = w.goats;
+  if (!G || !w.thorn || w.thorn.b < 0.5) return null;
+  const X0 = G.pen.x * TILE, Y0 = G.pen.y * TILE, W = S.PEN_W * TILE, H = S.PEN_H * TILE;
+  const dx = X0 + W / 2 - (w.fire.x * TILE + 4), dy = Y0 + H / 2 - (w.fire.y * TILE + 4);
+  const gate = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'w' : 'e') : dy > 0 ? 'n' : 's';
+  const back = { n: 's', s: 'n', e: 'w', w: 'e' }[gate], d = 3;
+  if (back === 'n') return { x: X0 - d, y: Y0 - d, w: W + 2 * d, h: d, back };
+  if (back === 's') return { x: X0 - d, y: Y0 + H, w: W + 2 * d, h: d, back };
+  if (back === 'w') return { x: X0 - d, y: Y0 - d, w: d, h: H + 2 * d, back };
+  return { x: X0 + W, y: Y0 - d, w: d, h: H + 2 * d, back };
+}
+function drawThorn(pal) {
+  const r = thornRect();
+  if (!r) return;
+  const share = Math.min(1, w.thorn.b / S.THORN_FULL), long = r.w > r.h, n = long ? r.w : r.h;
+  const autumn = S.clock(w.t).season === 2;
+  for (let k = 0; k < n; k++) {
+    for (let j = 0; j < 3; j++) {
+      const h = S.hash(r.x + k * 3 + j, r.y + j * 7, 113);
+      if (h > share * (j === 0 ? 1.15 : j === 1 ? 0.95 : 0.7)) continue; // the outer edge goes first as it thins
+      const outer = r.back === 'n' || r.back === 'w' ? j : 2 - j; // j = 0 against the wattle
+      const X = long ? r.x + k : r.x + outer, Y = long ? r.y + outer : r.y + k;
+      px(tc, X, Y, pal.snow && h < 0.25 ? '#dfe3e8' : h * 31 % 1 < 0.35 ? '#4d3f31' : h * 17 % 1 < 0.5 ? '#2b2620' : '#3a3028');
+      if (autumn && !pal.snow && h * 53 % 1 < 0.06) px(tc, X, Y, '#3e3f78'); // sloes, bloomed blue-black
+    }
+  }
+}
+function thornAt(mx, my) {
+  const r = thornRect();
+  if (!r) return null;
+  const X = mx * TILE, Y = my * TILE;
+  return X >= r.x - 1 && X < r.x + r.w + 1 && Y >= r.y - 1 && Y < r.y + r.h + 1 ? r : null;
 }
 // the cheese rack: two shelves of hazel rods on four stakes under a strip of bark roof, the rounds
 // set out along the shelves (one dot for every few), pale when fresh, darker as the rind hardens
@@ -2012,6 +2054,10 @@ function frame() {
       const s = S.summary(w);
       tip.innerHTML = `<b>Cheese rack</b><br>${s.cheeseRack ? `${s.cheeseRack} ${s.cheeseRack === 1 ? 'round' : 'rounds'} drying on the rods` : 'the rods are bare'}${s.cheesePail ? ` · ${s.cheesePail} milk in the pails` : ''}${s.cheeseMaking ? ' · someone pressing curd' : ''}${s.cheeseFed ? ' · <span class="fest">cheese by the fire today</span>' : ''}<br><span class="m">${s.cheeseYear} pressed this year · ${s.cheeseMade.toLocaleString()} since ${esc(w.cheese.nm)} found the milk turned ${when(w.cheese.at)} · eaten on ${s.cheeseDays} bitter ${s.cheeseDays === 1 ? 'day' : 'days'}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if (thornAt(mx, my)) {
+      const s = S.summary(w);
+      tip.innerHTML = `<b>Thorn fold</b><br>blackthorn heaped against the back of the goat pen · ${s.thornFull < 50 ? `<span class="bad">${s.thornFull}% high, thin</span>` : `${s.thornFull}% high`}${s.thornCutting ? ` · <span class="fest">${s.thornCutting} heaping more on</span>` : ''}<br><span class="m">${s.thornTurned} ${s.thornTurned === 1 ? 'wolf' : 'wolves'} turned${s.thornYear ? ` (${s.thornYear} this year)` : ''} · ${s.thornLoads} ${s.thornLoads === 1 ? 'load' : 'loads'} cut since ${esc(w.thorn.nm || 'someone')} thought of it ${when(w.thorn.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if (heapAt(mx, my)) {
       const s = S.summary(w);
       tip.innerHTML = `<b>Muck heap</b><br>dung from the pen, hearth ash and scraps · enough for ${s.muckHeap} ${s.muckHeap === 1 ? 'field' : 'fields'}${s.mucking ? ` · ${s.mucking} carrying it out` : ''}<br><span class="m">${s.muckYear} ${s.muckYear === 1 ? 'field' : 'fields'} mucked this year · ${s.muckGrain.toLocaleString()} more grain since ${esc(w.muck.nm)} saw it ${when(w.muck.at)}</span>`;
@@ -2723,7 +2769,7 @@ function updatePanels() {
     ...(s.ratsCame ? [['rat', 'Rats', s.rats ? `${s.rats} <span class="m">· ${s.ratsAte.toLocaleString()} grain eaten this year</span>` : '<span class="m">none in the stores</span>']] : []),
     ...(w.pot ? [['pot', 'Jars', `${s.jars} <span class="m">· ${s.jarsSealed.toLocaleString()} grain sealed · ${s.potter ? esc(s.potter) + ' pots' : 'no potter'}${s.jarsWet ? ` · ${s.jarsWet} drying` : ''}</span>`]] : []),
     ...(s.bees ? [['bee', 'Bees', `${s.hives} <span class="m">${s.hives === 1 ? 'hive' : 'hives'}${s.hiveLogs > s.hives ? ` (${s.hiveLogs - s.hives} empty ${s.hiveLogs - s.hives === 1 ? 'log' : 'logs'})` : ''} · ${s.honey} honey kept${s.honeyYear ? ` · ${s.honeyYear} taken this year` : ''}${s.meads ? ` · mead at ${s.meads} ${s.meads === 1 ? 'midsummer' : 'midsummers'}` : ''}</span>${s.honeyTaking ? ' · <span class="fest">taking the honey</span>' : ''}`]] : []),
-    ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.lame ? ` · <span class="bad">${s.lame} lame with foot rot${s.folded ? `, ${s.folded} in the fold` : ''}</span>` : ''}${s.paring ? ` · ${s.pared} ${s.pared === 1 ? 'hoof' : 'hooves'} pared` : ''}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.rotDied ? ` · ${s.rotDied} lost to foot rot` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
+    ...(s.goatsCame ? [['goat', 'Goats', `${s.goats} <span class="m">· ${s.herder ? esc(s.herder) + ' minds them' : 'nobody minds them'}${s.lame ? ` · <span class="bad">${s.lame} lame with foot rot${s.folded ? `, ${s.folded} in the fold` : ''}</span>` : ''}${s.paring ? ` · ${s.pared} ${s.pared === 1 ? 'hoof' : 'hooves'} pared` : ''}${s.goatMilk ? ` · ${s.goatMilk} milk this year` : ''}${s.rotDied ? ` · ${s.rotDied} lost to foot rot` : ''}${s.penYear ? ` · wolves at the pen ${s.penYear}x this year` : ''}${s.thorn ? ` · thorn fold ${s.thornFull < 50 && clockNow().season >= 2 ? `<span class="bad">thin (${s.thornFull}%)</span>` : `${s.thornFull}%`}${s.thornTurned ? `, ${s.thornTurned} ${s.thornTurned === 1 ? 'wolf' : 'wolves'} turned` : ''}` : ''}${w.goats && w.goats.gap ? ' · <span class="bad">wattle torn</span>' : ''}</span>`]] : []),
     ...(s.ale ? [['ale', 'Ale', `${s.harvestHomeNow ? '<span class="fest">harvest home</span> · ' : s.brewingNow ? '<span class="fest">mashing</span> · ' : ''}${s.aleJugs} jugs <span class="m">· ${s.aleVat ? 'a brew in the vat · ' : ''}${s.brewerAlive ? esc(s.brewer) + ' brews' : 'nobody brews'} · ${s.harvestHomes} harvest ${s.harvestHomes === 1 ? 'home' : 'homes'}${s.aleGrainYear ? ` · ${s.aleGrainYear} grain brewed this year` : ''}</span>`]] : []),
     ...(s.loom ? [['loom', 'Blankets', `${s.weaving ? '<span class="fest">at the loom</span> · ' : ''}${s.blankets} <span class="m">· ${Math.round(s.blanketCover * 100)}% of beds · ${s.weaverAlive ? esc(s.weaver) + ' weaves' : 'nobody weaves'} · ${s.yarn} yarn · ${s.hair} hair${s.wovenYear ? ` · ${s.wovenYear} woven this year` : ''}</span>`]] : []),
     ...(s.cheese ? [['cheese', 'Cheese', `${s.cheeseFed ? '<span class="fest">shared out by the fire</span> · ' : s.cheeseMaking ? '<span class="fest">curd in the press</span> · ' : ''}${s.cheeseRack} <span class="m">${s.cheeseRack === 1 ? 'round' : 'rounds'} on the rack · ${s.cheeseYear} pressed this year · eaten on ${s.cheeseDays} bitter ${s.cheeseDays === 1 ? 'day' : 'days'}</span>`]] : []),
