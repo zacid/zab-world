@@ -724,3 +724,16 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - The well as the gossip place: feuds started or mended at the well (quarrel spots already include "by the spring").
   - The spring row shows the level as % of the whole depth; a small level gauge drawn on the well head would show it on the map.
 - Housekeeping: scripts/_well.mjs and scripts/_peek.mjs (well probes) could not be deleted either (gitignored).
+- Castaways are done (SIM_VERSION 70; w.wreck {n, s saved, dr dead, last, cur, hulks[], tl, lo}; p.cw tick carried in, p.cf tale index;
+  wreckStorm/wreckSeen/wreckHour/wreckReach/wreckLift/wreckHome/wreckDay/wreckAct, WRECK_* in sim.js; wreckNow/wreckFrom exported; task 'wreck';
+  deed `c`; drawWrecks/wreckAt and the carried figure in render.js). The old invisible "X, a castaway, washes ashore" event at the hearth
+  now only fires below 12 people (the empty-island safety net). In winter the cold often wins (life 12-23 h from midnight, the walk
+  takes 6-9 h after the 07:00 find). Answers it invites:
+  - A beach walk at first light after every autumn gale (or the dog finds them): finds come at dawn instead of 07:00, fewer die of cold.
+  - The castaway's tale is a seed: a square sail of stitched hides (faster dugout, reach the far isle in a day), whale-oil stone lamps
+    (light for the loom on winter evenings), amber beads to trade with the far isle.
+  - A castaway's own people come looking a few years later: a strange boat off the point, friendly or not.
+  - The castaway brings a sickness the island has never had (like the cough, but for everyone).
+  - Planks of split oak are better than adzed logs: a plank boat once the island has a castaway who knows how.
+  - The Nameless graves could get a carved post on the beach where they were found.
+- Housekeeping: scripts/_wreck.mjs (wreck probe) could not be deleted either (gitignored).

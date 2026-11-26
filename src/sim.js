@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 69;
+export const SIM_VERSION = 70;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -96,6 +96,7 @@ export const TECHS = {
   surge:    { name: 'Storm tides', added: '2026-11-26T00:44Z', desc: 'Twice a month, at new moon and full moon, the tide runs higher than on other days. When a gale out of the sea comes on top of such a tide, the water does not stop at the sand: it pours over the low ground behind the beach, through the hedges and over the nearest fields. In a day it drains away, and leaves the earth grey and crusted with salt. Grain sown in it comes up yellow and dies, so a drowned field lies bare until enough rain has fallen to wash the salt back out, most of a year. The tide line is left heaped with wrack and driftwood. Nobody has an answer for it yet.', req: ['farming'] },
   ale:      { name: 'Ale', added: '2026-11-26T06:44Z', desc: 'Grain that gets wet in the jar sprouts; dried by the fire, cracked on a flat stone and steeped in hot water, it turns sweet, and a few days later it froths and turns to ale. One brewer keeps a wooden vat against the wall of their house and mashes a sack of the spare grain whenever the jugs run low. Ale is poured at midsummer and on the night the last sheaf comes in, the harvest home, when the whole village sits up late round the hearth. When the spring fails the children drink small ale and fewer skins have to come in from the pool. Ale goes sour in the summer heat, and a jug too many can turn words into blows.', req: ['pottery'] },
   well:     { name: 'The well', added: '2026-11-26T11:43Z', desc: 'The water of the spring does not come from the stones but up from under them. Once the spring has failed, it is dug down in the dry of the year while the water is low: one islander in the shaft with a digging stick, another hauling up the clay in a basket, the sides lined ring on ring with round stones from the beach. A ring is dug in a summer when the water gets down near the bottom, four at most before the rock. Each ring lets the spring fall further before there is only mud, and past two rings a sweep pole on a forked post dips the bucket. A wet side can slump in on the digger. More mouths draw it down faster, and in a long hot summer the deepest well can still go dry.', req: ['drought'] },
+  wreck:    { name: 'Castaways', added: '2026-11-26T12:19Z', desc: 'Some autumn and winter gales out of the open sea throw up more than weed: the broken planks of a boat from no shore anyone on the island knows, and now and then someone still alive among them, face down in the surf and blue with cold. The morning after, whoever walks the beach first runs for help, and two of them carry the stranger up between them to the herb-healer\'s fire. Out on the sand in winter the cold kills in hours, so a long walk can come too late; the drowned are buried with the island\'s own. Those who live stay. For a year they have only their own name and a few island words; after that they can tell where the sea took them from. The planks are dragged up above the tide line and the ribs of the boat are left on the sand.', req: ['fishing'] },
   cough:    { name: 'Whooping cough', added: '2026-11-25T00:43Z', desc: 'A cough that comes in long fits until the child cannot breathe, then a great whooping gasp. Every settler had it as a child far over the sea, and anyone who has had it never takes it again, so it waits until enough children have been born who never have. Then it goes through them in a few weeks, in the house and wherever they play together. The big children are kept by the door; a mother sits at home with a coughing baby. It is the babies it kills. Nobody has an answer for it yet.', req: ['fire'] },
 };
 
@@ -606,7 +607,7 @@ export function genesis(seed, epoch) {
     beasts: [], fauna: null, fest: { y: 0, on: -1, n: 0, k: 0 }, tale: null,
     fever: { k: 0, n: 0, d: 0, all: 0 },
     wear: new Array(MAP * MAP).fill(0),
-    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, vigil: null, well: null, roll: [],
+    graves: [], yard: null, heal: null, nLearned: 5, rats: null, goats: null, lost: { n: 0, y: 0, f: 0, d: 0, cur: null }, horn: null, isle: null, dogs: null, raid: null, pot: null, watch: null, snow: null, blaze: null, canoe: null, copse: null, hedge: null, whale: null, frost: null, wade: null, smudge: null, moon: null, rust: null, rogue: null, bees: null, lone: null, bow: null, lore: null, muck: null, rot: null, pare: null, cloak: null, squall: null, cheese: null, crow: null, spring: null, bear: null, seal: null, cough: null, stones: null, quarrel: null, inc: null, loom: null, surge: null, ale: null, vigil: null, well: null, wreck: null, roll: [],
   };
   // name the island
   let nm = '';
@@ -682,7 +683,7 @@ function findShore(w) {
 const personShape = (o) => ({
   id: o.id, name: o.name, sex: o.sex, born: o.born, mother: o.mother, father: o.father, partner: o.partner, home: o.home,
   wants: o.wants, lastBirth: o.lastBirth, hunger: o.hunger, x: o.x, y: o.y, px: o.px, py: o.py, task: o.task, asleep: o.asleep,
-  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi, fi: o.fi, vg: o.vg, vr: o.vr,
+  haul: o.haul, dd: o.dd, sick: o.sick, imm: o.imm, tend: o.tend, hurt: o.hurt, mourn: o.mourn, cl: o.cl, cg: o.cg, cgi: o.cgi, fi: o.fi, vg: o.vg, vr: o.vr, cw: o.cw, cf: o.cf,
 });
 const fieldShape = (o) => ({
   id: o.id, x: o.x, y: o.y, stage: o.stage, growth: o.growth, rg: o.rg, rl: o.rl, ru: o.ru, fr: o.fr, burnt: o.burnt,
@@ -782,6 +783,7 @@ export function step(w, fx) {
   if (w.blaze && w.blaze.cur) blazeHour(w, c);
   if (w.stones && w.stones.cur) stoneHour(w, c, fx);
   if (w.vigil && w.vigil.cur) vigilHour(w, c, fx);
+  if (w.wreck && w.wreck.cur) wreckHour(w, c);
   for (const p of w.people) if (!p.dead) act(w, p, c, fx);
   if (w.beasts) prowl(w, c);
   if (w.goats) goatHour(w, c);
@@ -937,6 +939,7 @@ function daily(w, c, fx) {
   if (w.seal !== undefined) sealDay(w, c);
   if (w.copse !== undefined) copseDay(w, c);
   if (w.whale) whaleDay(w, c);
+  if (w.wreck) wreckDay(w, c);
   if (w.fever) fever(w, c, fx);
   if (w.cough !== undefined) coughDay(w, c, fx);
   if (w.quarrel !== undefined) quarrelDay(w, c, fx);
@@ -972,9 +975,8 @@ function daily(w, c, fx) {
     milestone(w, `A boat of four settlers finds the cold hearth on ${w.name} and relights it.`);
   }
   if (w.people.length) w.stats.empty = false;
-  // castaways keep the island from emptying, and bring new blood
-  const lonely = w.people.length < 12 ? 0.004 : 0.0008;
-  if (c.season < 3 && rnd(w) < lonely) {
+  // castaways keep a near-empty island from emptying; on a peopled one they come by wreck in the autumn gales (wreckStorm)
+  if (w.people.length < 12 && c.season < 3 && rnd(w) < 0.004) {
     const n = 1 + ri(w, 2);
     const a = addPerson(w, rnd(w) < 0.5 ? 'f' : 'm', 18 + ri(w, 12), null, null, null);
     a.x = a.px = w.fire.x + 0.5; a.y = a.py = w.fire.y + 3.5;
@@ -1007,7 +1009,7 @@ function weather(w, c) {
   if (next === s.k) s.n++;
   else {
     endSpell(w, s);
-    if (s.k === 'storm') whaleStorm(w, c, s.n);
+    if (s.k === 'storm') { whaleStorm(w, c, s.n); wreckStorm(w, c, s.n); }
     if (s.fk || s.fs) frostTold(w, s);
     if (s.k === 'fog' && w.lore && w.lore.fl == null && s.n >= FOG_LEARN && w.goats && ((w.fauna && w.fauna.fa) || (w.lost && w.lost.n) || s.gl)) learnFog(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
@@ -6008,6 +6010,7 @@ export function deedsText(d) {
   if (d.r) out.push('won the midsummer race ' + n(d.r, 'time', 'times'));
   if (d.s) out.push('hauled ' + n(d.s, 'stone', 'stones') + ' up to the ring');
   if (d.e) out.push('dug and lined ' + n(d.e, 'ring', 'rings') + ' of the well');
+  if (d.c) out.push('carried ' + n(d.c, 'castaway', 'castaways') + ' up off the beach');
   return out.join('; ');
 }
 function deed(w, p, k, v = 1) {
@@ -6969,6 +6972,7 @@ function act(w, p, c, fx) {
   }
   // wildfire: everyone able goes out with green branches, dawn to late evening
   if (w.blaze && w.blaze.cur && w.t - w.blaze.cur.at >= BLAZE_SEEN && a >= 14 && a < 65 && !p.sick && !p.hurt && h >= 5 && h < 23 && blazeFight(w, p, c)) return; // even in a storm
+  if (w.wreck && w.wreck.cur && wreckAct(w, p)) return; // down on the beach for a castaway, or carrying one up, by night if need be
   // after a wolf attack the village keeps in from dusk to full daylight
   const afraid = w.fauna && w.fauna.fear > w.t;
   const warned = !!(w.lore && w.lore.on === c.day + 1) && h >= LORE_READ && h < LORE_LATE && a >= 14 && a < 65 && !p.hurt && !p.sick; // a storm is called: work on by firelight
@@ -7052,7 +7056,7 @@ function act(w, p, c, fx) {
     }
   }
   if (w.squall && w.squall.cur && shoreWatch(w, p, a)) return; // the dugout is out in a squall: down to the landing to watch
-  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || p.task.k === 'stone' || p.task.k === 'vigil' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
+  if (p.task && (p.task.k === 'shore' || p.task.k === 'gather' || p.task.k === 'home' || p.task.k === 'fest' || p.task.k === 'race' ||p.task.k === 'tale' || p.task.k === 'mourn' || p.task.k === 'search' || p.task.k === 'lost' || p.task.k === 'horn' || p.task.k === 'watch' || p.task.k === 'smudge' || p.task.k === 'blaze' || p.task.k === 'stone' || p.task.k === 'vigil' || p.task.k === 'wreck' || (p.task.k === 'herd' && !(w.goats && w.goats.hid === p.id)))) p.task = null;
   if (w.stones && w.stones.cur && stoneRope(w, p, c)) return; // on the ropes, dragging this summer's stone up to the ring
   // daytime
   if (w.goats && w.goats.hid === p.id) { // the herder goes where the goats are grazing
@@ -7834,6 +7838,198 @@ function whaleDay(w, c) {
   if (C.m < WHALE_GONE) { C.m = 0; whaleDone(w, 'rot'); }
 }
 
+// ---------- castaways ----------
+// Some autumn and winter gales out of the open sea leave a wreck on a far beach: the broken planks of a boat from no
+// shore anyone knows, and among them, sometimes, someone still breathing. The morning after, whoever walks the beach
+// first finds it and shouts for the nearest pair of hands; the two of them carry the stranger up between them to the
+// healer's fire. Out on the sand the cold kills in hours (fewer in winter), so a long walk can come too late, and the
+// drowned are buried with the island's own. Those who live stay: laid up a while, with nothing but their own name, and
+// after a year the words to say where they came from. The planks are dragged up for timber; the ribs stay on the sand.
+// w.wreck { n wrecks, s saved, dr dead, last tick, cur, hulks [{ x, y, dx, dy, t, nm }], tl [castaway ids yet to tell], lo { nm, k, y } }
+// cur { x, y sand tile, dx, dy toward the sea, at, d day, n storm days, nm, sex, a, live, life tick the cold takes them, st 'lie'|'carry'|'done',
+//   by [carrier ids], fnd finder's name, id the castaway once reached, cx, cy where they lie or are carried, ux, uy carry heading,
+//   tx, ty, hm home id they are carried to, k 'saved'|'cold'|'drowned'|'sea', side, wood }
+// p.cw is the tick a castaway was carried in, p.cf which tale of where they came from (once told).
+const WRECK_YEAR = 6;         // nobody walks the far beaches looking before this
+const WRECK_ODDS = 0.05;      // chance per storm day of an autumn or winter spell that ends
+const WRECK_MAX = 0.25;
+const WRECK_GAP = 4 * TICKS_PER_YEAR;
+const WRECK_LIVE = 0.7;       // someone is still alive among the planks
+const WRECK_SEEN = 7;         // hour the first one out on the beach finds it
+const WRECK_CARRY = 2;        // tiles an hour with someone carried between two (half with one)
+const WRECK_HURT = 14;        // days laid up by the healer's fire
+const WRECK_DAYS = 3;         // days before the planks are dragged up
+const WRECK_WOOD = 14;        // timber in the planks (+0..10)
+const WRECK_HULKS = 4;        // old wrecks kept on the beaches
+const WRECK_SYL = ['tor', 'vak', 'ung', 'skal', 'dra', 'eik', 'gun', 'hjal', 'brak', 'orm', 'sve', 'ald', 'ryk', 'thu', 'oda', 'kel'];
+const WRECK_FROM = [
+  ['a long coast to the south', (p) => `a long coast far to the south, where the cliffs are black and the people burn whale oil in stone lamps. ${Cap(pron(p))} draws its shape in the ash with a stick`],
+  ['a big island toward the sunrise', (p) => `an island far bigger than this one, three days toward the sunrise, where the boats carry a square sail of stitched hides and need no paddles. ${Cap(pron(p))} draws one in the sand for the children`],
+  ['a crowded shore', (p) => `a crowded shore where every field is taken, and the young are sent off in boats each spring to find their own ground. The gale found ${p.sex === 'f' ? 'hers' : 'his'} first`],
+  ['a fishing boat of six', (p) => `a fishing boat of six from a shore beyond sight of the far isle, driven out of sight of land by the gale. ${Cap(pron(p))} is the only one the sea gave back`],
+];
+export const wreckFrom = (p) => (p && p.cf != null && WRECK_FROM[p.cf] ? WRECK_FROM[p.cf][0] : null);
+export const wreckNow = (w) => (w.wreck && w.wreck.cur) || null;
+function wreckStorm(w, c, n) {
+  if (w.wreck === undefined || c.year < WRECK_YEAR || c.season < 2 || !w.shore || !w.shore.length) return;
+  const W = w.wreck;
+  if (W && (W.cur || w.t - W.last < WRECK_GAP)) return;
+  if (rnd(w) >= Math.min(WRECK_MAX, WRECK_ODDS * n)) return;
+  const R2 = 26 * 26, fx = w.fire.x + 0.5, fy = w.fire.y + 0.5, spots = [], wh = w.whale;
+  for (const i of w.shore) {
+    const x = i % MAP, y = (i - x) / MAP, dd = d2(x + 0.5, y + 0.5, fx, fy);
+    if (dd < 64 || dd > R2) continue;
+    if (wh && (wh.bones.some((b) => d2(b.x, b.y, x, y) < 9) || (wh.cur && d2(wh.cur.x, wh.cur.y, x, y) < 9))) continue;
+    if (W && W.hulks.some((b) => d2(b.x, b.y, x, y) < 9)) continue;
+    if (w.seal && w.seal.x != null && d2(w.seal.x, w.seal.y, x, y) < 9) continue;
+    if (lineOfLand(w, fx, fy, x + 0.5, y + 0.5)) spots.push(i);
+  }
+  if (!spots.length) return;
+  const i = spots[ri(w, spots.length)], x = i % MAP, y = (i - x) / MAP;
+  const [dx, dy] = DIRS4.find(([a, b]) => tile(w, x + a, y + b) === T.WATER);
+  if (!W) w.wreck = { n: 0, s: 0, dr: 0, last: 0, cur: null, hulks: [], tl: [], lo: null };
+  const V = w.wreck;
+  V.n++; V.last = w.t;
+  const sex = rnd(w) < 0.5 ? 'f' : 'm', a = 16 + ri(w, 24);
+  const s1 = ri(w, WRECK_SYL.length), nm = Cap(WRECK_SYL[s1] + WRECK_SYL[(s1 + 1 + ri(w, WRECK_SYL.length - 1)) % WRECK_SYL.length]);
+  const live = rnd(w) < WRECK_LIVE ? 1 : 0;
+  const life = w.t + (c.season === 3 ? 12 + ri(w, 12) : 18 + ri(w, 14));
+  V.cur = { x, y, dx, dy, at: w.t, d: c.day, n, nm, sex, a, live, life, st: 'lie', by: [], fnd: null, id: null,
+    cx: Math.round((x + 0.5 + dx * 0.1) * 1000) / 1000, cy: Math.round((y + 0.5 + dy * 0.1) * 1000) / 1000, ux: 0, uy: 0,
+    tx: 0, ty: 0, hm: null, k: null, side: sideOf(w, x, y), wood: WRECK_WOOD + ri(w, 11) };
+}
+function wreckFit(w, p) {
+  if (p.dead || p.sick || p.hurt || isLost(w, p) || (p.task && p.task.sea)) return false;
+  const a = ageY(w, p);
+  return a >= 16 && a <= 55 && !(w.horn && w.horn.hid === p.id) && !(w.watch && w.watch.hid === p.id) && !(w.heal && w.heal.id === p.id);
+}
+// the morning after: the first one out on that beach sees it, and shouts for whoever is nearest
+function wreckSeen(w, c, C) {
+  const able = w.people.filter((p) => wreckFit(w, p));
+  if (!able.length) return;
+  const f = C.fnd == null ? able[ri(w, able.length)] : nearest(able, { x: C.x + 0.5, y: C.y + 0.5 }, () => true);
+  let h = null, bd = 1e9;
+  for (const p of able) { if (p === f) continue; const dd = d2(p.x, p.y, f.x, f.y); if (dd < bd) { bd = dd; h = p; } }
+  C.by = h ? [f.id, h.id] : [f.id];
+  if (C.fnd != null) return; // the first pair gave out; others go down in their place
+  C.fnd = f.name;
+  const len = C.n === 1 ? 'the storm' : `${spellLen(C.n).toLowerCase()} of storm`, one = C.sex === 'f' ? 'a woman' : 'a man';
+  if (!w.techs.includes('wreck')) {
+    w.techs.push('wreck');
+    milestone(w, `After ${len} ${f.name} walks the ${C.side} beach to see what the sea has thrown up, and finds planks: the broken ribs and sides of a boat bigger than any dugout, pegged together by hands nobody on ${w.name} knows. ` +
+      `Among them, face down at the edge of the surf, lies ${one}. ${f.name} shouts${h ? ` for ${h.name}` : ''} and runs. There are other shores out there than the far isle.`);
+  } else log(w, `After ${len} ${f.name} finds a wreck on the ${C.side} beach, and ${one} lying among the planks. ${h ? `${f.name} and ${h.name} run` : `${f.name} runs`} down to the surf.`, 'bad');
+}
+function wreckSpot(C, i) { // kneeling on the landward side, one at the head and one at the feet
+  const bx = C.x + 0.5 - C.dx * 0.35, by = C.y + 0.5 - C.dy * 0.35, s = i ? -0.4 : 0.4;
+  return [Math.round((bx + C.dy * s) * 1000) / 1000, Math.round((by + C.dx * s) * 1000) / 1000];
+}
+function wreckHour(w, c) {
+  const W = w.wreck, C = W.cur;
+  if (C.st === 'done') return;
+  if (C.live && C.id == null && w.t >= C.life) { C.live = 0; C.cold = 1; } // the cold gets there before anyone does
+  if (C.by.length) C.by = C.by.filter((id) => { const p = aliveId(w, id); return p && !p.sick && !p.hurt && !isLost(w, p); });
+  if (C.st === 'lie') {
+    if (!C.by.length) { if (c.hour >= WRECK_SEEN && c.hour < 18) wreckSeen(w, c, C); return; }
+    const at = C.by.map((id, i) => { const p = aliveId(w, id), [sx, sy] = wreckSpot(C, i); return p.x === sx && p.y === sy; });
+    if (C.id == null && at.some(Boolean)) { wreckReach(w, c, C); if (C.st === 'done') return; }
+    if (C.id != null && at.every(Boolean)) wreckLift(w, C);
+    return;
+  }
+  // carrying: up the beach and in to the fire, slowly, by torchlight if it comes to that
+  const q = aliveId(w, C.id);
+  if (!q || !C.by.length) { C.st = 'done'; for (const id of C.by) { const p = aliveId(w, id); if (p) release(w, p); } C.by = []; return; }
+  const o = { x: C.cx, y: C.cy }, there = moveToward(o, C.tx, C.ty, C.by.length >= 2 ? WRECK_CARRY : WRECK_CARRY / 2);
+  const dx = o.x - C.cx, dy = o.y - C.cy, dd = Math.sqrt(dx * dx + dy * dy);
+  if (dd > 0) { C.ux = Math.round((dx / dd) * 1000) / 1000; C.uy = Math.round((dy / dd) * 1000) / 1000; }
+  C.cx = o.x; C.cy = o.y;
+  if (there) wreckHome(w, c, C, q);
+}
+// the first of them gets there: alive, or not
+function wreckReach(w, c, C) {
+  const W = w.wreck, f = aliveId(w, C.by[0]) || aliveId(w, C.by[1]);
+  const q = addPerson(w, C.sex, C.a, null, null, null);
+  q.x = q.px = C.cx; q.y = q.py = C.cy; q.cgi = 1;
+  const him = C.sex === 'f' ? 'her' : 'him', he = C.sex === 'f' ? 'she' : 'he';
+  if (!C.live) {
+    q.name = 'Nameless';
+    C.k = C.cold ? 'cold' : 'drowned';
+    W.dr++; W.lo = { nm: null, k: C.k, y: c.year };
+    for (const id of C.by) deed(w, aliveId(w, id), 'c');
+    log(w, C.k === 'cold' ? `${f ? f.name : 'The finder'} gets to the stranger too late: the sea let ${him} go alive, but the cold on the sand came first. ${w.name} buries ${him} with its own, and nobody knows what name to cut.` : `${f ? f.name : 'The finder'} turns the stranger over: the sea had ${him} long before the storm let go. ${w.name} buries ${him} with its own, and nobody knows what name to cut.`, 'death');
+    die(w, q, C.k === 'cold' ? `was found cold and still among the planks of a wreck on the ${C.side} beach` : `was found drowned among the planks of a wreck on the ${C.side} beach`);
+    for (const id of C.by) { const p = aliveId(w, id); if (p) release(w, p); }
+    C.by = []; C.st = 'done';
+    return;
+  }
+  q.name = C.nm; q.cw = w.t; q.hurt = w.t + WRECK_HURT * TICKS_PER_DAY;
+  C.id = q.id; C.k = 'saved';
+  log(w, `${f ? f.name : 'Someone'} turns the ${C.sex === 'f' ? 'woman' : 'man'} in the surf over: blue with cold, but breathing. ${Cap(he)} opens ${C.sex === 'f' ? 'her' : 'his'} eyes and says something in a tongue nobody on ${w.name} has heard.`, 'good');
+}
+// both carriers there: lift, and make for the healer's fire (or the finder's own)
+function wreckLift(w, C) {
+  const hl = w.heal && aliveId(w, w.heal.id), f = aliveId(w, C.by[0]), to = hl || f;
+  const hb = homeOf(w, to);
+  C.hm = to && to.home != null && hb.id != null ? to.home : null;
+  C.tx = hb.x + 0.5; C.ty = Math.round((hb.y + 1.2) * 1000) / 1000;
+  C.st = 'carry';
+}
+function wreckHome(w, c, C, q) {
+  const W = w.wreck, hl = w.heal && aliveId(w, w.heal.id);
+  const names = C.by.map((id) => aliveId(w, id)).filter(Boolean);
+  for (const p of names) { deed(w, p, 'c'); release(w, p); }
+  q.x = C.tx; q.y = C.ty;
+  if (C.hm != null && w.buildings.some((b) => b.id === C.hm)) q.home = C.hm;
+  W.s++; W.tl.push(q.id); W.lo = { nm: q.name, k: 'saved', y: c.year };
+  C.by = []; C.st = 'done';
+  const who = names.length ? names.map((p) => p.name).join(' and ') : 'They', his = q.sex === 'f' ? 'her' : 'his', He = q.sex === 'f' ? 'She' : 'He';
+  const where = hl && C.hm === hl.home ? `${hl.name}'s fire` : 'a fire';
+  const text = `${who} carry the stranger up from the ${C.side} beach to ${where}, and ${hl ? `${hl.name} rubs ${q.sex === 'f' ? 'her' : 'him'} warm with goose fat and herbs` : `they rub ${q.sex === 'f' ? 'her' : 'him'} warm`}. ${He} has one word for them, over and over, a hand on ${his} chest: ${q.name}.`;
+  if (W.s === 1) milestone(w, `${text} ${w.name} has taken in someone the sea brought.`);
+  else log(w, text, 'good');
+}
+function wreckDay(w, c) {
+  const W = w.wreck, C = W.cur;
+  if (C && c.day >= C.d + WRECK_DAYS && C.st !== 'carry' && !(C.st === 'lie' && C.by.length)) {
+    if (C.st === 'lie' && C.id == null) { // nobody ever got down to it
+      W.dr++; W.lo = { nm: null, k: 'sea', y: c.year };
+      log(w, `The tide comes back for the stranger on the ${C.side} beach before anyone could get down to ${C.sex === 'f' ? 'her' : 'him'}.`, 'death');
+    }
+    w.timber = Math.round((w.timber + C.wood) * 100) / 100;
+    W.hulks.push({ x: C.x, y: C.y, dx: C.dx, dy: C.dy, t: C.at, nm: C.k === 'saved' ? C.nm : null });
+    if (W.hulks.length > WRECK_HULKS) W.hulks.shift();
+    log(w, `The planks of the wreck on the ${C.side} beach are dragged up above the tide line: ${C.wood} timber of good split oak. Its ribs are left in the sand.`, 'info');
+    W.cur = null;
+  }
+  // a year on, a castaway has the words to say where they came from
+  for (let k = W.tl.length - 1; k >= 0; k--) {
+    const p = aliveId(w, W.tl[k]);
+    if (!p) { W.tl.splice(k, 1); continue; }
+    if (w.t - p.cw < TICKS_PER_YEAR) continue;
+    W.tl.splice(k, 1);
+    p.cf = ri(w, WRECK_FROM.length);
+    log(w, `A year after the sea gave ${p.name} to ${w.name}, ${pron(p)} has the words at last to tell where ${pron(p)} came from: ${WRECK_FROM[p.cf][1](p)}.`, 'good');
+  }
+}
+// the carriers, and the castaway between them
+function wreckAct(w, p) {
+  const C = w.wreck.cur;
+  if (C.st === 'done') return false;
+  if (C.id === p.id) { p.asleep = false; if (p.task) release(w, p); p.x = C.cx; p.y = C.cy; return true; }
+  const i = C.by.indexOf(p.id);
+  if (i < 0) return false;
+  p.asleep = false;
+  if (!p.task || p.task.k !== 'wreck') { release(w, p); p.task = { k: 'wreck', x: C.x, y: C.y, h: 99 }; }
+  if (C.st === 'carry') {
+    const s = i ? -0.45 : 0.45;
+    p.x = Math.round((C.cx + C.ux * s) * 1000) / 1000; p.y = Math.round((C.cy + C.uy * s) * 1000) / 1000;
+    return true;
+  }
+  const [sx, sy] = wreckSpot(C, i);
+  walk(w, p, sx, sy);
+  return true;
+}
+
 // ---------- wildfire ----------
 // After a run of summer heat the woods are tinder. Dry thunder, or a storm that brings lightning but no
 // rain at first, can set a tall tree alight; the fire creeps from tree to tree with the wind, through
@@ -8408,6 +8604,10 @@ const MIGRATIONS = {
   68: (w) => {
     if (w.well === undefined) w.well = null;
   },
+  // v69 -> v70: castaways (w.wreck; p.cw). Nothing washed up yet; an autumn or winter storm from year 6 may leave a wreck.
+  69: (w) => {
+    if (w.wreck === undefined) w.wreck = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8485,6 +8685,9 @@ export function summary(w) {
     copseYear: w.copse ? Math.round(w.copse.y) : 0, copseCut: w.copse ? w.copse.n : 0, copseCap: w.copse ? copseCap(w) : 0,
     whales: w.whale ? w.whale.n : 0, whaleMeat: w.whale ? w.whale.g : 0, whaleLeft: w.whale && w.whale.cur ? w.whale.cur.m : null,
     whaleCutting: w.whale && w.whale.cur ? w.people.filter((p) => p.task && p.task.k === 'whale').length : 0,
+    wrecks: w.wreck ? w.wreck.n : 0, wreckSaved: w.wreck ? w.wreck.s : 0, wreckDrowned: w.wreck ? w.wreck.dr : 0,
+    wreckNow: w.wreck && w.wreck.cur ? w.wreck.cur.st : null, wreckWho: w.wreck && w.wreck.cur ? (w.wreck.cur.st === 'carry' || w.wreck.cur.k === 'saved' ? w.wreck.cur.nm : null) : null,
+    wreckLast: (w.wreck && w.wreck.last) || null,
     frosts: w.frost ? w.frost.n : 0, frostKilled: w.frost ? w.frost.k : 0, frostYear: w.frost ? w.frost.y : 0,
     frostBlack: w.fields.filter((f) => f.fr != null).length,
     surges: w.surge ? w.surge.n : 0, saltNow: w.surge && w.surge.s ? w.fields.filter((f) => f.sa != null).length : 0,

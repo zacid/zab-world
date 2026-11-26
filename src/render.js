@@ -95,7 +95,11 @@ function doing(p) {
   if (p.cg && a < 14) return p.asleep ? 'whooping in the night' : a < 1 ? 'a baby with the whooping cough' : 'kept by the door with the whooping cough';
   const T = p.asleep && trystNow();
   if (T && (T.L.f === p.id || T.L.m === p.id)) return `out after dark ${T.L.at === 'stones' ? 'among the standing stones' : 'on the beach'} with ${p.id === T.L.f ? T.L.mn : T.L.fn}, of the other house`;
+  const WC = S.wreckNow(w);
+  if (WC && WC.id === p.id && WC.st !== 'done') return WC.st === 'carry' ? 'carried up from the beach in a cloak, half dead with cold' : 'lying in the surf by the wreck, a cloak thrown over them';
+  if (p.task && p.task.k === 'wreck' && WC) return WC.st === 'carry' ? `carrying ${WC.nm} up from the ${WC.side} beach` : p.x === p.px && p.y === p.py ? 'kneeling over the stranger in the surf' : `running down to the wreck on the ${WC.side} beach`;
   if (p.asleep) return 'asleep at home';
+  if (p.hurt && p.cw && w.t - p.cw < S.TICKS_PER_DAY * 20) return 'warming through by the fire after the wreck';
   if (!p.task && w.cough && w.cough.nu.includes(p.id)) return 'sitting up with a coughing child';
   if (p.task && p.task.k === 'mourn') {
     const g = w.yard && p.mourn && w.graves.find((o) => o.s === p.mourn[1]);
@@ -204,6 +208,7 @@ function drawWho() {
   const dog = w.dogs && w.dogs.d.find((d) => d.own === p.id && w.t - d.b >= S.TICKS_PER_YEAR);
   if (dog) kin.push(['dog', esc(dog.nm)]);
   if (p.fi) kin.push(['came', `over from the far isle in year ${p.fi}`]);
+  if (p.cw) { const fr = S.wreckFrom(p); kin.push(['came', `out of the sea in a wreck, ${when(p.cw)}${fr ? `, from ${esc(fr)}` : ' · has few island words yet'}`]); }
   const vg = a >= 13 && S.vigilWas(p);
   if (vg) kin.push(['the stones', p.vg ? esc(vg) : `<span class="bad">${esc(vg)}</span>`]);
   if (p.cl) kin.push(['wears', esc(`the pelt of ${p.cl.nm}` + (p.cl.by !== p.name ? `, killed by ${p.cl.by} in year ${p.cl.y}` : `, killed in year ${p.cl.y}`))]);
@@ -485,6 +490,7 @@ function drawTerrain() {
   drawSpring(pal);
   drawSnowmen();
   drawWhales();
+  drawWrecks();
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
   const fenced = new Set();
   for (const f of w.fields) if (f.fence) fenced.add(f.y * S.MAP + f.x);
@@ -1092,6 +1098,56 @@ function whaleAt(mx, my) {
   const X = mx * TILE, Y = my * TILE;
   return whaleSpots().reverse().find((s) => X >= s.X && Y >= s.Y && X < s.X + (s.vert ? 5 : 15) && Y < s.Y + (s.vert ? 15 : 5)) || null;
 }
+// a wreck on the sand: the split sides of a plank boat with its ribs showing, a snapped mast and a rag of hide sail.
+// While it is fresh someone may lie in the surf beside it, face down. Once the planks are dragged up only the keel and
+// the ribs stay, greying with the years.
+const HULL = [
+  '..r..r..r..',
+  '.PPPPPPPPm.',
+  'PpppppppPPm',
+  '.PPPPPPP..s',
+];
+const HULK = [
+  '..r..r..r..',
+  '.r..r..r..r',
+  'KKKKKKKKKK.',
+  '.r..r..r...',
+];
+const HULL_COL = { P: '#6a4a2c', p: '#3a281a', r: '#8a6a44', m: '#5a3e26', s: '#b8ad92', K: '#5a3e26' };
+const HULK_AGE = [{ r: '#8a6a44', K: '#5a3e26' }, { r: '#8a7a64', K: '#5e5044' }, { r: '#8f8a80', K: '#6a655e' }]; // weathering grey
+function wreckSpots() {
+  const W = w.wreck, out = [];
+  if (!W) return out;
+  const at = (o) => {
+    const vert = o.dx !== 0, X = o.x * TILE + 4 + o.dx * 2, Y = o.y * TILE + 4 + o.dy * 2;
+    return vert ? { X: X - 2, Y: Y - 5, vert } : { X: X - 5, Y: Y - 2, vert };
+  };
+  for (const h of W.hulks) out.push({ ...at(h), o: h, old: true });
+  if (W.cur) out.push({ ...at(W.cur), o: W.cur, old: false });
+  return out;
+}
+function drawWrecks() {
+  for (const s of wreckSpots()) {
+    const o = s.o, flip = (o.x * 3 + o.y) & 1, rows = s.old ? HULK : HULL;
+    const yrs = s.old ? (w.t - o.t) / S.TICKS_PER_YEAR : 0, pal = s.old ? HULK_AGE[yrs > 12 ? 2 : yrs > 4 ? 1 : 0] : HULL_COL;
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 11; k++) {
+      const ch = rows[r][flip ? 10 - k : k];
+      if (ch === '.') continue;
+      const col = pal[ch];
+      if (s.vert) px(tc, s.X + r, s.Y + k, col); else px(tc, s.X + k, s.Y + r, col);
+    }
+    if (s.old || o.id != null || o.st === 'done') continue;
+    // the castaway, face down at the edge of the surf, one arm flung out
+    const X = Math.round(o.cx * TILE) - 2, Y = Math.round(o.cy * TILE) - 1, dead = !o.live;
+    px(tc, X, Y, dead ? '#b8b4a8' : '#d9b89a'); px(tc, X + 1, Y, '#2e2620');
+    px(tc, X + 1, Y + 1, '#3e5566', 3, 1); px(tc, X + 4, Y + 1, '#2e3a44', 2, 1); px(tc, X - 1, Y + 1, dead ? '#b8b4a8' : '#d9b89a');
+    px(tc, X - 2, Y + 2, 'rgba(235,242,250,0.55)', 8, 1); // the wash running up round them
+  }
+}
+function wreckAt(mx, my) {
+  const X = mx * TILE, Y = my * TILE;
+  return wreckSpots().reverse().find((s) => X >= s.X - 2 && Y >= s.Y - 2 && X < s.X + (s.vert ? 6 : 13) && Y < s.Y + (s.vert ? 13 : 6)) || null;
+}
 // scarecrows in the fields: a pole with a crossbar, a straw head under a dark hat and an old hide (or a straw
 // coat) hung on the arms, tufts of straw at the ends. One the rooks have found out has a rook sitting on its head.
 function drawScarecrows(pal) {
@@ -1467,9 +1523,17 @@ function frame() {
   // people
   const shown = [];
   let horner = null;
-  const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5;
+  const fcx = w.fire.x + 0.5, fcy = w.fire.y + 0.5, WC = S.wreckNow(w);
   for (const p of w.people) {
     if (p.asleep) continue;
+    if (WC && WC.id === p.id && WC.st !== 'done') { // the castaway: on the sand wrapped in a cloak, or carried up slung in it between two
+      let x = p.px + (p.x - p.px) * frac, y = p.py + (p.y - p.py) * frac;
+      const up = WC.st === 'carry' ? 3 : 0, vert = Math.abs(WC.uy) > Math.abs(WC.ux), X = sub(x * TILE), Y = sub(y * TILE) - up;
+      if (vert) { px(sc, X, Y - 2, '#d9b89a'); px(sc, X, Y - 1, '#7d6a52', 1, 3); px(sc, X + 1, Y - 1, '#5e4c38', 1, 3); px(sc, X, Y + 2, '#2e3a44'); }
+      else { px(sc, X - 2, Y, '#d9b89a'); px(sc, X - 1, Y, '#7d6a52', 3, 1); px(sc, X - 1, Y + 1, '#5e4c38', 3, 1); px(sc, X + 2, Y, '#2e3a44'); }
+      shown.push({ p, x, y });
+      continue;
+    }
     let x = p.px + (p.x - p.px) * fw(p, frac), y = p.py + (p.y - p.py) * fw(p, frac);
     const moving = (p.x !== p.px || p.y !== p.py) && fw(p, frac) < 1;
     const dancing = fest && p.task && p.task.k === 'fest' && !moving;
@@ -1632,6 +1696,7 @@ function frame() {
       px(sc, X + 3, sy - 1, LOOM_WARP, 1, 3); px(sc, X + 3 - g, sy + 2, '#8a6c4c', 2, 1);
     }
     if (p.fi && age >= 4) px(sc, X + 1, Y + 1, '#4f7fa0'); // the shell bead of the far isle, worn for life
+    if (p.cw && age >= 4) px(sc, X + 1, Y + 1, '#d08a2a'); // the amber bead the sea brought in on a castaway's neck
     if (p.fi && age >= 10 && w.inc && w.inc.cur && w.inc.cur.ids.includes(p.id)) { px(sc, X - 1, Y, BUNDLE, 2, 3); px(sc, X - 1, Y, '#c4ad7e'); } // still carrying their bundle about
     if (p.cl && age >= 14) { // the wolf-skin cloak: pelt over the shoulders and down the back, the ears of the hood up
       const fur = CLOAK_FUR[p.cl.nm] || '#9a9ca2';
@@ -1833,6 +1898,12 @@ function frame() {
       const s = S.summary(w), W = w.seal;
       tip.innerHTML = `<b>Grey seals</b><br>${s.seals} ${best.wet ? 'in the water off the beach' : 'hauled out on the sand'}${s.sealPups ? ` · ${s.sealPups} white ${s.sealPups === 1 ? 'pup' : 'pups'}` : ''}${s.sealer ? ` · <span class="bad">${esc(s.sealer)} coming with a club</span>` : ''}` +
         `<br><span class="m">${s.sealFishYear.toLocaleString()} deep-water fish eaten this year · ${s.sealing ? `${s.sealsTaken} taken since ${esc(W.hn)} cut the first club` : 'nobody has gone after them yet'} · first seen by ${esc(W.nm || 'the paddler')} ${when(W.at)}</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = wreckAt(mx, my))) {
+      const o = best.o;
+      tip.innerHTML = best.old
+        ? `<b>Wreck</b><br>the keel and ribs of a plank boat, half sunk in the sand<br><span class="m">washed up ${when(o.t)} · ${o.nm ? `${esc(o.nm)} came in on it` : 'nobody on it lived'}</span>`
+        : `<b>Wreck</b><br>split planks of a boat from no shore anyone knows${o.id == null && o.st === 'lie' ? ` · <span class="bad">${o.sex === 'f' ? 'a woman' : 'a man'} lying in the surf</span>` : ''}<br><span class="m">${o.fnd ? `found by ${esc(o.fnd)}` : 'washed up'} ${when(o.at)} · ${o.wood} timber in the planks</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = whaleAt(mx, my))) {
       const o = best.o, s = S.summary(w);
@@ -2551,7 +2622,7 @@ const RES_GROUPS = [
   ['Stores & crafts', ['gran', 'spring', 'pot', 'ale', 'loom','cheese', 'bee', 'copse', 'path', 'herb']],
   ['Fields', ['muck', 'frost', 'tide', 'rust', 'rogue', 'smudge', 'rook', 'rat']],
   ['Beasts', ['wild', 'lone', 'bear', 'hunt', 'goat', 'dog']],
-  ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
+  ['Sea & sky', ['canoe', 'squall', 'seal', 'whale', 'wreck', 'wade', 'isle', 'raid', 'watch', 'moon', 'lore', 'fogl', 'bow', 'horn', 'blaze']],
   ['Folk', ['by', 'race', 'tale', 'stones', 'grave']],
 ];
 const RES_KEY = 'island.stats';
@@ -2630,6 +2701,7 @@ function updatePanels() {
     ...(s.moonLore ? [['moon', 'Moon', `<span class="m">${S.moonName(c.day)} · ${S.moonDark(c.day) ? 'dark enough for a boat to creep in' : 'too bright to row in unseen'} · counted since ${esc(w.moon.nm)} saw it ${when(w.moon.at)}</span>`]] : []),
     ...(s.wading ? [['wade', 'Shallows', `${s.waders ? `<span class="fest">${s.waders} ${s.waders === 1 ? 'child' : 'children'} paddling</span> · ` : ''}<span class="m">${s.cocklesYear.toLocaleString()} cockles this year · ${s.cockles.toLocaleString()} in all${s.wadeScares ? ` · ${s.wadeScares} pulled out of the sea` : ''}</span>`]] : []),
     ...(s.whales ? [['whale', 'Whales', `${s.whaleLeft != null ? `<span class="fest">a whale on the beach · ${s.whaleCutting} cutting</span> · ` : ''}<span class="m">${s.whales} stranded · ${s.whaleMeat.toLocaleString()} meat cut${w.whale.last ? ` · last ${when(w.whale.last)}` : ''}</span>`]] : []),
+    ...(s.wrecks ? [['wreck', 'Wrecks', `${s.wreckNow === 'lie' ? '<span class="bad">someone lying in the surf by a wreck</span> · ' : s.wreckNow === 'carry' ? `<span class="fest">carrying ${esc(s.wreckWho)} up from the beach</span> · ` : ''}<span class="m">${s.wrecks} washed up · ${s.wreckSaved} carried in alive${s.wreckDrowned ? ` · ${s.wreckDrowned} dead` : ''}${w.wreck.last ? ` · last ${when(w.wreck.last)}` : ''}</span>`]] : []),
     ...(s.blazeFires ? [['blaze', 'Fire', `${s.blaze ? `<span class="bad">the woods are burning · ${s.blazeAlight} alight · ${s.blazeFighting} beating</span> · ` : ''}<span class="m">${s.blazeFires} ${s.blazeFires === 1 ? 'fire' : 'fires'} · ${s.blazeBurnt.toLocaleString()} acres burnt${!s.blaze && w.blaze.last >= 0 ? ` · last ${when(w.blaze.last)}` : ''}</span>`]] : []),
     ...(named.length ? [['by', 'Named', `<span class="by">${named.map((p) => esc(p.name + ' ' + S.byname(p))).join(' · ')}</span>`]] : []),
     ...(s.race || s.racing ? [['race', 'Race', `${s.racing ? `<span class="fest">${s.racing} out to the stake and back</span> · ` : s.raceWin ? `<span class="fest">${esc(s.raceWin)} in the oak wreath</span> · ` : ''}<span class="m">${s.races} run at midsummer${s.raceLast ? ` · last won by ${esc(s.raceLast.nm)}, ${s.raceLast.a}, in year ${s.raceLast.y}` : ''}</span>`]] : []),
