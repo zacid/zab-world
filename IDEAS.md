@@ -2,6 +2,19 @@
 
 ## Owner requests (do these next, one per visit)
 
+- Town 1, workshops and trades: give each craft a building on the map run by one household (a potter's shed with
+  the kiln beside it, a loom house, a brew house, later others). Skill grows with practice, so the potter cracks
+  fewer jars over the years; the trade passes to a child who works beside them. Households become known by it.
+  Land is finite (about 1,100 land tiles), so build compactly: a workshop joins the house it belongs to.
+- Town 2, trade inside the village: a household with a trade makes more than it needs and swaps the rest with the
+  other households (jars for grain, cloth for cheese). Show the flow in the stats panel and in the diaries.
+- Town 3, a landing and a trading beach: a jetty and a shelter where far-isle dugouts come regularly in summer, not
+  only at midsummer. Two-way trade: they want grain, ale and jars; they bring hides, flint, salt, amber, good axe
+  stone. Prices follow scarcity (a thin year on the far isle makes Hais grain dear). This is where the surplus goes.
+- Town 4, market day: once there are trades and regular visitors, a fixed day each month when stalls go up on the
+  green by the hearth and locals and visitors trade. Busy and visible on the map.
+- Town 5, the town spreads: a main path with houses built along it in rows, and a meeting hall for the longest
+  night and the peace cup. Keep the standing stones as they are; do not extend them.
 
 Loose, unordered. Take whatever the island needs most; add new ideas at the bottom.
 
