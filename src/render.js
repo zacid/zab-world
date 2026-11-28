@@ -444,18 +444,24 @@ function drawTerrain() {
     const X = f.x * TILE, Y = f.y * TILE, fp = tilePal(c.season, cover, f.x, f.y);
     px(tc, X, Y, fp.snow ? '#8a7f74' : '#5a3d24', 8, 8);
     for (let r = 0; r < 4; r++) px(tc, X, Y + r * 2 + 1, fp.snow ? '#b9b2a8' : '#6e4b2c', 8, 1);
+    // tired soil: the grain stands thin, gaps in the rows and shorter, paler ears (more gaps the more worn)
+    const sl = S.soilOf(f), gap = sl < S.SOIL_TIRED ? (S.SOIL_TIRED + 5 - sl) / 40 : 0;
+    const thin = (r, k) => gap > 0 && S.hash(f.x * 4 + k, f.y * 4 + r, 59) < gap;
     if (f.stage === 'planted') {
       const g = Math.max(1, Math.round(f.growth * 3));
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) px(tc, X + k * 2, Y + r * 2 + 2 - g, f.growth > 0.7 ? '#9bbf3c' : '#5fae47', 1, g);
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) if (!thin(r, k)) px(tc, X + k * 2, Y + r * 2 + 2 - g, f.growth > 0.7 ? '#9bbf3c' : '#5fae47', 1, g);
     } else if (f.stage === 'ripe') {
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) { px(tc, X + k * 2, Y + r * 2, '#e6c14a', 1, 2); px(tc, X + k * 2, Y + r * 2, '#f7dc78'); }
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) {
+        if (thin(r, k)) { px(tc, X + k * 2, Y + r * 2 + 1, '#c9a845'); continue; } // a short, light ear
+        px(tc, X + k * 2, Y + r * 2, '#e6c14a', 1, 2); px(tc, X + k * 2, Y + r * 2, '#f7dc78');
+      }
     } else if (f.stage === 'harvested') {
       for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) px(tc, X + k * 2, Y + r * 2 + 1, '#b59b5c');
     } else if (f.flat) { // storm-flattened grain lying in the mud
       for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
     }
-    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !fp.snow) { // mucked: dark forkfuls spread over the furrows
-      for (let k = 0; k < 7; k++) { const hh = S.hash(f.x * 7 + k, f.y * 3 + k, 83); px(tc, X + ((hh * 7) | 0), Y + ((((hh * 64) | 0) % 4) * 2) + 1, k & 1 ? '#2e2014' : '#3d2a19', 2, 1); }
+    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !fp.snow) { // mucked: a few dark flecks of muck in the furrows
+      for (let k = 0; k < 4; k++) { const hh = S.hash(f.x * 7 + k, f.y * 3 + k, 83); px(tc, X + ((hh * 8) | 0), Y + ((((hh * 64) | 0) % 4) * 2) + 1, k & 1 ? '#2e2014' : '#3d2a19'); }
     } else if (f.mk && f.stage === 'planted' && f.growth > 0.15) { // and the shoots on it come up a darker, richer green
       const g = Math.max(1, Math.round(f.growth * 3));
       for (let r = 0; r < 4; r++) px(tc, X + 1 + (r & 1) * 4, Y + r * 2 + 2 - g, f.growth > 0.7 ? '#86ad2e' : '#3f9a3a', 1, g);
@@ -772,11 +778,12 @@ function heapAt(mx, my) {
   const x = mx * TILE, y = my * TILE;
   return x >= r.x - 2 && x <= r.x + r.mw + 2 && y >= r.y - 3 && y <= r.y + r.mh + 3 ? r : null;
 }
-function muckAt(mx, my) { // a mucked field under the pointer
+function muckAt(mx, my) { // a mucked or worn field under the pointer
   if (!w.muck) return null;
   const x = Math.floor(mx), y = Math.floor(my);
-  return w.fields.find((f) => f.mk && f.x === x && f.y === y) || null;
+  return w.fields.find((f) => (f.mk || f.sl != null) && f.x === x && f.y === y) || null;
 }
+function soilWord(sl) { return sl >= 97 ? 'in good heart' : sl >= S.SOIL_TIRED ? 'a little worn' : sl >= 75 ? 'tired' : 'worn out'; }
 function drawPen(pal) {
   const G = w.goats;
   if (!G) return;
@@ -2063,7 +2070,10 @@ function frame() {
       tip.innerHTML = `<b>Muck heap</b><br>dung from the pen, hearth ash and scraps · enough for ${s.muckHeap} ${s.muckHeap === 1 ? 'field' : 'fields'}${s.mucking ? ` · ${s.mucking} carrying it out` : ''}<br><span class="m">${s.muckYear} ${s.muckYear === 1 ? 'field' : 'fields'} mucked this year · ${s.muckGrain.toLocaleString()} more grain since ${esc(w.muck.nm)} saw it ${when(w.muck.at)}</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = muckAt(mx, my))) {
-      tip.innerHTML = `<b>Mucked field</b><br>${best.stage === 'planted' ? 'the grain comes up thick and dark' : best.stage === 'ripe' ? 'heavy ears, ready to cut' : 'forked over with muck from the pen'}<br><span class="m">about a third more grain at the next harvest</span>`;
+      const sl = Math.round(S.soilOf(best)), worn = sl < S.SOIL_TIRED;
+      tip.innerHTML = best.mk
+        ? `<b>Mucked field</b><br>${best.stage === 'planted' ? 'the grain comes up thick and dark' : best.stage === 'ripe' ? 'heavy ears, ready to cut' : 'forked over with muck from the pen'} · soil ${soilWord(sl)}<br><span class="m">${sl}% of full strength, ${best.mk} put back by the muck</span>`
+        : `<b>${worn ? 'Tired field' : 'Field'}</b><br>soil ${worn ? `<span class="bad">${soilWord(sl)}</span>` : soilWord(sl)}${best.stage === 'ripe' || best.stage === 'planted' ? (worn ? ' · the grain stands thin' : '') : ''}<br><span class="m">${sl}% of full strength · each harvest takes some out; muck or a rest puts it back</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = stoolAt(mx, my)) != null) {
       const v = w.wood[best], K = w.copse;
@@ -2745,7 +2755,7 @@ function updatePanels() {
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced${s.hedging ? ` · ${s.hedges} hedged, ${s.hedgesGrown} grown` : ''})</span>` : s.fields],
-    ...(s.muck ? [['muck', 'Muck', `${s.mucking ? `<span class="fest">${s.mucking} forking muck</span> · ` : ''}${s.mucked} <span class="m">${s.mucked === 1 ? 'field' : 'fields'} mucked · heap for ${s.muckHeap} more · ${s.muckGrainYear.toLocaleString()} more grain this year, ${s.muckGrain.toLocaleString()} in all</span>`]] : []),
+    ...(s.muck ? [['muck', 'Muck', `${s.mucking ? `<span class="fest">${s.mucking} forking muck</span> · ` : ''}${s.mucked} <span class="m">${s.mucked === 1 ? 'field' : 'fields'} mucked · heap for ${s.muckHeap} more · soil ${s.soil}%${s.soilTired ? `, ${s.soilTired} tired` : ''} · ${s.muckGrainYear.toLocaleString()} more grain this year, ${s.muckGrain.toLocaleString()} in all</span>`]] : []),
     ...(s.frosts ? [['frost', 'Frost', `${s.frostBlack ? `<span class="bad">${s.frostBlack} ${s.frostBlack === 1 ? 'field' : 'fields'} frost-black</span> · ` : ''}<span class="m">${s.frosts} late ${s.frosts === 1 ? 'frost' : 'frosts'} · ${s.frostKilled.toLocaleString()} fields killed · last ${when(w.frost.last)}</span>`]] : []),
     ...(s.surges ? [['tide', 'Storm tides', `${s.surgeNow ? '<span class="bad">the sea is over the low ground</span> · ' : ''}${s.saltNow ? `<span class="bad">${s.saltNow} ${s.saltNow === 1 ? 'field' : 'fields'} salted</span> · ` : ''}<span class="m">${s.surges} ${s.surges === 1 ? 'tide' : 'tides'} over the low ground · ${s.saltEver.toLocaleString()} fields drowned${s.surgeBoats ? ` · ${s.surgeBoats} ${s.surgeBoats === 1 ? 'dugout' : 'dugouts'} lost` : ''} · ${s.surgeWood.toLocaleString()} driftwood · last ${when(w.surge.last)}</span>`]] : []),
     ...(s.rusts ? [['rust', 'Rust', `${s.rusted ? `<span class="bad">${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted</span> · ` : ''}<span class="m">${s.rusts} ${s.rusts === 1 ? 'outbreak' : 'outbreaks'} · ${s.rustEver.toLocaleString()} fields spotted · ~${s.rustGrain.toLocaleString()} grain lost · last ${when(w.rust.last)}</span>`]] : []),
