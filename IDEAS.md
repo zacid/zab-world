@@ -2,6 +2,13 @@
 
 ## Owner requests (do these next, one per visit)
 
+- Refine muck: the soil tires. The heap now makes about 89 fields of muck a year for 53 fields, so every field is
+  mucked every winter and muck is just a flat +30%. Instead, give each field a fertility that drops a little with
+  every harvest and comes back with muck or a year left fallow; muck restores lost yield rather than adding a free
+  third. Fields far from the pen should then visibly lag. Lower the muck a goat makes, or let the heap waste, so
+  only part of the land can be mucked each year and nearest-the-pen-first matters again. Show the mucked look more
+  lightly (a few dark flecks, not a whole dark field), so the map does not turn brown every winter. Migrate the
+  live world in place (start every field at full fertility). This should also slow the grain surplus.
 
 Loose, unordered. Take whatever the island needs most; add new ideas at the bottom.
 
