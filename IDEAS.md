@@ -795,3 +795,12 @@ Loose, unordered. Take whatever the island needs most; add new ideas at the bott
   - Seaweed carried up from the beach after storms as muck for the fields nearest the shore.
   - Salt from storm tides could tire the soil as well as killing the crop.
   - A deliberate fallow: leave the worst field unsown for a year when the stores are deep.
+- Storm weed is done (SIM_VERSION 75; w.muck.wr, f.wk, WRACK_* and wrackStrand/wrackStorm/wrackTask/wrackDone in sim.js;
+  wrackTiles/drawWrack/wrackAt in render.js; probe scripts/_wrack.mjs). On Hais every field lies 13-16 tiles from the sea, so
+  each basket is a day's walk. Answers it invites:
+  - A sledge or a pair of baskets on a yoke (two fields a trip), or a weed heap by the fields that rots down over winter.
+  - Fields broken on the shore side once weed is known (findFieldSite could favour ground near the strand).
+  - Children sent down to gather it with the waders; gulls and flies over a big heap; a stink if it lies by the houses.
+  - Weed as winter fodder for the goats when the snow lies (they eat it on real islands), so fewer goats starve or go thin.
+  - Burnt weed ash (kelp) for the potter's glaze, much later.
+  - Housekeeping: scripts/_wrack.mjs, _wrack2.mjs, _wrack3.mjs (probes) could not be deleted.

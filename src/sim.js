@@ -2,7 +2,7 @@
 // Rules: no Math.random, no Date, no trig/exp in the step path; all state lives in
 // the JSON-serialisable world object so save -> load -> continue == continue.
 
-export const SIM_VERSION = 74;
+export const SIM_VERSION = 75;
 export const TICK_MS = 10000;            // 1 game hour = 10 real seconds
 export const HOURS_PER_DAY = 24;
 export const DAYS_PER_SEASON = 90;
@@ -270,6 +270,15 @@ const SOIL_NEW = 3;          // once muck is known, new fields a year at most, p
 const SOIL_STORES = 0.5;    // once muck is known, years of food in store (at sowing time) above which nobody clears new ground
 export function soilOf(f) { return f.sl == null ? 100 : f.sl; }
 const MUCK_WORK = 3;         // hours to fork a field over
+// Wrack: once the tired ground has been seen, every storm casts weed up on the strand nearest the fields
+// (w.muck.wr). Idle hands carry it up in baskets to the tired bare fields nearest that beach, so the shore
+// fields that the pen's heap never reaches get something back too. Weed left on the sand rots or washes away.
+const WRACK_DAY = 1.5;       // baskets of weed cast up per day of storm
+export const WRACK_CAP = 12;        // most the strand holds at once
+const WRACK_ROT = 0.03;      // share that rots or washes back each day
+const WRACK_HANDS = 2;       // carriers out at once, plus one per 40 islanders
+const WRACK_SOIL = 10;      // strength a basket of weed puts back (thinner stuff than dung)
+const WRACK_FAR = 18;        // fields farther than this from the strand are not worth the carry; the strand is the beach with most fields this near
 
 // ---------- cheese ----------
 // Summer milk curdled, pressed under a stone and dried on a rack by the pen. The rounds keep, and come
@@ -859,7 +868,7 @@ function daily(w, c, fx) {
   // new year
   if (c.doy === 0) {
     if (c.year > 1) {
-      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}), ...(w.surge && w.surge.yt ? { tides: w.surge.yt, ...(w.surge.y ? { salted: w.surge.y } : {}) } : {}), ...(w.ale ? { brewed: w.ale.yg, drunk: Math.round(w.ale.yd) } : {}) });
+      w.hist.yearly.push({ y: c.year - 1, pop, births: w.stats.yb, deaths: w.stats.yd, harvest: w.stats.yh, food: Math.round(w.food), timber: Math.round(w.timber), storms: w.stats.ys || 0, flattened: w.stats.yf || 0, wolves: w.stats.yw || 0, raids: w.stats.yr || 0, hunted: w.stats.yk || 0, fences: w.fields.filter((f) => f.fence).length, sick: w.stats.yi || 0, fog: w.stats.yg || 0, rats: w.rats ? Math.round(w.rats.y) : 0, ...(w.goats ? { goats: w.goats.herd.length, goatsLost: w.goats.yl, pens: w.goats.yp || 0 } : {}), ...(w.lost ? { lost: w.lost.y } : {}), ...(w.dogs ? { dogs: w.dogs.d.length } : {}), ...(w.raid ? { stolen: w.raid.yg, given: w.raid.yv || 0 } : {}), ...(w.pot ? { jars: w.pot.j } : {}), ...(w.snow ? { snowmen: w.snow.y } : {}), ...(w.blaze ? { burnt: w.blaze.y } : {}), ...(w.canoe ? { deep: w.canoe.y } : {}), ...(w.copse ? { copse: Math.round(w.copse.y) } : {}), ...(w.hedge ? { hedges: w.fields.filter((f) => f.hg != null).length, hedgesNew: w.hedge.y } : {}), ...(w.whale ? { whales: w.whale.n } : {}), ...(w.frost ? { frosted: w.stats.yfr || 0 } : {}), ...(w.wade ? { cockles: w.wade.y } : {}), ...(w.smudge ? { smudged: w.smudge.y } : {}), ...(w.rust ? { rusted: w.rust.y } : {}), ...(w.rogue ? { rogued: w.rogue.y } : {}), ...(w.bees ? { honey: w.bees.y, hives: beesAlive(w) } : {}), ...(w.lone ? { lone: w.lone.yh || 0 } : {}), ...(w.bear ? { bear: w.bear.yr || 0 } : {}),...(w.bow ? { bows: w.bow.y || 0 } : {}), ...(w.lore ? { held: w.lore.y } : {}), ...(w.muck ? { mucked: w.muck.y, muckGrain: w.muck.yg, ...(w.muck.wr ? { weed: w.muck.wr.y } : {}) } : {}), ...(w.rot ? { lame: w.rot.y, rotDied: w.rot.yd } : {}), ...(w.pare ? { pared: w.pare.y } : {}), ...(w.squall ? { squalls: w.squall.y } : {}), ...(w.seal ? { seals: w.seal.n, sealsTaken: w.seal.yk, sealFish: w.seal.ye } : {}), ...(w.cheese ? { cheese: w.cheese.y, cheeseEaten: w.cheese.ye } : {}), ...(w.crow ? { rooks: Math.round(w.crow.y), scared: w.crow.ys, ...(w.crow.m ? { crowTurned: w.crow.my } : {}) } : {}), ...(w.spring && w.spring.yd ? { dry: w.spring.yd, thirst: w.spring.yt, carried: w.spring.yc } : {}), ...(w.cough && w.cough.y ? { coughs: w.cough.y, coughDied: w.cough.yd } : {}), ...(w.quarrel && (w.quarrel.y || w.quarrel.yf) ? { spats: w.quarrel.y, fights: w.quarrel.yf } : {}), ...(w.inc && w.inc.y === c.year - 1 && w.inc.last ? { came: w.inc.last.n } : {}), ...(w.loom ? { woven: w.loom.yb } : {}), ...(w.surge && w.surge.yt ? { tides: w.surge.yt, ...(w.surge.y ? { salted: w.surge.y } : {}) } : {}), ...(w.ale ? { brewed: w.ale.yg, drunk: Math.round(w.ale.yd) } : {}) });
       log(w, `Year ${c.year - 1} ends: ${pop} people, ${w.stats.yb} born, ${w.stats.yd} died, ${w.stats.yh} grain harvested.`, 'year');
     }
     w.stats.yb = w.stats.yd = w.stats.yh = w.stats.ys = w.stats.yf = 0;
@@ -888,7 +897,7 @@ function daily(w, c, fx) {
     if (w.lone) w.lone.yh = 0;
     if (w.bow) w.bow.y = 0;
     if (w.lore) w.lore.y = 0;
-    if (w.muck) { w.muck.y = 0; w.muck.yg = 0; }
+    if (w.muck) { w.muck.y = 0; w.muck.yg = 0; if (w.muck.wr) w.muck.wr.y = 0; }
     if (w.pare) w.pare.y = 0;
     if (w.cheese) { w.cheese.y = 0; w.cheese.ye = 0; }
     if (w.spring) { w.spring.yd = 0; w.spring.yt = 0; w.spring.yc = 0; }
@@ -975,7 +984,7 @@ function daily(w, c, fx) {
   if (w.goats !== undefined) goatDay(w, c);
   if (w.loom !== undefined) loomDay(w, c, wx);
   if (w.ale !== undefined) aleDay(w, c, wx);
-  if (w.muck) muckDay(w);
+  if (w.muck) { muckDay(w); wrackDay(w); }
   soilDay(w);
   if (w.dogs !== undefined) dogDay(w, c);
   lifeAndDeath(w, c);
@@ -1035,7 +1044,7 @@ function weather(w, c) {
   if (next === s.k) s.n++;
   else {
     endSpell(w, s);
-    if (s.k === 'storm') { whaleStorm(w, c, s.n); wreckStorm(w, c, s.n); }
+    if (s.k === 'storm') { whaleStorm(w, c, s.n); wreckStorm(w, c, s.n); wrackStorm(w, c, s.n); }
     if (s.fk || s.fs) frostTold(w, s);
     if (s.k === 'fog' && w.lore && w.lore.fl == null && s.n >= FOG_LEARN && w.goats && ((w.fauna && w.fauna.fa) || (w.lost && w.lost.n) || s.gl)) learnFog(w, s);
     w.wx = { k: next, n: 1, f: 0, r: 0, d: 0 };
@@ -3650,6 +3659,78 @@ function muckDone(w, p, t, pop) {
   pop('mucked', 'muted');
   if (w.muck.n === 1) log(w, `${p.name} forks the first basket of muck over a bare field by the pen. It steams in the cold air.`, 'good');
   else if (w.muck.n === 50 || w.muck.n === 250 || w.muck.n === 1000) log(w, `${w.muck.n} fields have been mucked from the heap by the pen.`, 'good');
+}
+// w.muck.wr { a baskets on the strand, x, y strand tile, n carried ever, y this year, c storms that cast it, nm, at };
+// f.wk = 1 on a field whose f.mk came from the strand (drawn green-black, cleared at harvest).
+// The strand is the shore tile nearest any field that can be walked to from the hearth, picked again at every storm.
+function wrackStrand(w) {
+  if (!w.shore || !w.shore.length || !w.fields.length) return null;
+  const fx = w.fire.x + 0.5, fy = w.fire.y + 0.5;
+  const far = WRACK_FAR * WRACK_FAR;
+  let best = -1, bn = 0, bd = 1e9;
+  for (const i of w.shore) {
+    const x = i % MAP, y = (i - x) / MAP;
+    let n = 0;
+    for (const f of w.fields) if (d2(f.x, f.y, x, y) <= far) n++;
+    if (!n || n < bn) continue;
+    const dd = d2(x + 0.5, y + 0.5, fx, fy);
+    if ((n > bn || dd < bd) && lineOfLand(w, fx, fy, x + 0.5, y + 0.5)) { bn = n; bd = dd; best = i; }
+  }
+  return best < 0 ? null : { x: best % MAP, y: (best - (best % MAP)) / MAP };
+}
+function wrackStorm(w, c, n) {
+  const M = w.muck;
+  if (!M || !M.tn) return; // nobody looks at weed as muck until the tired ground has been seen
+  const s = wrackStrand(w);
+  if (!s) return;
+  const first = !M.wr;
+  if (first) {
+    const adults = w.people.filter((p) => !p.dead && ageY(w, p) >= 14);
+    const who = adults.length ? adults[ri(w, adults.length)] : null;
+    if (!who) return;
+    M.wr = { a: 0, x: s.x, y: s.y, n: 0, y: 0, c: 0, nm: who.name, at: w.t };
+    const side = sideOf(w, s.x, s.y);
+    milestone(w, `After the storm ${who.name} walks the ${side} beach below the fields and finds the tide line heaped knee-deep with torn weed, brown and glistening. ${who.name} remembers the far fields coming in light, and says the sea has done the mucking the pen cannot: from now on, after every storm, the weed is carried up in baskets and forked over the worn ground nearest the shore.`);
+  }
+  const R = M.wr;
+  R.x = s.x; R.y = s.y; R.c++;
+  R.a = Math.min(WRACK_CAP, Math.round((R.a + WRACK_DAY * n) * 100) / 100);
+}
+function wrackDay(w) {
+  const R = w.muck.wr;
+  if (!R || R.a <= 0) return;
+  R.a = R.a < 0.3 ? 0 : Math.round(R.a * (1 - WRACK_ROT) * 100) / 100;
+}
+function wrackTask(w, p, c) {
+  const M = w.muck, R = M && M.wr;
+  // a day's walk there and back: only set out in the morning, and only after the harvest, when hands are spare
+  if (!R || R.a < 1 || c.season < 2 || c.hour < 7 || c.hour > 11) return null;
+  const wx = w.wx ? w.wx.k : 'clear';
+  if (wx === 'snow' || wx === 'storm') return null;
+  const a = ageY(w, p);
+  if (a < 12 || a > 60) return null;
+  const cc = cacheOf(w);
+  if (cc.wrackNone === w.t) return null;
+  if (cc.wrackT !== w.t) { cc.wrackT = w.t; cc.wrackN = 0; for (const o of w.people) if (o.task && o.task.k === 'wrack') cc.wrackN++; }
+  if (cc.wrackN >= WRACK_HANDS + Math.floor(w.people.length / 40)) return null;
+  const s = { x: R.x, y: R.y }, far = WRACK_FAR * WRACK_FAR;
+  const f = nearest(w.fields, s, (o) => !o.mk && o.sl != null && o.sl <= 100 - SOIL_ASK && (o.stage === 'harvested' || o.stage === 'fallow') && o.fr == null && o.sa == null &&
+    d2(o.x, o.y, s.x, s.y) <= far && w.res['m' + o.id] == null);
+  if (!f) { cc.wrackNone = w.t; return null; }
+  R.a = Math.round((R.a - 1) * 100) / 100; // a basket filled on the strand; spilt if the work is broken off
+  cc.wrackN++;
+  return { k: 'wrack', key: 'm' + f.id, x: R.x, y: R.y, h: 1, f: f.id };
+}
+function wrackDone(w, p, t, pop) {
+  const R = w.muck && w.muck.wr, f = w.fields.find((o) => o.id === t.f);
+  if (!R || !f || f.mk) return;
+  const s = soilOf(f), back = Math.min(WRACK_SOIL, 100 - s);
+  f.mk = Math.max(1, Math.round(back)); f.wk = 1;
+  f.sl = s + back >= 99.95 ? undefined : Math.round((s + back) * 100) / 100;
+  R.n++; R.y++;
+  pop('weed', 'muted');
+  if (R.n === 1) log(w, `${p.name} tips the first dripping basket of weed out over a worn field above the beach and forks it in. The gulls follow the basket all the way up.`, 'good');
+  else if (R.n === 100 || R.n === 500 || R.n === 2000) log(w, `${R.n} baskets of storm weed have been carried up from the strand to the fields.`, 'good');
 }
 
 // ---------- the hunt ----------
@@ -6322,6 +6403,7 @@ function release(w, p) {
   if (p.task && p.task.sea && w.canoe) { // called in off the water: back on the beach at once
     p.x = w.canoe.bx + 0.5; p.y = w.canoe.by + 0.5; w.canoe.at = null;
   }
+  if (p.task && p.task.k === 'wrack' && p.task.b === 1) wrackDone(w, p, p.task, () => {}); // called in with a full basket: it is tipped on the field on the way home
   if (p.task && p.task.k === 'water' && w.spring) { // back with the water, or the carry is given up
     if (w.spring.o > 0) w.spring.o--;
     if (p.task.b === 1) { w.spring.c++; w.spring.n++; w.spring.yc++; } // called in on the way home: the water still comes in with them
@@ -6480,6 +6562,9 @@ function pickTask(w, p, c) {
   const sck = scareTask(w, c);
   if (sck) return sck;
   // muck from the heap by the pen, forked over the bare fields after the harvest
+  // and storm weed from the strand, before it rots, over the worn fields nearest the beach
+  const wrk = wrackTask(w, p, c);
+  if (wrk) return wrk;
   const mk = muckTask(w, p);
   if (mk) return mk;
   // the dugout: hollowing a new one, or out to the deep water, once the woodpile is seen to
@@ -7212,6 +7297,10 @@ function act(w, p, c, fx) {
   t.h--;
   if (t.h > 0) return;
   if (t.k === 'water' && !t.b && w.spring) { t.b = 1; t.x = w.spring.x; t.y = w.spring.y; t.h = 1; return; } // filled at the pool: the long walk home
+  if (t.k === 'wrack' && !t.b) { // the basket is full of weed: up the beach to the field
+    const f = w.fields.find((o) => o.id === t.f);
+    if (f && !f.mk) { t.b = 1; t.x = f.x; t.y = f.y; t.h = MUCK_WORK; return; }
+  }
   finish(w, p, t, c, fx);
   release(w, p);
 }
@@ -7224,7 +7313,7 @@ function finish(w, p, t, c, fx) {
     const base = FIELD_YIELD * w.harvest * (1 - (f.lost || 0)), sl = soilOf(f);
     const y = Math.round(base * sl / 100);
     if (f.mk && w.muck) { const more = Math.min(y, Math.round(base * f.mk / 100)); w.muck.g += more; w.muck.yg += more; }
-    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); f.lost = f.mk = undefined;
+    w.food += y; w.stats.yh += y; f.stage = 'harvested'; f.growth = 0; rustCut(w, f, y); f.lost = f.mk = f.wk = undefined;
     f.sl = Math.round(sl * (1 - SOIL_TIRE) * 100) / 100; // the crop takes its strength out of the ground
     if (w.muck && !w.muck.tn && sl < SOIL_TIRED) soilSeen(w, p, f, sl);
     if (!w.muck && w.goats && w.learned && w.learned.goats != null && w.t - w.learned.goats >= MUCK_YEARS * TICKS_PER_YEAR &&
@@ -7294,6 +7383,8 @@ function finish(w, p, t, c, fx) {
     pareDone(w, p, t, pop);
   } else if (t.k === 'muck') {
     muckDone(w, p, t, pop);
+  } else if (t.k === 'wrack') {
+    if (t.b) wrackDone(w, p, t, pop);
   } else if (t.k === 'cheese') {
     cheeseDone(w, p, pop);
   } else if (t.k === 'weave') {
@@ -8866,6 +8957,10 @@ const MIGRATIONS = {
   73: (w) => {
     for (const f of w.fields) f.sl = undefined;
   },
+  // v74 -> v75: storm weed (w.muck.wr, f.wk). Nothing on the strand yet; the next storm casts the first of it up.
+  74: (w) => {
+    if (w.muck && w.muck.wr === undefined) w.muck.wr = null;
+  },
 };
 export function migrate(w) {
   while (w.v < SIM_VERSION) {
@@ -8990,6 +9085,9 @@ export function summary(w) {
     muck: !!w.muck, muckHeap: w.muck ? Math.floor(w.muck.h / MUCK_FIELD) : 0, mucked: w.fields.filter((f) => f.mk).length,
     muckYear: w.muck ? w.muck.y : 0, muckEver: w.muck ? w.muck.n : 0, muckGrain: w.muck ? w.muck.g : 0, muckGrainYear: w.muck ? w.muck.yg : 0,
     mucking: w.muck ? w.people.filter((p) => p.task && p.task.k === 'muck').length : 0,
+    wrack: !!(w.muck && w.muck.wr), wrackOn: w.muck && w.muck.wr ? Math.floor(w.muck.wr.a) : 0, wrackEver: w.muck && w.muck.wr ? w.muck.wr.n : 0,
+    wrackYear: w.muck && w.muck.wr ? w.muck.wr.y : 0, wracking: w.muck && w.muck.wr ? w.people.filter((p) => p.task && p.task.k === 'wrack').length : 0,
+    weeded: w.fields.filter((f) => f.wk).length,
     soil: w.fields.length ? Math.round(w.fields.reduce((n, f) => n + soilOf(f), 0) / w.fields.length) : 100,
     soilTired: w.fields.filter((f) => soilOf(f) < SOIL_TIRED).length,
     lame: w.goats ? w.goats.herd.filter((g) => g.lm != null).length : 0, rots: w.rot ? w.rot.n : 0, rotLame: w.rot ? w.rot.k : 0, rotDied: w.rot ? w.rot.d : 0,

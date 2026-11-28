@@ -122,6 +122,7 @@ function doing(p) {
   if (p.task && p.task.k === 'water') { const v = w.techs.includes('pottery') ? 'jar' : 'skin'; return p.task.b ? (p.x === p.px && p.y === p.py ? `pouring a ${v} of water out by the dry spring` : `carrying a ${v} of water home from the pool in the woods`) : p.x === p.px && p.y === p.py ? `filling a ${v} at the pool in the woods` : `walking out to the pool in the woods with an empty ${v}`; }
   if (p.task && p.task.k === 'cheese') return p.x === p.px && p.y === p.py ? 'pressing curd in a basket under a stone' : 'carrying a pail of milk to the cheese rack';
   if (p.task && p.task.k === 'muck') return p.x === p.px && p.y === p.py ? 'forking muck over a bare field' : 'carrying a basket of muck from the heap by the pen';
+  if (p.task && p.task.k === 'wrack') return p.task.b ? (p.x === p.px && p.y === p.py ? 'forking storm weed into a worn field' : 'carrying a dripping basket of weed up from the strand') : p.x === p.px && p.y === p.py ? 'filling a basket with weed on the strand' : 'walking down to the strand for storm weed';
   if (p.task && p.task.k === 'shore') return p.x === p.px && p.y === p.py ? (w.squall && w.squall.cur && w.squall.cur.sw ? `watching ${w.squall.cur.nm} swim for the beach` : `watching the squall for ${w.squall && w.squall.cur ? w.squall.cur.nm : 'the dugout'}`) : 'running down to the landing';
   if (p.task && p.task.sea && p.task.sw) return 'in the water, swimming for the landing';
   if (p.task && p.task.sea && w.squall && w.squall.cur && w.squall.cur.id === p.id) return 'fighting the paddle home through a squall';
@@ -253,6 +254,7 @@ function fw(o, frac, ref = 3) {
 // Work at the spot (render-only): tools swing in a steady rhythm, each islander a little out of step with the next,
 // and chips, seed, clods or dust fly on the beat. X, Y = top-left of an adult standing sprite; tools on the right.
 const WOOD = '#8a5a32', IRON = '#c8c8c8';
+const WEED = '#3e4a1e', WEED_LT = '#6a6a2a'; // storm wrack: olive-black bladderwrack, a lighter tangle of kelp
 const COUGH_COL = '#c3d0d8'; // a whooping child's shirt: washed-out, bluish
 function work(k, id, X, Y, now) {
   const ph = (n) => Math.floor(now / n + id * 0.37);
@@ -288,11 +290,11 @@ function work(k, id, X, Y, now) {
     const f = ph(240) % 3;
     px(sc, X + 4, Y + 1 + (f === 1 ? -1 : 0), '#3a3028', 3, 2); px(sc, X + 5, Y + (f === 1 ? -1 : 0), '#2b2620'); px(sc, X + 7, Y + 2, '#4a3c2e');
     if (f === 2) px(sc, X + 6, Y - 1, '#5a4a3a');
-  } else if (k === 'muck') { // a wooden fork dug into the basket and swung out over the furrow, a dark clod flying off it
-    const f = ph(260) % 3;
-    px(sc, X - 1, Y + 2, WOOD, 2, 2); px(sc, X - 1, Y + 1, '#3d2a19', 2, 1); // the basket at the feet
-    if (f === 0) { px(sc, X + 3, Y + 1, WOOD, 1, 2); px(sc, X + 3, Y + 3, '#3d2a19'); }
-    else { px(sc, X + 3, Y, WOOD); px(sc, X + 4, Y - 1, WOOD); px(sc, X + 5, Y - 1, '#e6dccb'); if (f === 2) px(sc, X + 6 + (ph(260) % 2), Y + 1, '#3d2a19'); }
+  } else if (k === 'muck' || k === 'wrack') { // a wooden fork dug into the basket and swung out over the furrow, a dark clod (or a rag of weed) flying off it
+    const f = ph(260) % 3, cl = k === 'wrack' ? WEED : '#3d2a19';
+    px(sc, X - 1, Y + 2, WOOD, 2, 2); px(sc, X - 1, Y + 1, cl, 2, 1); // the basket at the feet
+    if (f === 0) { px(sc, X + 3, Y + 1, WOOD, 1, 2); px(sc, X + 3, Y + 3, cl); }
+    else { px(sc, X + 3, Y, WOOD); px(sc, X + 4, Y - 1, WOOD); px(sc, X + 5, Y - 1, '#e6dccb'); if (f === 2) px(sc, X + 6 + (ph(260) % 2), Y + 1, cl); }
   } else if (k === 'cheese') { // a wicker basket of curd at the feet, both hands pressing the stone down; whey drips out
     const f = ph(300) % 3;
     px(sc, X + 3, Y + 3, '#a8904e', 3, 2); px(sc, X + 3, Y + 2 + (f === 0 ? 0 : 1), '#8f8b82', 3, 1);
@@ -460,8 +462,8 @@ function drawTerrain() {
     } else if (f.flat) { // storm-flattened grain lying in the mud
       for (let r = 0; r < 4; r++) px(tc, X + (r & 1), Y + r * 2 + 1, '#8f7a3e', 6, 1);
     }
-    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !fp.snow) { // mucked: a few dark flecks of muck in the furrows
-      for (let k = 0; k < 4; k++) { const hh = S.hash(f.x * 7 + k, f.y * 3 + k, 83); px(tc, X + ((hh * 8) | 0), Y + ((((hh * 64) | 0) % 4) * 2) + 1, k & 1 ? '#2e2014' : '#3d2a19'); }
+    if (f.mk && (f.stage === 'fallow' || f.stage === 'harvested') && !fp.snow) { // mucked: a few dark flecks of muck in the furrows (olive rags of weed from the strand)
+      for (let k = 0; k < (f.wk ? 5 : 4); k++) { const hh = S.hash(f.x * 7 + k, f.y * 3 + k, 83); px(tc, X + ((hh * 8) | 0), Y + ((((hh * 64) | 0) % 4) * 2) + 1, f.wk ? (k & 1 ? WEED : WEED_LT) : k & 1 ? '#2e2014' : '#3d2a19', f.wk && k < 2 ? 2 : 1, 1); }
     } else if (f.mk && f.stage === 'planted' && f.growth > 0.15) { // and the shoots on it come up a darker, richer green
       const g = Math.max(1, Math.round(f.growth * 3));
       for (let r = 0; r < 4; r++) px(tc, X + 1 + (r & 1) * 4, Y + r * 2 + 2 - g, f.growth > 0.7 ? '#86ad2e' : '#3f9a3a', 1, g);
@@ -509,6 +511,7 @@ function drawTerrain() {
   drawSpring(pal);
   drawTracks(c, cover);
   drawSnowmen();
+  drawWrack();
   drawWhales();
   drawWrecks();
   // wattle fences: woven hazel on the outer edges of each fenced block, with a stake at every corner
@@ -1152,6 +1155,32 @@ function drawWhales() {
     put(WHALE, (ch, k) => (k < cut + 1 && ch !== 'e' ? ((k & 1) && ch !== 'w' ? '#e2d8c2' : o.rot ? '#6e4a36' : '#9a3a30') : pal[ch]));
   }
 }
+// storm weed heaped along the tide line of the strand by the fields: more clumps the more is lying there
+function wrackTiles() {
+  const R = w.muck && w.muck.wr;
+  if (!R || R.a < 0.5 || !w.shore) return null;
+  const out = [];
+  for (const i of w.shore) { const x = i % S.MAP, y = (i - x) / S.MAP; if ((x - R.x) ** 2 + (y - R.y) ** 2 <= 6.5) out.push([x, y]); }
+  out.sort((a, b) => ((a[0] - R.x) ** 2 + (a[1] - R.y) ** 2) - ((b[0] - R.x) ** 2 + (b[1] - R.y) ** 2) || a[1] - b[1] || a[0] - b[0]);
+  return out.length ? { R, out } : null;
+}
+function drawWrack() {
+  const t = wrackTiles();
+  if (!t) return;
+  const n = Math.min(36, Math.ceil(t.R.a * 3));
+  for (let k = 0; k < n; k++) {
+    const [x, y] = t.out[k % t.out.length], hh = S.hash(x * 5 + k, y * 3 + k, 97);
+    const X = x * TILE + ((hh * 7) | 0), Y = y * TILE + (((hh * 97) | 0) % 7);
+    px(tc, X, Y, k % 3 ? WEED : WEED_LT, k % 4 ? 2 : 1, 1);
+    if (k % 5 === 0) px(tc, X + 1, Y + 1, '#2c3414');
+  }
+}
+function wrackAt(mx, my) {
+  const t = wrackTiles();
+  if (!t) return null;
+  const x = Math.floor(mx), y = Math.floor(my);
+  return t.out.some(([a, b]) => a === x && b === y) ? t.R : null;
+}
 function whaleAt(mx, my) {
   const X = mx * TILE, Y = my * TILE;
   return whaleSpots().reverse().find((s) => X >= s.X && Y >= s.Y && X < s.X + (s.vert ? 5 : 15) && Y < s.Y + (s.vert ? 15 : 5)) || null;
@@ -1755,6 +1784,10 @@ function frame() {
         else { px(sc, X - 1, Y, '#5a3d24', 2, 3); px(sc, X - 1, Y, '#7a5636'); }
       }
       if (p.task && p.task.k === 'muck' && moving) { px(sc, X - 1, Y, WOOD, 2, 3); px(sc, X - 1, Y - 1, '#3d2a19', 2, 1); } // a basket of muck on the back
+      if (p.task && p.task.k === 'wrack' && moving) { // an empty basket down to the strand; back up dripping weed over the rim
+        px(sc, X - 1, Y, WOOD, 2, 3);
+        if (p.task.b) { px(sc, X - 1, Y - 1, WEED, 2, 1); px(sc, X - 2, Y, WEED_LT); if ((now / 400 + p.id) % 2 < 1) px(sc, X - 1, Y + 3, 'rgba(150,190,220,0.6)'); }
+      }
       if (p.task && p.task.k === 'haul') { // the kill slung over a shoulder
         const q = p.task.q, fur = q === 'wolf' ? '#8a8d93' : q === 'deer' ? '#9a6a3c' : q === 'seal' ? '#7d7f82' : '#4d3527';
         px(sc, X - 1, Y - 1, fur, 4, 2); px(sc, X - 2, Y, fur, 1, 1); px(sc, X + 3, Y - 1, q === 'wolf' ? '#b4b7bc' : q === 'deer' ? '#efe6d2' : q === 'seal' ? '#55575b' : '#7a5444', 1, 1);
@@ -1990,6 +2023,10 @@ function frame() {
         ? `<b>Wreck</b><br>the keel and ribs of a plank boat, half sunk in the sand<br><span class="m">washed up ${when(o.t)} · ${o.nm ? `${esc(o.nm)} came in on it` : 'nobody on it lived'}</span>`
         : `<b>Wreck</b><br>split planks of a boat from no shore anyone knows${o.id == null && o.st === 'lie' ? ` · <span class="bad">${o.sex === 'f' ? 'a woman' : 'a man'} lying in the surf</span>` : ''}<br><span class="m">${o.fnd ? `found by ${esc(o.fnd)}` : 'washed up'} ${when(o.at)} · ${o.wood} timber in the planks</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
+    } else if ((best = wrackAt(mx, my))) {
+      const s = S.summary(w), R = best;
+      tip.innerHTML = `<b>Storm weed</b><br>wrack cast up on the strand · ${s.wrackOn ? `enough for ${s.wrackOn} ${s.wrackOn === 1 ? 'field' : 'fields'}` : 'the last of it, rotting'}${s.wracking ? ` · <span class="fest">${s.wracking} carrying it up</span>` : ''}<br><span class="m">${s.wrackYear} ${s.wrackYear === 1 ? 'basket' : 'baskets'} forked into the worn fields this year, ${s.wrackEver} since ${esc(R.nm)} first saw it ${when(R.at)} · it rots if it lies</span>`;
+      tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = whaleAt(mx, my))) {
       const o = best.o, s = S.summary(w);
       tip.innerHTML = best.bone
@@ -2072,7 +2109,7 @@ function frame() {
     } else if ((best = muckAt(mx, my))) {
       const sl = Math.round(S.soilOf(best)), worn = sl < S.SOIL_TIRED;
       tip.innerHTML = best.mk
-        ? `<b>Mucked field</b><br>${best.stage === 'planted' ? 'the grain comes up thick and dark' : best.stage === 'ripe' ? 'heavy ears, ready to cut' : 'forked over with muck from the pen'} · soil ${soilWord(sl)}<br><span class="m">${sl}% of full strength, ${best.mk} put back by the muck</span>`
+        ? `<b>${best.wk ? 'Weeded field' : 'Mucked field'}</b><br>${best.stage === 'planted' ? 'the grain comes up thick and dark' : best.stage === 'ripe' ? 'heavy ears, ready to cut' : best.wk ? 'forked over with storm weed from the strand' : 'forked over with muck from the pen'} · soil ${soilWord(sl)}<br><span class="m">${sl}% of full strength, ${best.mk} put back by the ${best.wk ? 'weed' : 'muck'}</span>`
         : `<b>${worn ? 'Tired field' : 'Field'}</b><br>soil ${worn ? `<span class="bad">${soilWord(sl)}</span>` : soilWord(sl)}${best.stage === 'ripe' || best.stage === 'planted' ? (worn ? ' · the grain stands thin' : '') : ''}<br><span class="m">${sl}% of full strength · each harvest takes some out; muck or a rest puts it back</span>`;
       tip.style.left = mouse.x + 14 + 'px'; tip.style.top = mouse.y + 10 + 'px'; tip.hidden = false;
     } else if ((best = stoolAt(mx, my)) != null) {
@@ -2755,7 +2792,7 @@ function updatePanels() {
     ['wood', 'Timber', s.timber.toLocaleString()],
     ['house', 'Houses', s.roofsDown ? `${s.houses} <span class="m">(${s.roofsDown} roofless)</span>` : s.houses],
     ['field', 'Fields', s.fencing ? `${s.fields} <span class="m">(${s.fenced} fenced${s.hedging ? ` · ${s.hedges} hedged, ${s.hedgesGrown} grown` : ''})</span>` : s.fields],
-    ...(s.muck ? [['muck', 'Muck', `${s.mucking ? `<span class="fest">${s.mucking} forking muck</span> · ` : ''}${s.mucked} <span class="m">${s.mucked === 1 ? 'field' : 'fields'} mucked · heap for ${s.muckHeap} more · soil ${s.soil}%${s.soilTired ? `, ${s.soilTired} tired` : ''} · ${s.muckGrainYear.toLocaleString()} more grain this year, ${s.muckGrain.toLocaleString()} in all</span>`]] : []),
+    ...(s.muck ? [['muck', 'Muck', `${s.mucking ? `<span class="fest">${s.mucking} forking muck</span> · ` : ''}${s.wracking ? `<span class="fest">${s.wracking} carrying storm weed</span> · ` : ''}${s.mucked} <span class="m">${s.mucked === 1 ? 'field' : 'fields'} mucked${s.weeded ? ` (${s.weeded} with weed)` : ''} · heap for ${s.muckHeap} more${s.wrackOn ? `, weed on the strand for ${s.wrackOn}` : ''} · soil ${s.soil}%${s.soilTired ? `, ${s.soilTired} tired` : ''} · ${s.muckGrainYear.toLocaleString()} more grain this year, ${s.muckGrain.toLocaleString()} in all</span>`]] : []),
     ...(s.frosts ? [['frost', 'Frost', `${s.frostBlack ? `<span class="bad">${s.frostBlack} ${s.frostBlack === 1 ? 'field' : 'fields'} frost-black</span> · ` : ''}<span class="m">${s.frosts} late ${s.frosts === 1 ? 'frost' : 'frosts'} · ${s.frostKilled.toLocaleString()} fields killed · last ${when(w.frost.last)}</span>`]] : []),
     ...(s.surges ? [['tide', 'Storm tides', `${s.surgeNow ? '<span class="bad">the sea is over the low ground</span> · ' : ''}${s.saltNow ? `<span class="bad">${s.saltNow} ${s.saltNow === 1 ? 'field' : 'fields'} salted</span> · ` : ''}<span class="m">${s.surges} ${s.surges === 1 ? 'tide' : 'tides'} over the low ground · ${s.saltEver.toLocaleString()} fields drowned${s.surgeBoats ? ` · ${s.surgeBoats} ${s.surgeBoats === 1 ? 'dugout' : 'dugouts'} lost` : ''} · ${s.surgeWood.toLocaleString()} driftwood · last ${when(w.surge.last)}</span>`]] : []),
     ...(s.rusts ? [['rust', 'Rust', `${s.rusted ? `<span class="bad">${s.rusted} ${s.rusted === 1 ? 'field' : 'fields'} rusted</span> · ` : ''}<span class="m">${s.rusts} ${s.rusts === 1 ? 'outbreak' : 'outbreaks'} · ${s.rustEver.toLocaleString()} fields spotted · ~${s.rustGrain.toLocaleString()} grain lost · last ${when(w.rust.last)}</span>`]] : []),
@@ -2928,7 +2965,7 @@ const HARD = [
 // Births and grain count for most; the rest are the island's small riches (sea, hunt, larder, play).
 const GOOD = [
   ['births', (h) => (h.births || 0) + (h.came || 0), (h) => [h.births && pl(h.births, 'child born', 'children born'), h.came && `${pl(h.came, 'newcomer', 'newcomers')} from the far isle`]],
-  ['harvest', (h) => h.harvest || 0, (h) => [h.harvest && `${h.harvest.toLocaleString()} grain harvested`, h.muckGrain && `${h.muckGrain} of it from the muck`, h.smudged && pl(h.smudged, 'field saved from frost', 'fields saved from frost')]],
+  ['harvest', (h) => h.harvest || 0, (h) => [h.harvest && `${h.harvest.toLocaleString()} grain harvested`, h.muckGrain && `${h.muckGrain} of it from the muck`, h.weed && pl(h.weed, 'basket of storm weed carried up', 'baskets of storm weed carried up'), h.smudged && pl(h.smudged, 'field saved from frost', 'fields saved from frost')]],
   ['sea', (h) => (h.deep || 0) + Math.round((h.cockles || 0) / 4), (h) => [h.deep && pl(h.deep, 'fish from the dugout', 'fish from the dugout'), h.cockles && pl(h.cockles, 'cockle', 'cockles')]],
   ['hunt', (h) => h.hunted || 0, (h) => [h.hunted && pl(h.hunted, 'beast brought home', 'beasts brought home')]],
   ['larder', (h) => (h.cheese || 0) + Math.round((h.honey || 0) / 4) + Math.round((h.copse || 0) / 10), (h) => [h.cheese && pl(h.cheese, 'round of cheese', 'rounds of cheese'), h.honey && `${h.honey} honey`, h.copse && `${h.copse} timber from the coppice`]],
